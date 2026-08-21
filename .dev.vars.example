@@ -1,0 +1,4 @@
+# Cloudflare Worker local variables. Keep real values in an untracked .dev.vars file.
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=

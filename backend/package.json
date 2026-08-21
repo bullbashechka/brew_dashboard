@@ -1,0 +1,23 @@
+{
+  "name": "@brew-dashboard/backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "wrangler dev --config ../wrangler.jsonc",
+    "lint": "eslint .",
+    "test:integration": "bun test tests/integration",
+    "test:unit": "bun test tests/unit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@brew-dashboard/contracts": "workspace:*",
+    "@hono/zod-openapi": "^1.0.0",
+    "hono": "^4.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0"
+  }
+}
