@@ -1,5 +1,5 @@
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { healthResponseSchema } from "@brew-dashboard/contracts";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { apiErrorResponseSchema, healthResponseSchema } from "@brew-dashboard/contracts";
 
 export type WorkerBindings = {
   ASSETS?: Fetcher;
@@ -51,11 +51,4 @@ export default {
   fetch: app.fetch,
 };
 
-export const notFoundResponseSchema = z.object({
-  error: z.object({
-    code: z.literal("NOT_FOUND"),
-    fields: z.record(z.string(), z.unknown()),
-    message: z.string(),
-  }),
-  requestId: z.uuid(),
-});
+export const notFoundResponseSchema = apiErrorResponseSchema;

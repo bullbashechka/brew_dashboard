@@ -56,23 +56,23 @@
 
 ### Задачи
 
-- [ ] **S1.1.** В `packages/contracts` определить общий success/error envelope с `requestId`, `data`, `meta`, field errors и кодами ошибок из PRD.
-- [ ] **S1.2.** Описать Zod-контракты login, language, onboarding, profile/session state и фиксированных значений `period`.
-- [ ] **S1.3.** Описать query-контракты `locationId`, period, cursor/page и ответы Overview, Locations, Sales, Products и Inventory.
-- [ ] **S1.4.** Описать mutation-контракты изменения цены, inventory receipt/writeoff, месячной цели, языка, tour state, feedback и reset.
-- [ ] **S1.5.** Описать whitelist product events и отдельную schema metadata для каждого допустимого type; запретить произвольный текст и чувствительные поля.
-- [ ] **S1.6.** Реализовать серверные доменные функции для Revenue, COGS, Gross Profit, Gross Margin, Orders, Average Check, Current Unit Margin и Goal Completion.
-- [ ] **S1.7.** Реализовать периодные границы и comparison: `Today` против вчера до того же локального времени, а остальные периоды — против непосредственно предыдущего окна той же длительности.
-- [ ] **S1.8.** Реализовать stock statuses, stock alerts, sales-drop condition и menu engineering относительно медиан активных товаров.
-- [ ] **S1.9.** Зафиксировать правила `N/A`, исключения cancelled orders, historical price/cost snapshots, UTC storage и группировки в IANA timezone сети.
-- [ ] **S1.10.** Добавить unit tests для формул, zero division, timezone boundaries, comparison, menu matrix, stock statuses, alerts, schemas, generator helpers и event whitelist.
+- [x] **S1.1.** В `packages/contracts` определить общий success/error envelope с `requestId`, `data`, `meta`, field errors и кодами ошибок из PRD.
+- [x] **S1.2.** Описать Zod-контракты login, language, onboarding, profile/session state и фиксированных значений `period`.
+- [x] **S1.3.** Описать query-контракты `locationId`, period, cursor/page и ответы Overview, Locations, Sales, Products и Inventory.
+- [x] **S1.4.** Описать mutation-контракты изменения цены, inventory receipt/writeoff, месячной цели, языка, tour state, feedback и reset.
+- [x] **S1.5.** Описать whitelist product events и отдельную schema metadata для каждого допустимого type; запретить произвольный текст и чувствительные поля.
+- [x] **S1.6.** Реализовать серверные доменные функции для Revenue, COGS, Gross Profit, Gross Margin, Orders, Average Check, Current Unit Margin и Goal Completion.
+- [x] **S1.7.** Реализовать периодные границы и comparison: `Today` против вчера до того же локального времени, а остальные периоды — против непосредственно предыдущего окна той же длительности.
+- [x] **S1.8.** Реализовать stock statuses, stock alerts, sales-drop condition и menu engineering относительно медиан активных товаров.
+- [x] **S1.9.** Зафиксировать правила `N/A`, исключения cancelled orders, historical price/cost snapshots, UTC storage и группировки в IANA timezone сети.
+- [x] **S1.10.** Добавить unit tests для формул, zero division, timezone boundaries, comparison, menu matrix, stock statuses, alerts, schemas, generator helpers и event whitelist.
 
 ### Критерии приёмки
 
-- [ ] React и Hono импортируют схемы и типы из `packages/contracts`, не дублируя DTO.
-- [ ] Неизвестные mutation fields отклоняются, а допустимые значения period/event ограничены контрактом.
-- [ ] Деньги рассчитываются без binary floating-point ошибок, cancelled orders не участвуют в метриках.
-- [ ] Unit tests покрывают положительные, граничные и отрицательные случаи доменных правил.
+- [x] React и Hono импортируют схемы и типы из `packages/contracts`, не дублируя DTO.
+- [x] Неизвестные mutation fields отклоняются, а допустимые значения period/event ограничены контрактом.
+- [x] Деньги рассчитываются без binary floating-point ошибок, cancelled orders не участвуют в метриках.
+- [x] Unit tests покрывают положительные, граничные и отрицательные случаи доменных правил.
 
 ---
 
