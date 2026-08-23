@@ -58,21 +58,34 @@ DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' bun run db:
 ```
 
 `DATABASE_MIGRATION_URL` (or `DATABASE_PUBLIC_URL`) must be an owner/unpooled connection. Before
-the Worker can use Hyperdrive, apply the migrations and provision the separate non-owner role:
+the Worker can use Hyperdrive, apply the migrations and provision the separate non-owner role.
+Set `RUNTIME_DATABASE_PASSWORD` and `DATABASE_MIGRATION_URL` through an interactive prompt or a
+local secret manager, then run:
 
 ```bash
-RUNTIME_DATABASE_PASSWORD='use-a-random-24-character-secret' \
-DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
 bun run --cwd backend db:provision-runtime
 ```
 
 The password is used only by this server-side command and must not be placed in `.dev.vars`, the
-Worker bundle, or source control. The cache-disabled Hyperdrive configuration should use a
-connection string for `brew_runtime`, not the migration owner. After Cloudflare authentication,
-create or inspect the configuration with `bun run --cwd webapp wrangler hyperdrive list` and
-`bun run --cwd webapp wrangler hyperdrive create <name> --connection-string=<runtime-url> --caching-disabled`;
-then put the returned real ID into `wrangler.jsonc` as the `HYPERDRIVE` binding. Do not commit a
-placeholder ID.
+Worker bundle, source control, shell history, process arguments, or logs. The cache-disabled
+Hyperdrive configuration must use a connection string for `brew_runtime`, not the migration owner.
+After Cloudflare authentication, inspect the existing configuration with
+`bun run --cwd webapp wrangler hyperdrive list` and `bun run --cwd webapp wrangler hyperdrive get <id>`;
+create it through the authenticated Cloudflare dashboard or a short-lived local session that does
+not print the connection string. Use `--caching-disabled` when creating or updating the
+configuration. Put only the returned real ID into `wrangler.jsonc` as the `HYPERDRIVE` binding. Do
+not commit a placeholder ID or a connection string.
+
+After the real binding exists, run the temporary, read-only data-plane check with:
+
+```bash
+bun run db:smoke:hyperdrive
+```
+
+The command starts the smoke Worker with `wrangler dev --remote` on loopback, sends a one-time
+token, verifies `SELECT 1`, the `brew_runtime` role, and an empty tenant read without
+`app.network_id`, then terminates the development process. It does not deploy a permanent route or
+create test data. It requires an authenticated Wrangler session and a real `HYPERDRIVE` binding.
 
 The integration runner never touches a remote database. Point it at a local PostgreSQL admin URL;
 it creates a random database, applies every migration, runs the RLS/constraint tests, and drops the

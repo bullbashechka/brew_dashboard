@@ -106,11 +106,25 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
     const identityIndex = await client.query<{ exists: boolean }>(
       `SELECT EXISTS (
          SELECT 1
-         FROM pg_indexes
-         WHERE schemaname = 'auth'
-           AND tablename = 'accounts'
-           AND indexdef LIKE '%"issuer"%'
-           AND indexdef LIKE '%"account_id"%'
+         FROM pg_class index_class
+         JOIN pg_index index_meta ON index_meta.indexrelid = index_class.oid
+         JOIN pg_class table_class ON table_class.oid = index_meta.indrelid
+         JOIN pg_namespace namespace ON namespace.oid = table_class.relnamespace
+         JOIN LATERAL (
+           SELECT array_agg(attribute.attname ORDER BY key.ordinality) AS columns
+           FROM unnest(index_meta.indkey) WITH ORDINALITY AS key(attnum, ordinality)
+           JOIN pg_attribute attribute
+             ON attribute.attrelid = table_class.oid AND attribute.attnum = key.attnum
+         ) index_columns ON true
+         WHERE namespace.nspname = 'auth'
+           AND table_class.relname = 'accounts'
+           AND index_class.relname = 'auth_accounts_issuer_account_id_uidx'
+           AND index_meta.indisunique
+           AND index_meta.indisvalid
+           AND index_meta.indnkeyatts = 2
+           AND index_meta.indexprs IS NULL
+           AND index_meta.indpred IS NULL
+           AND index_columns.columns = ARRAY['issuer', 'account_id']::name[]
        ) AS exists`,
     );
 

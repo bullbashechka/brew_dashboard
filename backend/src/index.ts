@@ -3,7 +3,7 @@ import { apiErrorResponseSchema, healthResponseSchema } from "@brew-dashboard/co
 
 export type WorkerBindings = {
   ASSETS?: Fetcher;
-  HYPERDRIVE?: Hyperdrive;
+  HYPERDRIVE: Hyperdrive;
   BETTER_AUTH_SECRET?: string;
   BETTER_AUTH_URL?: string;
 };
