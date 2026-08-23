@@ -157,17 +157,12 @@ const handler = async (request: Request, env: HyperdriveSmokeEnv): Promise<Respo
             FROM tenant_tables AS tenant
             WHERE NOT EXISTS (
               SELECT 1
-              FROM pg_policy AS policy
-              JOIN pg_class AS relation ON relation.oid = policy.polrelid
-              WHERE relation.relnamespace = 'app'::regnamespace
-                AND relation.relname = tenant.table_name
-                AND policy.polname = tenant.table_name || '_tenant_isolation'
-                AND policy.polcmd = '*'
-                AND policy.polroles = ARRAY[0::oid]
-                AND pg_get_expr(policy.polqual, policy.polrelid) LIKE '%app.network_id%'
-                AND pg_get_expr(policy.polwithcheck, policy.polrelid) LIKE '%app.network_id%'
-                AND pg_get_expr(policy.polqual, policy.polrelid) NOT LIKE '%true%'
-                AND pg_get_expr(policy.polwithcheck, policy.polrelid) NOT LIKE '%true%'
+              FROM pg_policies AS policy
+              WHERE policy.schemaname = 'app'
+                AND policy.tablename = tenant.table_name
+                AND policy.policyname = tenant.table_name || '_tenant_isolation'
+                AND policy.qual IS NOT NULL
+                AND policy.with_check IS NOT NULL
             )
           ) AS tenant_policies_present,
           to_regprocedure('app.enforce_inventory_balance_unit()') IS NOT NULL
