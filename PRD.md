@@ -1,7 +1,7 @@
 # Brew Dashboard — Product Requirements Document
 
-**Версия:** Demo MVP 0.1
-**Дата:** 2026-08-21
+**Версия:** Demo MVP 0.2
+**Дата:** 2026-08-23
 **Статус:** готово к разработке
 **Язык документа:** русский; программные идентификаторы, маршруты, API и сущности БД — английские.
 
@@ -66,7 +66,7 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 ### 3.1. Входит в первую версию
 
 - персональные аккаунты, создаваемые администратором;
-- Supabase Auth без публичной регистрации;
+- Better Auth без публичной регистрации;
 - вход по выданному login alias и паролю;
 - English и Русский, English по умолчанию;
 - onboarding сети из 1–5 точек;
@@ -83,7 +83,7 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 - встроенная форма обратной связи;
 - минимальная аналитика использования демо;
 - responsive desktop и mobile интерфейс;
-- один production Worker и один удалённый Supabase project.
+- один production Worker и один Railway PostgreSQL service.
 
 ### 3.2. Не входит в первую версию
 
@@ -107,12 +107,13 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 - AI, прогнозирование и автоматические рекомендации;
 - казахская локализация;
 - landing page, платежи и подписки;
-- staging, preview deployments и отдельная test database;
-- production SLA, автоматические backup и полноценная observability-платформа.
+- staging, preview deployments и отдельная remote test database;
+- production SLA, point-in-time recovery, off-site backup automation и полноценная
+  observability-платформа.
 
 ## 4. Технологическая основа
 
-Проект использует структуру и инженерные соглашения шаблона `di-sukharev/vibe`, ветка `master`, но адаптируется под Cloudflare и Supabase.
+Проект использует структуру и инженерные соглашения шаблона `di-sukharev/vibe`, ветка `master`, но адаптируется под Cloudflare Workers и Railway PostgreSQL.
 
 ### 4.1. Сохраняемые части шаблона
 
@@ -125,8 +126,8 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 ### 4.2. Удаляемые или заменяемые части шаблона
 
 - `website`/Astro и mobile не входят в active workspace;
-- Prisma и standalone PostgreSQL заменяются Supabase migrations и generated database types;
-- исходная JWT/auth-модель заменяется Supabase Auth;
+- Prisma и старая standalone PostgreSQL-реализация заменяются Railway PostgreSQL, Drizzle schema и versioned SQL migrations;
+- исходная JWT/auth-модель заменяется database-backed sessions Better Auth;
 - email/reset, роли, media storage и background jobs удаляются;
 - Terraform и DigitalOcean/Yandex runbooks заменяются конфигурацией Cloudflare Worker;
 - неиспользуемые зависимости и команды удаляются из workspace и lockfile.
@@ -136,11 +137,14 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 - один Cloudflare Worker обслуживает Hono API под `/api/*` и статическую React/Vite SPA;
 - неизвестные статические маршруты получают SPA fallback на `index.html`;
 - React обращается только к Hono API того же origin;
-- браузер не обращается к Supabase напрямую;
-- Hono использует Supabase publishable key для входа и secret key для административных и бизнес-операций;
-- secret key хранится только в Cloudflare Secrets и никогда не попадает в Vite bundle;
-- Hono проверяет Supabase Auth session и получает `network_id` только из server-side профиля пользователя;
+- браузер не обращается к PostgreSQL напрямую;
+- Hono подключается к Railway PostgreSQL через cache-disabled Cloudflare Hyperdrive binding и Drizzle;
+- Railway `DATABASE_PUBLIC_URL` используется только для создания Hyperdrive configuration, migrations и защищённых admin commands и никогда не попадает в Worker или Vite bundle;
+- Better Auth secret хранится только в Cloudflare Secrets и никогда не попадает в Vite bundle;
+- Hono проверяет database-backed Better Auth session и получает `network_id` только из server-side профиля пользователя;
 - каждый бизнес-запрос явно ограничивается текущим `network_id`;
+- runtime database role не владеет tenant tables и не имеет `BYPASSRLS`; tenant context задаётся через transaction-local `app.network_id`;
+- Drizzle schema является источником database types, а сгенерированные versioned SQL migrations применяются отдельно;
 - Zod-схемы в `packages/contracts` являются источником API-контрактов;
 - время хранится в UTC и показывается в IANA timezone сети.
 
@@ -158,7 +162,7 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 | `/app/inventory` | Остатки, приходы и списания | Сессия |
 | `/app/settings` | Язык, цель, feedback, reset и logout | Сессия |
 
-Корневой маршрут перенаправляет пользователя на `/login`, `/first-run/*` или `/app/overview` по состоянию Supabase Auth и onboarding.
+Корневой маршрут перенаправляет пользователя на `/login`, `/first-run/*` или `/app/overview` по состоянию Better Auth session и onboarding.
 
 Alerts открываются из badge/dropdown в общей шапке и показываются на Overview. Feedback открывается из постоянной кнопки и из Settings.
 
@@ -208,7 +212,7 @@ Alerts открываются из badge/dropdown в общей шапке и п
 
 ### 7.1. Создание аккаунта
 
-Публичной регистрации нет. Администратор запускает локальную защищённую команду против production Supabase:
+Публичной регистрации нет. Администратор запускает локальную защищённую команду против production Railway PostgreSQL через server-only connection string:
 
 ```text
 bun run admin:create-user -- --login <login>
@@ -219,7 +223,7 @@ bun run admin:create-user -- --login <login>
 1. нормализует login и проверяет case-insensitive uniqueness;
 2. проверяет лимит не более 15 активных demo accounts;
 3. генерирует пароль либо принимает его интерактивно;
-4. создаёт Supabase Auth user с подтверждённым внутренним техническим email;
+4. создаёт Better Auth credential user с login alias и внутренним техническим email;
 5. создаёт `app_users` и пустую сеть с незавершённым onboarding;
 6. не создаёт точки и бизнес-данные;
 7. выводит login и пароль один раз;
@@ -229,28 +233,29 @@ bun run admin:create-user -- --login <login>
 
 Отдельные административные команды позволяют сбросить пароль, отключить аккаунт и удалить только явно выбранный demo/e2e account.
 
-### 7.2. Supabase Auth
+### 7.2. Better Auth
 
-- Пароль и его hash хранит только Supabase Auth.
+- Пароль в открытом виде не хранится; password hash находится только в credential account Better Auth.
 - `app_users` не содержит password fields.
 - Технический email не показывается пользователю и не используется для писем.
-- Hono принимает `login` и `password`, находит соответствующего Auth user и выполняет Supabase password sign-in.
+- Hono принимает `login` и `password` и выполняет Better Auth username/password sign-in.
 - Ошибка входа всегда едина и не раскрывает существование login.
-- Rate limits Supabase Auth являются базовой защитой от перебора.
+- Login endpoint имеет server-side rate limit и не полагается на browser state.
 - Публичные signup, email confirmation, recovery и user-facing password change отсутствуют.
+- Ненужные Better Auth routes отключены; браузеру доступен только согласованный Hono auth API.
 
 ### 7.3. Сессия
 
-- Worker хранит Supabase Auth tokens только в `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/` cookies.
-- Refresh выполняется server-side средствами Supabase Auth.
-- Logout отзывает/очищает текущую сессию и cookies.
+- Better Auth хранит opaque session token только в cookie `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`.
+- Сессия хранится в PostgreSQL, продлевается и проверяется server-side; JWT access/refresh tokens не используются.
+- Logout отзывает текущую database session и очищает cookie; reset password/disable account отзывает все сессии пользователя.
 - Mutation-запросы принимаются только как same-origin JSON и проверяют `Origin`.
 - `401` очищает TanStack Query cache и перенаправляет на `/login`.
-- Истёкший `expires_at` блокирует вход независимо от состояния Supabase Auth user.
+- Истёкший `app_users.expires_at` блокирует вход независимо от состояния Better Auth user/session.
 
 ### 7.4. Tenancy
 
-- один Auth user связан ровно с одной сетью;
+- один Better Auth user связан ровно с одной сетью;
 - один аккаунт имеет доступ только к своей сети;
 - `network_id` не принимается из browser request body;
 - Hono получает tenant scope из проверенного `app_users`;
@@ -337,7 +342,7 @@ bun run admin:create-user -- --login <login>
 
 - Reset находится в Settings и требует подтверждения;
 - удаляются и заново создаются products, categories, orders, order items, inventory balances/movements и revenue goal;
-- сохраняются Auth user, login, owner name, network name, country, currency, timezone, language, locations, tour state и feedback;
+- сохраняются Better Auth user/session-independent account data, login, owner name, network name, country, currency, timezone, language, locations, tour state и feedback;
 - новые данные адаптируются к текущим названиям и количеству точек;
 - операция атомарна и идемпотентна;
 - повторная отправка блокируется;
@@ -517,14 +522,14 @@ Currency и timezone после onboarding не редактируются.
 
 Event содержит `user_id`, `network_id`, type, timestamp, optional route и небольшую schema-validated metadata. В metadata запрещены password, cookies, arbitrary form text и feedback contents.
 
-## 13. Схема данных Supabase
+## 13. Схема данных Railway PostgreSQL
 
 ### 13.1. Auth и tenancy
 
 | Таблица | Ключевые поля |
 |---|---|
-| `auth.users` | Supabase-managed internal email, password hash и auth state |
-| `app_users` | `auth_user_id`, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at` |
+| Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry |
+| `app_users` | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at` |
 | `networks` | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at` |
 
 `account_kind`: `demo | e2e`.
@@ -554,11 +559,13 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 - `network_id` индексируется во всех tenant tables;
 - time-series индексы используют `(network_id, occurred_at)` и `(network_id, location_id, occurred_at)`;
 - money: `numeric(14,2)`, quantity: `numeric(14,3)`, timestamps: `timestamptz`;
-- RLS включён на всех public tables без browser-facing разрешающих policies;
-- secret-key операции Hono всегда добавляют server-derived `network_id`;
+- RLS включён на всех tenant business tables без browser-facing разрешающих policies;
+- migrations выполняются owner role, а Hono использует отдельную runtime role без ownership и `BYPASSRLS`;
+- Hono задаёт server-derived `network_id` через `set_config('app.network_id', ..., true)` внутри транзакции; pooled connection не сохраняет tenant context между запросами;
 - связанные UUID проверяются на принадлежность одной сети;
 - browser-supplied `network_id` запрещён;
-- feedback и events доступны только администратору через Supabase dashboard/SQL, отдельного admin UI нет.
+- Better Auth tables находятся в server-only schema и не участвуют в tenant RLS;
+- feedback и events доступны только администратору через Railway database view/SQL client, отдельного admin UI нет.
 
 ## 14. Hono API
 
@@ -703,7 +710,8 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 ### 18.2. Безопасность
 
 - только HTTPS;
-- Supabase secret key доступен только Worker и admin CLI;
+- Railway database credentials доступны только Hyperdrive configuration, migration/admin CLI и локальному isolated test environment;
+- Better Auth secret доступен только Worker и admin CLI;
 - credentials, cookies и tokens не логируются;
 - same-origin deployment и Origin checks для mutations;
 - generic login errors;
@@ -751,7 +759,7 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 - atomic Reset;
 - API error envelope.
 
-Поскольку существует только один удалённый Supabase project, destructive integration/E2E tests разрешены только для аккаунта с `account_kind = 'e2e'`. Runner обязан проверять этот признак до mutation или cleanup и не может перечислять, изменять либо удалять demo accounts.
+Integration tests используют изолированную локальную PostgreSQL database и никогда не production data. Поскольку существует только один удалённый Railway PostgreSQL service, destructive production smoke/E2E операции разрешены только для аккаунта с `account_kind = 'e2e'`. Runner обязан проверять этот признак до mutation или cleanup и не может перечислять, изменять либо удалять demo accounts.
 
 ### 20.3. Component
 
@@ -782,10 +790,11 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 Используется только одно облачное окружение:
 
 - один Cloudflare Worker;
-- один Supabase Free project;
+- один Railway Hobby PostgreSQL service;
+- одна cache-disabled Cloudflare Hyperdrive configuration;
 - бесплатный `*.workers.dev` URL;
-- remote database с первого дня;
-- staging и preview отсутствуют.
+- одна production remote database; integration tests используют только локальную изолированную PostgreSQL;
+- staging, preview и отдельная remote test database отсутствуют.
 
 Cloudflare configuration:
 
@@ -796,7 +805,9 @@ Cloudflare configuration:
 - compatibility date зафиксирована;
 - Observability включён;
 - Cron Triggers отсутствуют;
-- `SUPABASE_URL`, publishable key и secret key находятся в Worker environment/secrets;
+- Hyperdrive создаётся из Railway `DATABASE_PUBLIC_URL`; database credentials не дублируются в Worker variables;
+- `BETTER_AUTH_SECRET` находится в Cloudflare Secrets, а non-secret base URL — в Worker environment;
+- native Railway volume backups выполняются daily и weekly; перед migration доступен manual backup;
 - production migrations применяются вручную до совместимого Worker release.
 
 Release gate:
@@ -823,7 +834,7 @@ Demo MVP готов, когда:
 - feedback и product events сохраняются с tenant scope;
 - два аккаунта не видят и не изменяют данные друг друга;
 - основной путь работает на desktop и mobile;
-- приложение развернуто на `workers.dev` с одним Supabase project;
+- приложение развернуто на `workers.dev` с одним Railway PostgreSQL service и Hyperdrive binding;
 - в UI отсутствуют функции, заявленные как out of scope;
 - можно выдать 15 персональных доступов и оценить достижение цели «три заинтересованных владельца».
 

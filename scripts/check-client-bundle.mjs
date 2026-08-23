@@ -5,6 +5,9 @@ import process from "node:process";
 const root = process.cwd();
 const clientOutput = path.join(root, "webapp", "dist", "client");
 const forbiddenMarkers = [
+  "DATABASE_URL",
+  "DATABASE_PUBLIC_URL",
+  "BETTER_AUTH_SECRET",
   "SUPABASE_SECRET_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "VITE_SUPABASE_SECRET_KEY",

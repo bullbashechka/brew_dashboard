@@ -3,9 +3,9 @@ import { healthResponseSchema } from "@brew-dashboard/contracts";
 
 export type WorkerBindings = {
   ASSETS?: Fetcher;
-  SUPABASE_URL?: string;
-  SUPABASE_PUBLISHABLE_KEY?: string;
-  SUPABASE_SECRET_KEY?: string;
+  HYPERDRIVE?: Hyperdrive;
+  BETTER_AUTH_SECRET?: string;
+  BETTER_AUTH_URL?: string;
 };
 
 const healthRoute = createRoute({

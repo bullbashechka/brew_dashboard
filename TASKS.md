@@ -1,10 +1,10 @@
 # Brew Dashboard — этапы и задачи Demo MVP
 
-**Версия плана:** 0.1
+**Версия плана:** 0.2
 
-**Дата:** 2026-08-21
+**Дата:** 2026-08-23
 
-**Источник требований:** `PRD.md`, Demo MVP 0.1
+**Источник требований:** `PRD.md`, Demo MVP 0.2
 
 ## Как работать с планом
 
@@ -12,7 +12,7 @@
 - `[ ]` — не начато, `[x]` — завершено. Этап закрывается только после выполнения всех его задач и критериев приёмки.
 - Для каждой фичи действует Definition of Done из раздела 23 `PRD.md`: desktop/mobile, нужные состояния интерфейса, RU/EN, общий контракт и серверная валидация, tenant isolation, безопасные логи и соразмерные тесты.
 - Любое изменение общего контракта проверяется одновременно на стороне React и Hono.
-- Применённые Supabase migrations не редактируются: изменения оформляются новой versioned migration.
+- Применённые PostgreSQL migrations не редактируются: изменения Drizzle schema оформляются новой versioned SQL migration.
 - Destructive integration/E2E операции разрешены только для аккаунтов `account_kind = 'e2e'`; runner обязан проверить этот признак до mutation или cleanup.
 - Функции из раздела 3.2 `PRD.md` не реализуются и не должны появляться в UI или API.
 
@@ -34,9 +34,9 @@
 - [x] **S0.2.** Поднять `webapp` на React, TypeScript и Vite; подключить TanStack Router, TanStack Query, TanStack Form, Tailwind CSS, shadcn/ui, Recharts и Playwright.
 - [x] **S0.3.** Поднять `backend` на Hono с Zod/OpenAPI и Cloudflare Workers runtime.
 - [x] **S0.4.** Настроить единый Worker: Hono обслуживает `/api/*`, Vite SPA — статические assets, неизвестные client routes получают `index.html`.
-- [x] **S0.5.** Удалить из active workspace и lockfile неиспользуемые части шаблона: Astro/website, mobile, Prisma, standalone PostgreSQL, старую JWT/auth-модель, email/reset, роли, media storage, background jobs, Terraform и старые cloud runbooks.
+- [x] **S0.5.** Удалить из active workspace и lockfile неиспользуемые части шаблона: Astro/website, mobile, Prisma, старую standalone PostgreSQL-реализацию, старую JWT/auth-модель, email/reset, роли, media storage, background jobs, Terraform и старые cloud runbooks.
 - [x] **S0.6.** Добавить root-команды `dev`, `lint`, `typecheck`, `test`, `test:integration`, `test:e2e` и `build`; каждая команда должна запускать соответствующие workspace-задачи.
-- [x] **S0.7.** Описать локальные переменные окружения без значений секретов; гарантировать, что Supabase secret key не доступен Vite-коду.
+- [x] **S0.7.** Описать локальный environment contract без значений секретов; гарантировать, что database credentials и auth secrets не доступны Vite-коду.
 - [x] **S0.8.** Настроить базовые lint, formatting, TypeScript и test conventions для всех workspace.
 
 ### Критерии приёмки
@@ -76,7 +76,7 @@
 
 ---
 
-## Этап 2. Создать схему Supabase и tenant boundaries
+## Этап 2. Создать схему Railway PostgreSQL и tenant boundaries
 
 **Цель:** подготовить целостную БД, в которой данные каждого аккаунта физически и логически ограничены одной сетью.
 
@@ -84,22 +84,22 @@
 
 ### Задачи
 
-- [ ] **S2.1.** Настроить Supabase CLI/config и каталог versioned migrations.
-- [ ] **S2.2.** Создать `networks` и `app_users` с nullable onboarding-полями, уникальными `login_normalized` и `network_id`, status, `account_kind`, expiry, login/tour timestamps и связью с `auth.users`.
+- [ ] **S2.1.** Создать один Railway Hobby PostgreSQL service с daily/weekly backups и cache-disabled Hyperdrive configuration; привязать `HYPERDRIVE`, затем подключить Drizzle ORM/Kit, создать server-only schema source и каталог `backend/drizzle` для versioned SQL migrations.
+- [ ] **S2.2.** Подготовить server-only Better Auth tables, `networks` и `app_users` с nullable onboarding-полями, уникальными `login_normalized` и `network_id`, status, `account_kind`, expiry, login/tour timestamps и связью с Better Auth user.
 - [ ] **S2.3.** Создать `locations`, `categories`, `products`, `orders`, `order_items`, `inventory_items`, `inventory_balances`, `inventory_movements`, `revenue_targets`, `feedback_responses`, `product_events` и `demo_generations`.
 - [ ] **S2.4.** Применить типы из PRD: UUID, `numeric(14,2)` для money, `numeric(14,3)` для quantity, `timestamptz`, а также необходимые `created_at`/`updated_at`.
 - [ ] **S2.5.** Добавить foreign keys, unique/check constraints и запрет orphan records; проверить принадлежность связанных UUID одной сети на write path.
 - [ ] **S2.6.** Добавить tenant и time-series индексы, включая `network_id`, `(network_id, occurred_at)` и `(network_id, location_id, occurred_at)` там, где они применимы.
-- [ ] **S2.7.** Включить RLS на всех public tables без browser-facing разрешающих policies.
-- [ ] **S2.8.** Сгенерировать database types из миграций и подключить их только на server side.
-- [ ] **S2.9.** Подготовить безопасный migration workflow для единственного remote Supabase project.
+- [ ] **S2.7.** Включить RLS на tenant business tables; создать owner/runtime roles, запретить runtime role ownership/`BYPASSRLS` и задавать transaction-local `app.network_id` только из server session.
+- [ ] **S2.8.** Использовать Drizzle schema как источник server-side database types; проверить соответствие schema и сгенерированных migrations.
+- [ ] **S2.9.** Подготовить безопасный migration workflow для локальной isolated PostgreSQL и единственного production Railway PostgreSQL service; migrations применяются прямым unpooled connection до Worker release.
 
 ### Критерии приёмки
 
 - [ ] Все business tables имеют обязательный `network_id`; soft delete и лишние таблицы отсутствуют.
 - [ ] Прямой browser client не может читать или изменять public tables.
 - [ ] Constraints отвергают отрицательные деньги, некорректные quantities, дубликаты balance/goal/feedback и cross-tenant references.
-- [ ] Чистая БД разворачивается полным набором migrations, а generated types соответствуют схеме.
+- [ ] Чистая БД разворачивается полным набором migrations, а Drizzle-inferred types соответствуют schema source.
 
 ---
 
@@ -111,17 +111,17 @@
 
 ### Задачи
 
-- [ ] **S3.1.** Создать server-side Supabase clients: publishable key для password sign-in и secret key для административных/бизнес-операций.
+- [ ] **S3.1.** Создать request-scoped Drizzle client через cache-disabled Hyperdrive binding и server-side Better Auth instance с PostgreSQL adapter.
 - [ ] **S3.2.** Реализовать `bun run admin:create-user -- --login <login>` с нормализацией, case-insensitive uniqueness, login длиной 3–64 из латинских букв, цифр, `.`, `_`, `-`, password длиной 12–128 и лимитом 15 активных demo accounts.
-- [ ] **S3.3.** В admin command создавать подтверждённый внутренний email, `auth.users`, `app_users` и пустую сеть без точек/business data; выводить пароль один раз без записи в БД, файл, лог или shell history.
+- [ ] **S3.3.** В admin command создавать Better Auth credential user с login alias и внутренним техническим email, `app_users` и пустую сеть без точек/business data; выводить пароль один раз без записи в БД, файл, лог или shell history.
 - [ ] **S3.4.** Добавить защищённые admin commands сброса пароля, отключения аккаунта и удаления только явно указанного demo/e2e account.
-- [ ] **S3.5.** Реализовать `POST /auth/login`, `POST /auth/logout` и `GET /auth/me` с единым generic login error; использовать password sign-in и базовую защиту rate limits Supabase Auth.
-- [ ] **S3.6.** Хранить access/refresh tokens только в cookies `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`; выполнять refresh server-side и очищать cookies при logout/невалидной сессии.
+- [ ] **S3.5.** Реализовать `POST /auth/login`, `POST /auth/logout` и `GET /auth/me` с единым generic login error; использовать Better Auth username/password sign-in, отключить public signup/recovery endpoints и добавить server-side login rate limit.
+- [ ] **S3.6.** Хранить opaque Better Auth session token только в cookie `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`; продлевать и проверять database session server-side, отзывать её при logout/невалидном аккаунте и не использовать JWT access/refresh tokens.
 - [ ] **S3.7.** Проверять status и `expires_at`; обновлять `last_login_at`; не допускать вход отключённого или истёкшего аккаунта.
 - [ ] **S3.8.** Реализовать auth middleware, который получает `network_id` только из проверенного `app_users` и добавляет его ко всем business queries.
 - [ ] **S3.9.** Ограничить JSON body размером 256 KiB; для mutations требовать same-origin JSON и валидный `Origin`.
 - [ ] **S3.10.** Добавить request ID middleware, единый API envelope и безопасное преобразование validation/auth/internal errors.
-- [ ] **S3.11.** Добавить integration tests admin creation, login/logout, refresh/session expiry, status/expiry и базовой tenant isolation минимум между двумя аккаунтами.
+- [ ] **S3.11.** Добавить integration tests admin creation, login/logout, session renewal/expiry, status/expiry и базовой tenant isolation минимум между двумя аккаунтами.
 
 ### Критерии приёмки
 
@@ -357,7 +357,7 @@
 ### Критерии приёмки
 
 - [ ] Все Settings mutations tenant-scoped, idempotent там, где это требуется, и имеют согласованные состояния UI.
-- [ ] Feedback переживает Reset и доступен администратору только через Supabase dashboard/SQL; admin UI отсутствует.
+- [ ] Feedback переживает Reset и доступен администратору только через Railway database view/SQL client; admin UI отсутствует.
 - [ ] Текст feedback и произвольные form values не появляются в events или application logs.
 - [ ] После Reset все аналитические экраны показывают восстановленный детерминированный набор текущей сети.
 
@@ -406,8 +406,8 @@
 ### Задачи
 
 - [ ] **S13.1.** Зафиксировать Cloudflare compatibility date и production config для Worker, assets, SPA fallback, `/api/*` и Observability; не добавлять Cron, staging и preview.
-- [ ] **S13.2.** Создать один Supabase Free project и один `*.workers.dev` deployment.
-- [ ] **S13.3.** Настроить `SUPABASE_URL`, publishable key и secret key через Worker environment/secrets; повторно проверить отсутствие secret key в bundle и git.
+- [ ] **S13.2.** Проверить существующие Railway Hobby PostgreSQL service, daily/weekly backups и cache-disabled Hyperdrive configuration; создать один `*.workers.dev` deployment.
+- [ ] **S13.3.** Привязать `HYPERDRIVE`, сохранить `BETTER_AUTH_SECRET` в Cloudflare Secrets и non-secret base URL в Worker environment; повторно проверить отсутствие database/auth secrets в bundle и git.
 - [ ] **S13.4.** Задокументировать порядок релиза: вручную применить совместимые migrations, затем развернуть Worker.
 - [ ] **S13.5.** Выполнить release gate на чистом worktree: lint, typecheck, unit tests, production build и `bun audit`.
 - [ ] **S13.6.** Выполнить smoke checks `/api/v1/health`, login, Overview и feedback на отдельном e2e account.
@@ -419,7 +419,7 @@
 
 ### Критерии приёмки
 
-- [ ] Production работает на одном Worker и одном Supabase project; staging/preview/test database отсутствуют.
+- [ ] Production работает на одном Worker, одном Railway PostgreSQL service и одной Hyperdrive configuration; staging/preview/remote test database отсутствуют.
 - [ ] Миграции применены до совместимой версии Worker, health и критические smoke checks зелёные.
 - [ ] Можно безопасно создать и выдать 15 независимых demo accounts без хранения открытых паролей.
 - [ ] Все критерии готовности Demo MVP из PRD подтверждены фактическим UI/API/E2E сигналом.
@@ -439,7 +439,7 @@
 | 10. Метрики | Этапы 1 и 5 |
 | 11. Функциональные разделы | Этапы 8–11 |
 | 12. Feedback и product events | Этап 11 |
-| 13. Supabase schema | Этап 2 |
+| 13. Railway PostgreSQL schema | Этап 2 |
 | 14–15. Hono API, validation и atomicity | Этапы 1, 3–5 и 9–11 |
 | 16. Локализация и visual system | Этап 6 |
 | 17. Responsive и accessibility | Этапы 6–12 |

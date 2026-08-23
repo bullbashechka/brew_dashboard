@@ -23,9 +23,9 @@ Once implementation exists, current code, schemas, tests, and runtime output des
 The target Bun workspace is a monorepo with:
 
 - `webapp/` — React, TypeScript, Vite, TanStack, Tailwind, shadcn/ui, and Recharts.
-- `backend/` — Hono API deployed with the web app on Cloudflare Workers.
+- `backend/` — Hono API deployed with the web app on Cloudflare Workers; server-only Drizzle schema and database access live here.
 - `packages/contracts/` — shared Zod schemas and request/response types.
-- `supabase/migrations/` — versioned SQL migrations; never edit an applied migration.
+- `backend/drizzle/` — generated versioned PostgreSQL migrations; never edit an applied migration.
 
 Place static assets under `webapp/public/`. Keep unit and component tests near their modules and Playwright journeys in a dedicated E2E directory.
 
@@ -58,14 +58,14 @@ Place static assets under `webapp/public/`. Keep unit and component tests near t
 
 ## Build, Test, and Development Commands
 
-No package scripts exist yet. After scaffolding, expose these commands from the repository root:
+The repository exposes these commands from the root:
 
 - `bun install` — install workspace dependencies.
 - `bun run dev` — start the web app and Worker locally.
 - `bun run lint` — check source style and common errors.
 - `bun run typecheck` — validate all TypeScript workspaces.
 - `bun run test` — run unit and component tests.
-- `bun run test:integration` — test APIs against local Supabase.
+- `bun run test:integration` — test APIs against isolated local PostgreSQL fixtures.
 - `bun run test:e2e` — run Playwright user journeys.
 - `bun run build` — produce the Worker and static application bundle.
 
@@ -84,7 +84,7 @@ Only document and run commands that are defined in the root `package.json`, exce
 
 - Name unit and component tests `*.test.ts(x)` and Playwright tests `*.spec.ts`.
 - Cover financial calculations, timezone boundaries, validation, tenant isolation, authentication, ledger reversals, and responsive critical paths. Add negative cases for permission, tenant, contract, and validation boundaries.
-- Integration tests use local Supabase fixtures and never production data.
+- Integration tests use isolated local PostgreSQL fixtures and never Railway production data.
 - Run the smallest meaningful validation covering the changed surface. Prefer targeted tests, then typecheck, lint, build, and wider suites as risk requires.
 - Treat non-zero exits, runtime errors, unhandled rejections, failed assertions, type errors, lint errors, build failures, and timeouts as failed validation.
 - Do not declare success from proxy metrics alone. A green lint, typecheck, or unit suite does not prove the task complete if the primary user-visible or runtime signal remains broken.
@@ -101,10 +101,10 @@ Only document and run commands that are defined in the root `package.json`, exce
 ## Security, Data & Workspace Hygiene
 
 - Never commit credentials or local environment files, or expose secrets, tokens, private keys, cookies, customer data, or raw `.env` values in responses, logs, fixtures, tests, documentation, or screenshots.
-- Keep Supabase secret keys and the authentication pepper server-side in Cloudflare Secrets. Never include them in the Vite client bundle.
+- Keep Railway connection strings out of Worker variables: production Worker database access uses a cache-disabled Hyperdrive binding. Keep `BETTER_AUTH_SECRET` server-side in Cloudflare Secrets and never include database/auth secrets in the Vite client bundle.
 - Derive tenant scope from the verified session. Never trust or accept client-supplied `network_id`; verify that related UUIDs belong to the same tenant.
 - Do not weaken authentication, authorization, validation, encryption, rate limits, tenant isolation, or auditability to make a task easier.
-- Use versioned Supabase SQL migrations. Never edit an applied migration; add a new migration and validate affected read paths, write paths, constraints, functions, and generated database types.
+- Use Drizzle schema source and generated versioned PostgreSQL migrations. Never edit an applied migration; add a new migration and validate affected read paths, write paths, constraints, functions, RLS policies, and Drizzle-inferred database types.
 - Keep temporary investigation artifacts under `./.scratch/` or a tool-owned artifact directory rather than the repository root.
 - Do not stop unrelated processes to free ports; use isolated ports or local configuration overrides.
 - Do not stage, commit, amend, rebase, reset, stash, push, delete files, or add hosted automation unless explicitly requested.

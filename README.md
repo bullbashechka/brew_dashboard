@@ -31,9 +31,17 @@ is served by the Worker, `/api/*` stays on the Worker path, and unknown browser 
 fallback. Playwright needs its local browser installed once with `bunx playwright install chromium`.
 
 Local Worker variables are documented in [.dev.vars.example](.dev.vars.example); keep real values
-in the ignored `.dev.vars` file. Supabase keys are reserved for the server-side Worker and are not
-available to Vite code or client bundles.
+in the ignored `.dev.vars` file. The target persistence path is a cache-disabled Cloudflare
+Hyperdrive binding backed by Railway PostgreSQL. Railway's `DATABASE_PUBLIC_URL` is used only to
+create that binding and by local migration/admin commands; it is never a Vite variable or Worker
+environment value. `BETTER_AUTH_SECRET` remains server-only.
+
+For local Hyperdrive development, provide
+`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in the shell environment rather than
+committing a connection string. The actual `HYPERDRIVE` binding ID is added to `wrangler.jsonc`
+in S2.1, only after the Cloudflare configuration exists.
 
 The repository intentionally contains only the active `webapp`, `backend` and
-`packages/contracts` workspaces. Product screens, Supabase persistence, authentication and domain
-contracts are introduced by later stages in `TASKS.md`.
+`packages/contracts` workspaces. Product screens, Railway/Drizzle persistence, Better Auth and
+domain contracts are introduced by later stages in `TASKS.md`; only their foundation environment
+and Worker binding contracts are reserved now.
