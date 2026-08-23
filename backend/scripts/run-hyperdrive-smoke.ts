@@ -18,8 +18,14 @@ export type HyperdriveSmokePayload = {
   ok: boolean;
   queryOk: boolean;
   runtimeRole: boolean;
+  runtimeRoleSafe: boolean;
+  runtimeGrantsValid: boolean;
   tenantContextUnset: boolean;
   tenantRowsHidden: boolean;
+  tenantTablesRlsEnabled: boolean;
+  runtimeOwnsNoTenantTables: boolean;
+  tenantPoliciesPresent: boolean;
+  migrationHeadApplied: boolean;
 };
 
 type RootWranglerConfig = {
@@ -50,12 +56,19 @@ export const isValidSmokePayload = (payload: unknown): payload is HyperdriveSmok
   const candidate = payload as Partial<HyperdriveSmokePayload>;
   const keys = Object.keys(candidate).sort().join(",");
   return (
-    keys === "ok,queryOk,runtimeRole,tenantContextUnset,tenantRowsHidden" &&
+    keys ===
+      "migrationHeadApplied,ok,queryOk,runtimeGrantsValid,runtimeOwnsNoTenantTables,runtimeRole,runtimeRoleSafe,tenantContextUnset,tenantPoliciesPresent,tenantRowsHidden,tenantTablesRlsEnabled" &&
     candidate.ok === true &&
     candidate.queryOk === true &&
     candidate.runtimeRole === true &&
+    candidate.runtimeRoleSafe === true &&
+    candidate.runtimeGrantsValid === true &&
     candidate.tenantContextUnset === true &&
-    candidate.tenantRowsHidden === true
+    candidate.tenantRowsHidden === true &&
+    candidate.tenantTablesRlsEnabled === true &&
+    candidate.runtimeOwnsNoTenantTables === true &&
+    candidate.tenantPoliciesPresent === true &&
+    candidate.migrationHeadApplied === true
   );
 };
 
@@ -252,7 +265,15 @@ const run = async () => {
     const payload: unknown = await response.json().catch(() => undefined);
 
     if (response.status !== 200 || !isValidSmokePayload(payload)) {
-      throw new Error("Hyperdrive smoke did not satisfy the runtime tenant checks");
+      const safeResult =
+        payload && typeof payload === "object"
+          ? Object.fromEntries(
+              Object.entries(payload).filter(([, value]) => typeof value === "boolean"),
+            )
+          : undefined;
+      throw new Error(
+        `Hyperdrive smoke did not satisfy the runtime tenant checks: ${JSON.stringify(safeResult)}`,
+      );
     }
 
     console.log("Hyperdrive smoke passed: runtime role and tenant isolation checks are valid.");

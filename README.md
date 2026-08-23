@@ -38,13 +38,13 @@ environment value. `BETTER_AUTH_SECRET` remains server-only.
 
 For local Hyperdrive development, provide
 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in the shell environment rather than
-committing a connection string. The actual `HYPERDRIVE` binding ID is added to `wrangler.jsonc`
-in S2.1, only after the Cloudflare configuration exists.
+committing a connection string. The production `HYPERDRIVE` binding is configured in
+`wrangler.jsonc`; runtime database integration begins in S3.1.
 
 The repository intentionally contains only the active `webapp`, `backend` and
 `packages/contracts` workspaces. Product screens and API flows are introduced by later stages in
-`TASKS.md`; Stage 2 now contains the server-only Railway/Drizzle persistence foundation, while the
-Worker binding remains intentionally unbound until the real Cloudflare configuration exists.
+`TASKS.md`; Stage 2 contains the server-only Railway/Drizzle persistence foundation, and S3.1
+connects the existing Hyperdrive binding to request-scoped database access.
 
 ## Database workflow (Stage 2)
 
@@ -95,7 +95,7 @@ database in a `finally` block:
 DATABASE_TEST_ADMIN_URL='postgresql://localhost/postgres' bun run test:integration
 ```
 
-Production release order is: take/verify the Railway backup, apply migrations with the unpooled
-owner URL, smoke-test the database and API, then deploy the Worker. Railway daily/weekly backup
-schedules and the real Hyperdrive binding remain environment configuration rather than checked-in
-secrets.
+Production release order is: apply migrations with the unpooled owner URL, smoke-test the database
+and API, then deploy the Worker. Backups and disaster-recovery automation are out of scope for the
+Demo MVP on Railway Hobby; the real Hyperdrive binding remains environment configuration rather
+than a checked-in secret.

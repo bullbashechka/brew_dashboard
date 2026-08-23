@@ -807,8 +807,10 @@ Cloudflare configuration:
 - Cron Triggers отсутствуют;
 - Hyperdrive создаётся из Railway `DATABASE_PUBLIC_URL`; database credentials не дублируются в Worker variables;
 - `BETTER_AUTH_SECRET` находится в Cloudflare Secrets, а non-secret base URL — в Worker environment;
-- native Railway volume backups выполняются daily и weekly; перед migration доступен manual backup;
 - production migrations применяются вручную до совместимого Worker release.
+
+Railway-native backups, point-in-time recovery и иная disaster-recovery автоматизация находятся
+за пределами Demo MVP и не являются release prerequisite для Hobby-плана.
 
 Release gate:
 

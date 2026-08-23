@@ -84,7 +84,7 @@
 
 ### Задачи
 
-- [ ] **S2.1.** Создать один Railway Hobby PostgreSQL service с daily/weekly backups и cache-disabled Hyperdrive configuration; привязать `HYPERDRIVE`, затем подключить Drizzle ORM/Kit, создать server-only schema source и каталог `backend/drizzle` для versioned SQL migrations.
+- [x] **S2.1.** Создать один Railway Hobby PostgreSQL service и cache-disabled Hyperdrive configuration; привязать `HYPERDRIVE`, затем подключить Drizzle ORM/Kit, создать server-only schema source и каталог `backend/drizzle` для versioned SQL migrations.
 - [x] **S2.2.** Подготовить server-only Better Auth tables, `networks` и `app_users` с nullable onboarding-полями, уникальными `login_normalized` и `network_id`, status, `account_kind`, expiry, login/tour timestamps и связью с Better Auth user.
 - [x] **S2.3.** Создать `locations`, `categories`, `products`, `orders`, `order_items`, `inventory_items`, `inventory_balances`, `inventory_movements`, `revenue_targets`, `feedback_responses`, `product_events` и `demo_generations`.
 - [x] **S2.4.** Применить UUID, `timestamptz` и exact-scale `numeric` для money/quantity: money ограничены диапазоном `numeric(14,2)`, quantity — `numeric(14,3)`, но scale проверяется constraint до записи, чтобы PostgreSQL не выполнял silent rounding; также добавить необходимые `created_at`/`updated_at`.
@@ -129,13 +129,11 @@ Onboarding показывает review перед генерацией; при �
 отключаются, формы сохраняют введённые значения. Demo-stale banner не сбрасывает данные
 автоматически. Product analytics best-effort и не откатывает пользовательское действие.
 Feedback хранится одной текущей строкой, переживает Reset, а удаление аккаунта удаляет его.
-Backups — только disaster recovery всей БД; per-account restore не предусматривается.
+Backups, disaster recovery и per-account restore находятся за пределами MVP.
 
-S2.1 остаётся единственным инфраструктурным хвостом этой фиксации: для создания Railway service,
-backup schedules и Hyperdrive нужен авторизованный Railway/Cloudflare context. В репозитории уже
-есть команды миграции, runtime-role provisioning и безопасный локальный runner; после появления
-доступа нужно создать cache-disabled Hyperdrive на `brew_runtime`, добавить реальный binding ID в
-`wrangler.jsonc`, выполнить backup/migration smoke-check и только затем закрыть S2.1.
+S2.1 завершён: миграции применены к единственному Railway PostgreSQL service, роль `brew_runtime`
+подключена через cache-disabled Hyperdrive, а binding добавлен в `wrangler.jsonc`. Railway-native
+backup schedules не являются частью MVP и не требуются для закрытия этапа.
 
 ---
 
@@ -442,8 +440,8 @@ backup schedules и Hyperdrive нужен авторизованный Railway/C
 ### Задачи
 
 - [ ] **S13.1.** Зафиксировать Cloudflare compatibility date и production config для Worker, assets, SPA fallback, `/api/*` и Observability; не добавлять Cron, staging и preview.
-- [ ] **S13.2.** Проверить существующие Railway Hobby PostgreSQL service, daily/weekly backups и cache-disabled Hyperdrive configuration; создать один `*.workers.dev` deployment.
-- [ ] **S13.3.** Привязать `HYPERDRIVE`, сохранить `BETTER_AUTH_SECRET` в Cloudflare Secrets и non-secret base URL в Worker environment; повторно проверить отсутствие database/auth secrets в bundle и git.
+- [ ] **S13.2.** Проверить существующие Railway Hobby PostgreSQL service и cache-disabled Hyperdrive configuration; создать один `*.workers.dev` deployment.
+- [ ] **S13.3.** Проверить существующий `HYPERDRIVE` binding, сохранить `BETTER_AUTH_SECRET` в Cloudflare Secrets и non-secret base URL в Worker environment; повторно проверить отсутствие database/auth secrets в bundle и git.
 - [ ] **S13.4.** Задокументировать порядок релиза: вручную применить совместимые migrations, затем развернуть Worker.
 - [ ] **S13.5.** Выполнить release gate на чистом worktree: lint, typecheck, unit tests, production build и `bun audit`.
 - [ ] **S13.6.** Выполнить smoke checks `/api/v1/health`, login, Overview и feedback на отдельном e2e account.

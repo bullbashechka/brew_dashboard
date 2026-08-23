@@ -9,5 +9,10 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"],
   },
-  // The HYPERDRIVE binding is added in S2.1 after its real Cloudflare configuration exists.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0fa9081629d645a8945914bdc517a194",
+    },
+  ],
 }
