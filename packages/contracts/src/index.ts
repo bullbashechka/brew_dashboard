@@ -20,6 +20,27 @@ const isIsoRegion = (value: string): boolean => {
 const isIsoCurrency = (value: string): boolean =>
   /^[A-Z]{3}$/.test(value) && Intl.supportedValuesOf("currency").includes(value);
 
+const invisibleControlPattern =
+  /[\p{Cc}\u061c\u200b\u200e\u200f\u2060\u202a-\u202e\u2066-\u2069\ufeff]/u;
+
+export const normalizeDisplayName = (value: string): string =>
+  value
+    .normalize("NFC")
+    .replace(/\p{White_Space}+/gu, " ")
+    .trim();
+
+export const normalizedNameKey = (value: string): string =>
+  normalizeDisplayName(value).normalize("NFKC").toLowerCase();
+
+const displayNameSchema = z
+  .string()
+  .refine((value) => !invisibleControlPattern.test(value), "Name contains an unsupported character")
+  .refine((value) => normalizeDisplayName(value).length >= 2, "Name must be at least 2 characters")
+  .refine(
+    (value) => normalizeDisplayName(value).length <= 80,
+    "Name must be at most 80 characters",
+  );
+
 const moneyPattern = /^-?(?:0|[1-9]\d{0,11})\.\d{2}$/;
 const nonNegativeMoneyPattern = /^(?:0|[1-9]\d{0,11})\.\d{2}$/;
 const percentagePattern = /^-?(?:0|[1-9]\d{0,6})\.\d{2}$/;
@@ -70,6 +91,8 @@ export const currencyCodeSchema = z
   .string()
   .refine(isIsoCurrency, "Expected an ISO 4217 currency code");
 export const timeZoneSchema = z.string().refine(isValidTimeZone, "Expected an IANA timezone");
+export const versionSchema = z.number().int().positive();
+export const idempotencyKeySchema = uuidSchema;
 
 export const apiErrorCodeSchema = z.enum([
   "VALIDATION_ERROR",
@@ -133,24 +156,26 @@ export const loginRequestSchema = z.strictObject({
 
 export const languageRequestSchema = z.strictObject({
   language: languageSchema,
+  idempotencyKey: idempotencyKeySchema,
 });
 
 export const locationInputSchema = z.strictObject({
-  name: z.string().trim().min(2).max(80),
+  name: displayNameSchema,
 });
 export const onboardingRequestSchema = z
   .strictObject({
-    networkName: z.string().trim().min(2).max(80),
-    ownerName: z.string().trim().min(2).max(80),
+    networkName: displayNameSchema,
+    ownerName: displayNameSchema,
     locations: z.array(locationInputSchema).min(1).max(5),
     country: countryCodeSchema,
     currency: currencyCodeSchema,
     timeZone: timeZoneSchema,
+    idempotencyKey: idempotencyKeySchema,
   })
   .superRefine(({ locations }, context) => {
     const names = new Set<string>();
     for (const [index, location] of locations.entries()) {
-      const key = location.name.toLowerCase();
+      const key = normalizedNameKey(location.name);
       if (names.has(key)) {
         context.addIssue({
           code: "custom",
@@ -262,6 +287,7 @@ export const goalSchema = z.strictObject({
   month: z.string().regex(/^\d{4}-\d{2}$/),
   revenue: moneySchema,
   target: nonNegativeMoneySchema,
+  version: versionSchema,
   completionPercent: percentageSchema.nullable(),
 });
 
@@ -367,7 +393,7 @@ export const inventoryBalanceSchema = z.strictObject({
   productName: z.string(),
   locationId: uuidSchema,
   locationName: z.string(),
-  unit: z.string(),
+  unit: z.enum(["pcs", "kg", "l"]),
   onHand: quantitySchema,
   minThreshold: quantitySchema,
   status: stockStatusSchema,
@@ -400,6 +426,7 @@ export const productAnalyticsSchema = z.strictObject({
   categoryName: z.string(),
   currentPrice: nonNegativeMoneySchema,
   currentUnitCost: nonNegativeMoneySchema,
+  version: versionSchema,
   unitsSold: quantitySchema,
   revenue: moneySchema,
   grossProfit: moneySchema,
@@ -441,25 +468,35 @@ export const inventoryResponseSchema = createSuccessEnvelopeSchema(
 
 export const priceMutationSchema = z.strictObject({
   price: nonNegativeMoneySchema,
+  expectedVersion: versionSchema,
+  idempotencyKey: idempotencyKeySchema,
 });
 export const inventoryMovementMutationSchema = z.strictObject({
   inventoryItemId: uuidSchema,
   locationId: uuidSchema,
   type: movementTypeSchema,
   quantity: positiveQuantitySchema,
+  idempotencyKey: idempotencyKeySchema,
 });
 export const revenueGoalMutationSchema = z.strictObject({
   monthlyGoal: nonNegativeMoneySchema,
+  expectedVersion: versionSchema.nullable(),
+  idempotencyKey: idempotencyKeySchema,
 });
 export const tourMutationSchema = z.strictObject({
   state: tourStateSchema,
+  idempotencyKey: idempotencyKeySchema,
 });
 export const feedbackMutationSchema = z.strictObject({
   rating: z.number().int().min(1).max(5),
   comment: z.string().max(2000).optional().default(""),
   desiredFeatures: z.string().min(1).max(2000),
+  expectedVersion: versionSchema.nullable(),
+  idempotencyKey: idempotencyKeySchema,
 });
-export const resetMutationSchema = z.strictObject({});
+export const resetMutationSchema = z.strictObject({
+  idempotencyKey: idempotencyKeySchema,
+});
 
 export const productEventMetadataSchemas = {
   login_succeeded: z.strictObject({}),
@@ -495,46 +532,55 @@ export const productEventTypeSchema = z.enum([
 
 export const productEventRequestSchema = z.discriminatedUnion("type", [
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("login_succeeded"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.login_succeeded,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("onboarding_completed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.onboarding_completed,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("section_viewed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.section_viewed,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("filter_changed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.filter_changed,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("product_price_changed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.product_price_changed,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("inventory_movement_created"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.inventory_movement_created,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("revenue_goal_changed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.revenue_goal_changed,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("demo_reset"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.demo_reset,
   }),
   z.strictObject({
+    eventId: uuidSchema,
     type: z.literal("feedback_submitted"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.feedback_submitted,
@@ -557,6 +603,8 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type OnboardingRequest = z.infer<typeof onboardingRequestSchema>;
+export type CurrencyCode = z.infer<typeof currencyCodeSchema>;
+export type InventoryUnit = z.infer<typeof inventoryBalanceSchema>["unit"];
 export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>;
 export type FinancialKpis = z.infer<typeof financialKpisSchema>;
 export type OverviewData = z.infer<typeof overviewDataSchema>;

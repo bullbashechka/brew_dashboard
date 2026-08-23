@@ -85,21 +85,57 @@
 ### Задачи
 
 - [ ] **S2.1.** Создать один Railway Hobby PostgreSQL service с daily/weekly backups и cache-disabled Hyperdrive configuration; привязать `HYPERDRIVE`, затем подключить Drizzle ORM/Kit, создать server-only schema source и каталог `backend/drizzle` для versioned SQL migrations.
-- [ ] **S2.2.** Подготовить server-only Better Auth tables, `networks` и `app_users` с nullable onboarding-полями, уникальными `login_normalized` и `network_id`, status, `account_kind`, expiry, login/tour timestamps и связью с Better Auth user.
-- [ ] **S2.3.** Создать `locations`, `categories`, `products`, `orders`, `order_items`, `inventory_items`, `inventory_balances`, `inventory_movements`, `revenue_targets`, `feedback_responses`, `product_events` и `demo_generations`.
-- [ ] **S2.4.** Применить типы из PRD: UUID, `numeric(14,2)` для money, `numeric(14,3)` для quantity, `timestamptz`, а также необходимые `created_at`/`updated_at`.
-- [ ] **S2.5.** Добавить foreign keys, unique/check constraints и запрет orphan records; проверить принадлежность связанных UUID одной сети на write path.
-- [ ] **S2.6.** Добавить tenant и time-series индексы, включая `network_id`, `(network_id, occurred_at)` и `(network_id, location_id, occurred_at)` там, где они применимы.
-- [ ] **S2.7.** Включить RLS на tenant business tables; создать owner/runtime roles, запретить runtime role ownership/`BYPASSRLS` и задавать transaction-local `app.network_id` только из server session.
-- [ ] **S2.8.** Использовать Drizzle schema как источник server-side database types; проверить соответствие schema и сгенерированных migrations.
-- [ ] **S2.9.** Подготовить безопасный migration workflow для локальной isolated PostgreSQL и единственного production Railway PostgreSQL service; migrations применяются прямым unpooled connection до Worker release.
+- [x] **S2.2.** Подготовить server-only Better Auth tables, `networks` и `app_users` с nullable onboarding-полями, уникальными `login_normalized` и `network_id`, status, `account_kind`, expiry, login/tour timestamps и связью с Better Auth user.
+- [x] **S2.3.** Создать `locations`, `categories`, `products`, `orders`, `order_items`, `inventory_items`, `inventory_balances`, `inventory_movements`, `revenue_targets`, `feedback_responses`, `product_events` и `demo_generations`.
+- [x] **S2.4.** Применить UUID, `timestamptz` и exact-scale `numeric` для money/quantity: money ограничены диапазоном `numeric(14,2)`, quantity — `numeric(14,3)`, но scale проверяется constraint до записи, чтобы PostgreSQL не выполнял silent rounding; также добавить необходимые `created_at`/`updated_at`.
+- [x] **S2.5.** Добавить foreign keys, unique/check constraints и запрет orphan records; проверить принадлежность связанных UUID одной сети на write path.
+- [x] **S2.6.** Добавить tenant и time-series индексы, включая `network_id`, `(network_id, occurred_at)` и `(network_id, location_id, occurred_at)` там, где они применимы.
+- [x] **S2.7.** Включить RLS на tenant business tables; создать owner/runtime roles, запретить runtime role ownership/`BYPASSRLS` и задавать transaction-local `app.network_id` только из server session.
+- [x] **S2.8.** Использовать Drizzle schema как источник server-side database types; проверить соответствие schema и сгенерированных migrations.
+- [x] **S2.9.** Подготовить безопасный migration workflow для локальной isolated PostgreSQL и единственного production Railway PostgreSQL service; migrations применяются прямым unpooled connection до Worker release.
 
 ### Критерии приёмки
 
-- [ ] Все business tables имеют обязательный `network_id`; soft delete и лишние таблицы отсутствуют.
-- [ ] Прямой browser client не может читать или изменять public tables.
-- [ ] Constraints отвергают отрицательные деньги, некорректные quantities, дубликаты balance/goal/feedback и cross-tenant references.
-- [ ] Чистая БД разворачивается полным набором migrations, а Drizzle-inferred types соответствуют schema source.
+- [x] Все business tables имеют обязательный `network_id`; soft delete и лишние таблицы отсутствуют.
+- [x] Прямой browser client не может читать или изменять public tables.
+- [x] Constraints отвергают отрицательные деньги, некорректные quantities, дубликаты balance/goal/feedback и cross-tenant references.
+- [x] Чистая БД разворачивается полным набором migrations, а Drizzle-inferred types соответствуют schema source.
+
+### Фиксация решений для следующих этапов
+
+Схема и будущие API/UI должны сохранять следующие продуктовые решения: имена точек нормализуются
+для поиска дублей (trim, схлопывание пробелов, без изменения отображаемого текста); disabled и
+expired accounts сохраняют данные и не занимают активный лимит, а hard delete аккаунта удаляет все
+его данные только после явного подтверждения; конкурентные price/goal/feedback/inventory mutations
+проверяют `version` или блокировку баланса и возвращают конфликт, не перетирая ввод пользователя;
+все mutations получают UUID idempotency key и повтор запроса не создаёт вторую операцию.
+
+Месяц цели вычисляется в зафиксированной IANA timezone сети; новый месяц без цели показывает
+`goal not set`, а zero goal удаляет текущую цель. Reset атомарен, выигрывает у stale mutation,
+показывает пользователю список сбрасываемых/сохраняемых данных и использует pinned generator
+version сети. Country только предлагает currency и timezone, ручной выбор не перезаписывается;
+после завершения onboarding сеть и точки не редактируются в MVP. Для `pcs` разрешены только целые
+количества, для `kg`/`l` — до трёх знаков; деньги — до двух знаков, без silent rounding. Zero price
+допустим после отдельного предупреждения и не меняет исторические продажи.
+
+Onboarding показывает review перед генерацией; при двух вкладках побеждает первый завершивший,
+а вторая вкладка переходит в Overview. Невалидный или чужой `location` в URL безопасно откатывается
+на All locations с предупреждением. Expiry во время активной сессии обрабатывается на следующем
+запросе как `401` с очисткой кэша; реактивация при 15 активных аккаунтах блокируется и не выключает
+другой аккаунт. Version conflicts в UI предлагают reload или explicit overwrite, а введённое
+значение сохраняется до выбора пользователя.
+
+При outage reads отдают последний успешный snapshot с timestamp и persistent banner, mutations
+отключаются, формы сохраняют введённые значения. Demo-stale banner не сбрасывает данные
+автоматически. Product analytics best-effort и не откатывает пользовательское действие.
+Feedback хранится одной текущей строкой, переживает Reset, а удаление аккаунта удаляет его.
+Backups — только disaster recovery всей БД; per-account restore не предусматривается.
+
+S2.1 остаётся единственным инфраструктурным хвостом этой фиксации: для создания Railway service,
+backup schedules и Hyperdrive нужен авторизованный Railway/Cloudflare context. В репозитории уже
+есть команды миграции, runtime-role provisioning и безопасный локальный runner; после появления
+доступа нужно создать cache-disabled Hyperdrive на `brew_runtime`, добавить реальный binding ID в
+`wrangler.jsonc`, выполнить backup/migration smoke-check и только затем закрыть S2.1.
 
 ---
 
@@ -428,24 +464,24 @@
 
 ## Матрица покрытия PRD
 
-| Раздел PRD | Этапы |
-|---|---|
-| 1–3. Назначение, сценарий и границы MVP | Сквозной критерий, все этапы, финальный out-of-scope audit S13.8 |
-| 4. Технологическая основа | Этап 0 |
-| 5–6. Информационная архитектура и общий интерфейс | Этапы 6–11 |
-| 7. Авторизация и аккаунты | Этап 3 |
-| 8. Первый вход и onboarding | Этапы 4 и 7 |
-| 9. Демо-данные и Reset | Этапы 4 и 11 |
-| 10. Метрики | Этапы 1 и 5 |
-| 11. Функциональные разделы | Этапы 8–11 |
-| 12. Feedback и product events | Этап 11 |
-| 13. Railway PostgreSQL schema | Этап 2 |
-| 14–15. Hono API, validation и atomicity | Этапы 1, 3–5 и 9–11 |
-| 16. Локализация и visual system | Этап 6 |
-| 17. Responsive и accessibility | Этапы 6–12 |
-| 18. Производительность и безопасность | Этап 12 |
-| 19. Наблюдаемость | Этап 12 |
-| 20. Тестирование | Тесты каждого этапа и этап 12 |
-| 21. Production deployment | Этап 13 |
-| 22. Критерии готовности | Этап 13 |
-| 23. Definition of Done | Обязателен для каждой задачи |
+| Раздел PRD                                        | Этапы                                                            |
+| ------------------------------------------------- | ---------------------------------------------------------------- |
+| 1–3. Назначение, сценарий и границы MVP           | Сквозной критерий, все этапы, финальный out-of-scope audit S13.8 |
+| 4. Технологическая основа                         | Этап 0                                                           |
+| 5–6. Информационная архитектура и общий интерфейс | Этапы 6–11                                                       |
+| 7. Авторизация и аккаунты                         | Этап 3                                                           |
+| 8. Первый вход и onboarding                       | Этапы 4 и 7                                                      |
+| 9. Демо-данные и Reset                            | Этапы 4 и 11                                                     |
+| 10. Метрики                                       | Этапы 1 и 5                                                      |
+| 11. Функциональные разделы                        | Этапы 8–11                                                       |
+| 12. Feedback и product events                     | Этап 11                                                          |
+| 13. Railway PostgreSQL schema                     | Этап 2                                                           |
+| 14–15. Hono API, validation и atomicity           | Этапы 1, 3–5 и 9–11                                              |
+| 16. Локализация и visual system                   | Этап 6                                                           |
+| 17. Responsive и accessibility                    | Этапы 6–12                                                       |
+| 18. Производительность и безопасность             | Этап 12                                                          |
+| 19. Наблюдаемость                                 | Этап 12                                                          |
+| 20. Тестирование                                  | Тесты каждого этапа и этап 12                                    |
+| 21. Production deployment                         | Этап 13                                                          |
+| 22. Критерии готовности                           | Этап 13                                                          |
+| 23. Definition of Done                            | Обязателен для каждой задачи                                     |

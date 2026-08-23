@@ -20,6 +20,9 @@
     "test": "bun run --cwd packages/contracts test && bun run --cwd backend test:unit && bun run --cwd webapp test",
     "test:integration": "bun run --cwd backend test:integration",
     "test:e2e": "bun run --cwd webapp test:e2e",
+    "db:generate": "bun run --cwd backend db:generate",
+    "db:check": "bun run --cwd backend db:check",
+    "db:migrate": "bun run --cwd backend db:migrate",
     "build": "bun run --cwd packages/contracts build && bun run --cwd backend build && bun run --cwd webapp build && bun run check:client-secrets"
   },
   "devDependencies": {

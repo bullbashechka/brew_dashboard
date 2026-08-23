@@ -16,13 +16,13 @@ const forbiddenPackageNames = [
   "expo",
   "react-native",
   "jsonwebtoken",
-  "jose",
   "nodemailer",
   "terraform",
   "doctl",
   "digitalocean",
   "yandex-cloud",
 ];
+const forbiddenDirectOnlyPackageNames = ["jose"];
 
 const failures = [];
 
@@ -60,6 +60,9 @@ for (const [manifestPath, manifest] of manifests) {
   for (const packageName of packageNames) {
     if (packageNameIsForbidden(packageName)) {
       failures.push(`${manifestPath} contains removed package ${packageName}`);
+    }
+    if (forbiddenDirectOnlyPackageNames.includes(packageName)) {
+      failures.push(`${manifestPath} contains removed direct package ${packageName}`);
     }
   }
 }

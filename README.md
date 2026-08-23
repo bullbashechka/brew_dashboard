@@ -42,6 +42,47 @@ committing a connection string. The actual `HYPERDRIVE` binding ID is added to `
 in S2.1, only after the Cloudflare configuration exists.
 
 The repository intentionally contains only the active `webapp`, `backend` and
-`packages/contracts` workspaces. Product screens, Railway/Drizzle persistence, Better Auth and
-domain contracts are introduced by later stages in `TASKS.md`; only their foundation environment
-and Worker binding contracts are reserved now.
+`packages/contracts` workspaces. Product screens and API flows are introduced by later stages in
+`TASKS.md`; Stage 2 now contains the server-only Railway/Drizzle persistence foundation, while the
+Worker binding remains intentionally unbound until the real Cloudflare configuration exists.
+
+## Database workflow (Stage 2)
+
+`backend/src/db/schema.ts` is the server-only source of database types. Drizzle generates the
+versioned SQL in `backend/drizzle/`; applied migrations must never be edited in place.
+
+```bash
+bun run db:check
+bun run db:generate
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' bun run db:migrate
+```
+
+`DATABASE_MIGRATION_URL` (or `DATABASE_PUBLIC_URL`) must be an owner/unpooled connection. Before
+the Worker can use Hyperdrive, apply the migrations and provision the separate non-owner role:
+
+```bash
+RUNTIME_DATABASE_PASSWORD='use-a-random-24-character-secret' \
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+bun run --cwd backend db:provision-runtime
+```
+
+The password is used only by this server-side command and must not be placed in `.dev.vars`, the
+Worker bundle, or source control. The cache-disabled Hyperdrive configuration should use a
+connection string for `brew_runtime`, not the migration owner. After Cloudflare authentication,
+create or inspect the configuration with `bun run --cwd webapp wrangler hyperdrive list` and
+`bun run --cwd webapp wrangler hyperdrive create <name> --connection-string=<runtime-url> --caching-disabled`;
+then put the returned real ID into `wrangler.jsonc` as the `HYPERDRIVE` binding. Do not commit a
+placeholder ID.
+
+The integration runner never touches a remote database. Point it at a local PostgreSQL admin URL;
+it creates a random database, applies every migration, runs the RLS/constraint tests, and drops the
+database in a `finally` block:
+
+```bash
+DATABASE_TEST_ADMIN_URL='postgresql://localhost/postgres' bun run test:integration
+```
+
+Production release order is: take/verify the Railway backup, apply migrations with the unpooled
+owner URL, smoke-test the database and API, then deploy the Worker. Railway daily/weekly backup
+schedules and the real Hyperdrive binding remain environment configuration rather than checked-in
+secrets.

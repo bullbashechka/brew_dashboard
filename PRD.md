@@ -150,17 +150,17 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 
 ## 5. Информационная архитектура
 
-| Маршрут | Экран | Доступ |
-|---|---|---|
-| `/login` | Вход | Без сессии |
-| `/first-run/language` | Выбор языка | Сессия, первый вход |
-| `/first-run/onboarding` | Настройка сети | Сессия, onboarding не завершён |
-| `/app/overview` | Главный dashboard | Сессия |
-| `/app/locations` | Карточки и сравнение точек | Сессия |
-| `/app/sales` | Аналитика продаж | Сессия |
-| `/app/products` | Товары и menu engineering | Сессия |
-| `/app/inventory` | Остатки, приходы и списания | Сессия |
-| `/app/settings` | Язык, цель, feedback, reset и logout | Сессия |
+| Маршрут                 | Экран                                | Доступ                         |
+| ----------------------- | ------------------------------------ | ------------------------------ |
+| `/login`                | Вход                                 | Без сессии                     |
+| `/first-run/language`   | Выбор языка                          | Сессия, первый вход            |
+| `/first-run/onboarding` | Настройка сети                       | Сессия, onboarding не завершён |
+| `/app/overview`         | Главный dashboard                    | Сессия                         |
+| `/app/locations`        | Карточки и сравнение точек           | Сессия                         |
+| `/app/sales`            | Аналитика продаж                     | Сессия                         |
+| `/app/products`         | Товары и menu engineering            | Сессия                         |
+| `/app/inventory`        | Остатки, приходы и списания          | Сессия                         |
+| `/app/settings`         | Язык, цель, feedback, reset и logout | Сессия                         |
 
 Корневой маршрут перенаправляет пользователя на `/login`, `/first-run/*` или `/app/overview` по состоянию Better Auth session и onboarding.
 
@@ -352,16 +352,16 @@ bun run admin:create-user -- --login <login>
 
 Демо использует компактную понятную финансовую модель без refunds, discounts и tax breakdown.
 
-| Показатель | Формула |
-|---|---|
-| Revenue | `Σ(quantity × unit_price_at_sale)` для completed orders |
-| COGS | `Σ(quantity × unit_cost_at_sale)` для completed orders |
-| Gross profit | `revenue - COGS` |
-| Gross margin | `gross_profit / revenue × 100%` |
-| Orders | количество completed orders |
-| Average check | `revenue / orders` |
+| Показатель          | Формула                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| Revenue             | `Σ(quantity × unit_price_at_sale)` для completed orders      |
+| COGS                | `Σ(quantity × unit_cost_at_sale)` для completed orders       |
+| Gross profit        | `revenue - COGS`                                             |
+| Gross margin        | `gross_profit / revenue × 100%`                              |
+| Orders              | количество completed orders                                  |
+| Average check       | `revenue / orders`                                           |
 | Current unit margin | `(current_price - current_unit_cost) / current_price × 100%` |
-| Goal completion | `current_month_revenue / monthly_goal × 100%` |
+| Goal completion     | `current_month_revenue / monthly_goal × 100%`                |
 
 Правила:
 
@@ -526,30 +526,30 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 
 ### 13.1. Auth и tenancy
 
-| Таблица | Ключевые поля |
-|---|---|
-| Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry |
-| `app_users` | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at` |
-| `networks` | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at` |
+| Таблица            | Ключевые поля                                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry                                                        |
+| `app_users`        | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at` |
+| `networks`         | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at`                                 |
 
 `account_kind`: `demo | e2e`.
 
 ### 13.2. Демо-данные
 
-| Таблица | Ключевые поля |
-|---|---|
-| `locations` | `network_id`, `name`, `sort_order` |
-| `categories` | `network_id`, `name`, `sort_order` |
-| `products` | `network_id`, `category_id`, `name`, `current_price`, `current_unit_cost`, `active` |
-| `orders` | `network_id`, `location_id`, `ordered_at`, `status` |
-| `order_items` | `network_id`, `order_id`, `product_id`, `quantity`, `unit_price_at_sale`, `unit_cost_at_sale` |
-| `inventory_items` | `network_id`, `name`, `unit`, optional `product_id` |
-| `inventory_balances` | `network_id`, `location_id`, `inventory_item_id`, `on_hand`, `min_threshold`, UNIQUE location/item |
-| `inventory_movements` | `network_id`, `location_id`, `inventory_item_id`, `type`, `quantity`, `occurred_at` |
-| `revenue_targets` | `network_id`, `month`, `amount`, UNIQUE network/month |
-| `feedback_responses` | `network_id UNIQUE`, `rating`, `comment`, `desired_features`, `submitted_at`, `updated_at` |
-| `product_events` | `network_id`, `user_id`, `type`, `route`, `metadata`, `occurred_at` |
-| `demo_generations` | `network_id`, `generated_for_date`, `seed`, `version`, `created_at` |
+| Таблица               | Ключевые поля                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `locations`           | `network_id`, `name`, `sort_order`                                                                 |
+| `categories`          | `network_id`, `name`, `sort_order`                                                                 |
+| `products`            | `network_id`, `category_id`, `name`, `current_price`, `current_unit_cost`, `active`                |
+| `orders`              | `network_id`, `location_id`, `ordered_at`, `status`                                                |
+| `order_items`         | `network_id`, `order_id`, `product_id`, `quantity`, `unit_price_at_sale`, `unit_cost_at_sale`      |
+| `inventory_items`     | `network_id`, `name`, `unit`, optional `product_id`                                                |
+| `inventory_balances`  | `network_id`, `location_id`, `inventory_item_id`, `on_hand`, `min_threshold`, UNIQUE location/item |
+| `inventory_movements` | `network_id`, `location_id`, `inventory_item_id`, `type`, `quantity`, `occurred_at`                |
+| `revenue_targets`     | `network_id`, `month`, `amount`, UNIQUE network/month                                              |
+| `feedback_responses`  | `network_id UNIQUE`, `rating`, `comment`, `desired_features`, `submitted_at`, `updated_at`         |
+| `product_events`      | `network_id`, `user_id`, `type`, `route`, `metadata`, `occurred_at`                                |
+| `demo_generations`    | `network_id`, `generated_for_date`, `seed`, `version`, `created_at`                                |
 
 Все business tables используют UUID, `created_at`/`updated_at` по необходимости и обязательный `network_id`. Soft delete отсутствует.
 
@@ -558,7 +558,7 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 - внешние ключи запрещают orphan records;
 - `network_id` индексируется во всех tenant tables;
 - time-series индексы используют `(network_id, occurred_at)` и `(network_id, location_id, occurred_at)`;
-- money: `numeric(14,2)`, quantity: `numeric(14,3)`, timestamps: `timestamptz`;
+- money: exact-scale `numeric` с диапазоном `numeric(14,2)`, quantity: exact-scale `numeric` с диапазоном `numeric(14,3)`, timestamps: `timestamptz`; scale проверяется constraint до записи, чтобы PostgreSQL не выполнял silent rounding;
 - RLS включён на всех tenant business tables без browser-facing разрешающих policies;
 - migrations выполняются owner role, а Hono использует отдельную runtime role без ownership и `BYPASSRLS`;
 - Hono задаёт server-derived `network_id` через `set_config('app.network_id', ..., true)` внутри транзакции; pooled connection не сохраняет tenant context между запросами;
@@ -573,40 +573,40 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 
 ### 14.1. Auth и onboarding
 
-| Method | Route | Назначение |
-|---|---|---|
-| `GET` | `/health` | Smoke-check Worker и доступности API |
-| `POST` | `/auth/login` | Вход по login alias и password |
-| `POST` | `/auth/logout` | Logout и очистка cookies |
-| `GET` | `/auth/me` | Профиль, язык, tour и onboarding state |
-| `PUT` | `/onboarding/language` | Сохранить первый язык |
+| Method | Route                  | Назначение                               |
+| ------ | ---------------------- | ---------------------------------------- |
+| `GET`  | `/health`              | Smoke-check Worker и доступности API     |
+| `POST` | `/auth/login`          | Вход по login alias и password           |
+| `POST` | `/auth/logout`         | Logout и очистка cookies                 |
+| `GET`  | `/auth/me`             | Профиль, язык, tour и onboarding state   |
+| `PUT`  | `/onboarding/language` | Сохранить первый язык                    |
 | `POST` | `/onboarding/complete` | Сохранить сеть/точки и создать demo data |
 
 ### 14.2. Аналитика
 
-| Method | Route | Назначение |
-|---|---|---|
-| `GET` | `/overview` | KPI, charts, goal и alerts |
-| `GET` | `/locations` | Карточки и comparison |
-| `GET` | `/sales` | Sales analytics и recent orders |
-| `GET` | `/products` | Product analytics и menu matrix |
-| `GET` | `/inventory` | Balances, movements и stock alerts |
+| Method | Route        | Назначение                         |
+| ------ | ------------ | ---------------------------------- |
+| `GET`  | `/overview`  | KPI, charts, goal и alerts         |
+| `GET`  | `/locations` | Карточки и comparison              |
+| `GET`  | `/sales`     | Sales analytics и recent orders    |
+| `GET`  | `/products`  | Product analytics и menu matrix    |
+| `GET`  | `/inventory` | Balances, movements и stock alerts |
 
 Analytics endpoints принимают `locationId`, `period` и cursor/page параметры там, где есть таблица. Допустимые periods фиксированы контрактом.
 
 ### 14.3. Разрешённые mutations
 
-| Method | Route | Назначение |
-|---|---|---|
-| `PATCH` | `/products/:productId/price` | Изменить current selling price |
-| `POST` | `/inventory/movements` | Создать `receipt` или `writeoff` |
-| `PUT` | `/settings/revenue-goal` | Upsert цели текущего месяца |
-| `PUT` | `/settings/language` | Изменить язык |
-| `PUT` | `/settings/tour` | Сохранить tour state |
-| `GET` | `/feedback` | Получить текущий ответ |
-| `PUT` | `/feedback` | Upsert текущего ответа |
-| `POST` | `/events` | Записать whitelist product event |
-| `POST` | `/demo/reset` | Восстановить исходный набор |
+| Method  | Route                        | Назначение                       |
+| ------- | ---------------------------- | -------------------------------- |
+| `PATCH` | `/products/:productId/price` | Изменить current selling price   |
+| `POST`  | `/inventory/movements`       | Создать `receipt` или `writeoff` |
+| `PUT`   | `/settings/revenue-goal`     | Upsert цели текущего месяца      |
+| `PUT`   | `/settings/language`         | Изменить язык                    |
+| `PUT`   | `/settings/tour`             | Сохранить tour state             |
+| `GET`   | `/feedback`                  | Получить текущий ответ           |
+| `PUT`   | `/feedback`                  | Upsert текущего ответа           |
+| `POST`  | `/events`                    | Записать whitelist product event |
+| `POST`  | `/demo/reset`                | Восстановить исходный набор      |
 
 Других business mutations в Demo MVP нет.
 
