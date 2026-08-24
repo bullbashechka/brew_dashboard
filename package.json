@@ -24,6 +24,10 @@
     "db:check": "bun run --cwd backend db:check",
     "db:migrate": "bun run --cwd backend db:migrate",
     "db:smoke:hyperdrive": "bun run --cwd backend db:smoke:hyperdrive",
+    "admin:create-user": "bun run --cwd backend admin:create-user",
+    "admin:reset-password": "bun run --cwd backend admin:reset-password",
+    "admin:disable-user": "bun run --cwd backend admin:disable-user",
+    "admin:delete-user": "bun run --cwd backend admin:delete-user",
     "build": "bun run --cwd packages/contracts build && bun run --cwd backend build && bun run --cwd webapp build && bun run check:client-secrets"
   },
   "devDependencies": {

@@ -6,7 +6,9 @@ This file applies to the whole repository unless a deeper `AGENTS.md` overrides 
 
 - Answer in the user's language.
 - Read the relevant conversation and repository context before acting.
-- Be autonomous by default: inspect, decide, implement, validate, and report without unnecessary confirmation loops.
+- The user alone decides when repository files may be changed. Unless the user gives explicit permission to begin changes in the current conversation, work read-only: inspect, analyze, review, plan, and report without editing, generating, formatting, or deleting files.
+- A request to inspect a diff, review an implementation, analyze a stage, identify edge cases, or propose solutions does not authorize changes. Wait for a separate explicit instruction from the user before implementing any proposed fix.
+- After explicit permission is given, be autonomous within the authorized scope: implement, validate, and report without unnecessary confirmation loops.
 - Ask only when ambiguity blocks a safe decision, a material product or architecture choice is open, or an action is destructive, irreversible, security-sensitive, or likely to affect unrelated users or data.
 - Verify uncertain claims through repository evidence, documentation, tests, scripts, runtime output, or logs. Do not invent facts.
 - Preserve unrelated user changes. Do not revert, overwrite, reformat, or clean up work outside the requested scope.

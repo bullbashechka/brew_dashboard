@@ -32,9 +32,10 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
       [networkA, networkB],
     );
     await client.query(
-      `INSERT INTO app.app_users (id, auth_user_id, login_normalized, network_id)
-       VALUES ('10000000-0000-0000-0000-000000000001', 'auth-a', 'owner_a', $1),
-              ('10000000-0000-0000-0000-000000000002', 'auth-b', 'owner_b', $2)`,
+      `INSERT INTO app.app_users
+        (id, auth_user_id, login_normalized, network_id, account_kind)
+       VALUES ('10000000-0000-0000-0000-000000000001', 'auth-a', 'owner_a', $1, 'e2e'),
+              ('10000000-0000-0000-0000-000000000002', 'auth-b', 'owner_b', $2, 'e2e')`,
       [networkA, networkB],
     );
     await client.query(

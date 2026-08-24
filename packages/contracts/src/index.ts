@@ -154,6 +154,8 @@ export const loginRequestSchema = z.strictObject({
   password: passwordSchema,
 });
 
+export const logoutRequestSchema = z.strictObject({});
+
 export const languageRequestSchema = z.strictObject({
   language: languageSchema,
   idempotencyKey: idempotencyKeySchema,
@@ -191,12 +193,12 @@ export const profileSchema = z.strictObject({
   userId: uuidSchema,
   login: loginSchema,
   networkId: uuidSchema,
-  networkName: z.string(),
-  ownerName: z.string(),
-  country: countryCodeSchema,
-  currency: currencyCodeSchema,
-  timeZone: timeZoneSchema,
-  language: languageSchema,
+  networkName: z.string().nullable(),
+  ownerName: z.string().nullable(),
+  country: countryCodeSchema.nullable(),
+  currency: currencyCodeSchema.nullable(),
+  timeZone: timeZoneSchema.nullable(),
+  language: languageSchema.nullable(),
   onboardingCompletedAt: utcTimestampSchema.nullable(),
   tourState: tourStateSchema,
   expiresAt: utcTimestampSchema.nullable(),
@@ -206,6 +208,14 @@ export const sessionStateSchema = z.strictObject({
   authenticated: z.literal(true),
   profile: profileSchema,
 });
+
+export const sessionResponseSchema = createSuccessEnvelopeSchema(sessionStateSchema);
+
+export const logoutStateSchema = z.strictObject({
+  authenticated: z.literal(false),
+});
+
+export const logoutResponseSchema = createSuccessEnvelopeSchema(logoutStateSchema);
 
 export const analyticsQuerySchema = z.strictObject({
   locationId: uuidSchema.optional(),
@@ -602,6 +612,9 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type ApiError = z.infer<typeof apiErrorSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+export type Profile = z.infer<typeof profileSchema>;
+export type SessionResponse = z.infer<typeof sessionResponseSchema>;
+export type LogoutResponse = z.infer<typeof logoutResponseSchema>;
 export type OnboardingRequest = z.infer<typeof onboardingRequestSchema>;
 export type CurrencyCode = z.infer<typeof currencyCodeSchema>;
 export type InventoryUnit = z.infer<typeof inventoryBalanceSchema>["unit"];

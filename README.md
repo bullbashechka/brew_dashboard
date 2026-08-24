@@ -39,12 +39,46 @@ environment value. `BETTER_AUTH_SECRET` remains server-only.
 For local Hyperdrive development, provide
 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in the shell environment rather than
 committing a connection string. The production `HYPERDRIVE` binding is configured in
-`wrangler.jsonc`; runtime database integration begins in S3.1.
+`wrangler.jsonc`; Stage 3 opens a request-scoped connection through that cache-disabled binding.
 
 The repository intentionally contains only the active `webapp`, `backend` and
-`packages/contracts` workspaces. Product screens and API flows are introduced by later stages in
-`TASKS.md`; Stage 2 contains the server-only Railway/Drizzle persistence foundation, and S3.1
-connects the existing Hyperdrive binding to request-scoped database access.
+`packages/contracts` workspaces. Product screens and business API flows are introduced by later
+stages in `TASKS.md`; Stage 3 adds server-only Better Auth sessions and account administration.
+
+## Authentication and account administration (Stage 3)
+
+The Worker exposes only the application auth routes `POST /api/v1/auth/login`,
+`POST /api/v1/auth/logout` and `GET /api/v1/auth/me`. Better Auth's internal handler is mounted
+under a non-public path and is not routed by the Worker. Sessions are database-backed opaque
+cookies; signup, recovery, email confirmation and user-facing password changes are disabled.
+Mutating requests must be same-origin JSON and are limited to 256 KiB.
+
+Admin commands use the owner/unpooled database URL, never the runtime Hyperdrive role. Login aliases
+are normalized to lowercase and must contain 3–64 Latin letters, digits, `.`, `_` or `-`. A generated
+password is printed once only; use `--interactive-password` to enter one without putting it in shell
+history. Production commands additionally require the explicit environment/confirmation gate.
+
+```bash
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:create-user -- --login demo.owner
+
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:create-user -- --login test.owner --account-kind e2e --interactive-password
+
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:reset-password -- --login demo.owner --account-kind demo --confirm-login demo.owner
+
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:disable-user -- --login demo.owner --account-kind demo --confirm-login demo.owner
+
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:delete-user -- --login test.owner --account-kind e2e --confirm-login test.owner
+```
+
+The default `demo` kind is capped at 15 active accounts; `e2e` accounts are excluded from that
+limit. Deletion is intentionally explicit and cascades the selected account's empty network and
+business data. Do not place database URLs, Better Auth secrets, passwords or generated output in
+tracked files or logs.
 
 ## Database workflow (Stage 2)
 

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 
@@ -62,7 +62,25 @@ try {
   if (migrationProcess.exitCode !== 0) {
     throw new Error(`Database migration failed with exit code ${migrationProcess.exitCode ?? 1}`);
   }
-  await runTests({ DATABASE_TEST_URL: databaseUrl.toString() });
+  const runtimePassword = randomBytes(24).toString("base64url");
+  const databaseClient = new Client({ connectionString: databaseUrl.toString() });
+  await databaseClient.connect();
+  try {
+    const statement = await databaseClient.query<{ sql: string }>(
+      "SELECT format('ALTER ROLE brew_runtime LOGIN PASSWORD %L', $1::text) AS sql",
+      [runtimePassword],
+    );
+    await databaseClient.query(statement.rows[0]!.sql);
+  } finally {
+    await databaseClient.end();
+  }
+  const runtimeUrl = new URL(databaseUrl);
+  runtimeUrl.username = "brew_runtime";
+  runtimeUrl.password = runtimePassword;
+  await runTests({
+    DATABASE_TEST_URL: databaseUrl.toString(),
+    DATABASE_TEST_RUNTIME_URL: runtimeUrl.toString(),
+  });
 } finally {
   const cleanupClient = new Client({ connectionString: adminUrl });
   await cleanupClient.connect();

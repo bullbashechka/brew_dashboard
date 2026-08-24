@@ -145,26 +145,26 @@ backup schedules не являются частью MVP и не требуютс
 
 ### Задачи
 
-- [ ] **S3.1.** Создать request-scoped Drizzle client через cache-disabled Hyperdrive binding и server-side Better Auth instance с PostgreSQL adapter.
-- [ ] **S3.2.** Реализовать `bun run admin:create-user -- --login <login>` с нормализацией, case-insensitive uniqueness, login длиной 3–64 из латинских букв, цифр, `.`, `_`, `-`, password длиной 12–128 и лимитом 15 активных demo accounts.
-- [ ] **S3.3.** В admin command создавать Better Auth credential user с login alias и внутренним техническим email, `app_users` и пустую сеть без точек/business data; выводить пароль один раз без записи в БД, файл, лог или shell history.
-- [ ] **S3.4.** Добавить защищённые admin commands сброса пароля, отключения аккаунта и удаления только явно указанного demo/e2e account.
-- [ ] **S3.5.** Реализовать `POST /auth/login`, `POST /auth/logout` и `GET /auth/me` с единым generic login error; использовать Better Auth username/password sign-in, отключить public signup/recovery endpoints и добавить server-side login rate limit.
-- [ ] **S3.6.** Хранить opaque Better Auth session token только в cookie `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`; продлевать и проверять database session server-side, отзывать её при logout/невалидном аккаунте и не использовать JWT access/refresh tokens.
-- [ ] **S3.7.** Проверять status и `expires_at`; обновлять `last_login_at`; не допускать вход отключённого или истёкшего аккаунта.
-- [ ] **S3.8.** Реализовать auth middleware, который получает `network_id` только из проверенного `app_users` и добавляет его ко всем business queries.
-- [ ] **S3.9.** Ограничить JSON body размером 256 KiB; для mutations требовать same-origin JSON и валидный `Origin`.
-- [ ] **S3.10.** Добавить request ID middleware, единый API envelope и безопасное преобразование validation/auth/internal errors.
-- [ ] **S3.11.** Добавить integration tests admin creation, login/logout, session renewal/expiry, status/expiry и базовой tenant isolation минимум между двумя аккаунтами.
+- [x] **S3.1.** Создать request-scoped Drizzle client через cache-disabled Hyperdrive binding и server-side Better Auth instance с PostgreSQL adapter.
+- [x] **S3.2.** Реализовать `bun run admin:create-user -- --login <login>` с нормализацией, case-insensitive uniqueness, login длиной 3–64 из латинских букв, цифр, `.`, `_`, `-`, password длиной 12–128 и лимитом 15 активных demo accounts.
+- [x] **S3.3.** В admin command создавать Better Auth credential user с login alias и внутренним техническим email, `app_users` и пустую сеть без точек/business data; выводить пароль один раз без записи в БД, файл, лог или shell history.
+- [x] **S3.4.** Добавить защищённые admin commands сброса пароля, отключения аккаунта и удаления только явно указанного demo/e2e account.
+- [x] **S3.5.** Реализовать `POST /auth/login`, `POST /auth/logout` и `GET /auth/me` с единым generic login error; использовать Better Auth username/password sign-in, отключить public signup/recovery endpoints и добавить server-side login rate limit.
+- [x] **S3.6.** Хранить opaque Better Auth session token только в cookie `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`; продлевать и проверять database session server-side, отзывать её при logout/невалидном аккаунте и не использовать JWT access/refresh tokens.
+- [x] **S3.7.** Проверять status и `expires_at`; обновлять `last_login_at`; не допускать вход отключённого или истёкшего аккаунта.
+- [x] **S3.8.** Реализовать auth middleware, который получает `network_id` только из проверенного `app_users` и добавляет его ко всем business queries.
+- [x] **S3.9.** Ограничить JSON body размером 256 KiB; для mutations требовать same-origin JSON и валидный `Origin`.
+- [x] **S3.10.** Добавить request ID middleware, единый API envelope и безопасное преобразование validation/auth/internal errors.
+- [x] **S3.11.** Добавить integration tests admin creation, login/logout, session renewal/expiry, status/expiry и базовой tenant isolation минимум между двумя аккаунтами.
 
 ### Критерии приёмки
 
-- [ ] Публичных signup, email confirmation, recovery и user-facing password change нет.
-- [ ] Login alias не позволяет определить существование аккаунта по тексту или форме ошибки.
-- [ ] Browser request не может задать или подменить `network_id`.
-- [ ] E2E accounts не входят в лимит 15 demo accounts.
-- [ ] Технический email нигде не показывается пользователю и не используется для писем.
-- [ ] Credentials, cookies, tokens и password hashes отсутствуют в application logs и client bundle.
+- [x] Публичных signup, email confirmation, recovery и user-facing password change нет.
+- [x] Login alias не позволяет определить существование аккаунта по тексту или форме ошибки.
+- [x] Browser request не может задать или подменить `network_id`.
+- [x] E2E accounts не входят в лимит 15 demo accounts.
+- [x] Технический email нигде не показывается пользователю и не используется для писем.
+- [x] Credentials, cookies, tokens и password hashes отсутствуют в application logs и client bundle.
 
 ---
 
