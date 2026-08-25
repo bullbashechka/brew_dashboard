@@ -284,6 +284,12 @@ bun run admin:create-user -- --login <login>
 - валюта: ISO 4217;
 - timezone: IANA timezone.
 
+Для страны клиент предлагает базовые значения валюты и timezone без дополнительного
+справочника: `KZ → KZT / Asia/Almaty`, `RU → RUB / Europe/Moscow`,
+`US → USD / America/New_York`, `GB → GBP / Europe/London`. Предложение заполняет
+только пустые или ранее автоматически заполненные поля; ручной ввод не перезаписывается.
+При неизвестной стране очищаются только ранее автоматически предложенные значения.
+
 ### 8.3. Завершение onboarding
 
 - клиентская и серверная Zod-валидация согласованы;
@@ -603,7 +609,9 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 | `GET`  | `/products`  | Product analytics и menu matrix    |
 | `GET`  | `/inventory` | Balances, movements и stock alerts |
 
-Analytics endpoints принимают `locationId`, `period` и cursor/page параметры там, где есть таблица. Допустимые periods фиксированы контрактом.
+Analytics endpoints принимают `locationId`, `period` и cursor/page параметры там, где есть таблица. Допустимые periods фиксированы контрактом. Подписанный continuation
+фиксирует `pageSize`: следующий запрос обязан повторить размер страницы, иначе API
+возвращает `400 VALIDATION_ERROR`.
 
 ### 14.3. Разрешённые mutations
 

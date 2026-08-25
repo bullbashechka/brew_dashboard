@@ -68,7 +68,9 @@ export function AppShell() {
     enabled: Boolean(profile),
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const tourOpen = profile?.tourState === "pending" && section === "overview";
+  // Keep an in-progress tour mounted while it navigates between its three routes.
+  // The persisted state remains `pending` until the user finishes or skips it.
+  const tourOpen = profile?.tourState === "pending";
 
   useEffect(() => {
     if (!filters.locationId) return;

@@ -167,6 +167,19 @@ const compareContinuation = (
   }
 };
 
+const assertContinuationPageSize = (
+  continuation: ContinuationPayload | null,
+  requestedPageSize: number | undefined,
+) => {
+  if (
+    continuation &&
+    requestedPageSize !== undefined &&
+    requestedPageSize !== continuation.pageSize
+  ) {
+    throw new ApiProblem("VALIDATION_ERROR", 400, "Page size does not match pagination context");
+  }
+};
+
 const basePayload = (
   context: AnalyticsContext,
   kind: ContinuationPayload["kind"],
@@ -287,6 +300,7 @@ export const salesHandler = async (context: Context<AppEnvironment>) => {
       (request.pageContext && continuation.kind !== "page"))
   )
     throw new ApiProblem("VALIDATION_ERROR", 400, "Invalid pagination mode");
+  assertContinuationPageSize(continuation, request.pageSize);
   const asOf = continuation ? new Date(continuation.asOf) : undefined;
   if (continuation && !Number.isFinite(asOf!.getTime()))
     throw new ApiProblem("VALIDATION_ERROR", 400, "Invalid pagination context");
@@ -373,6 +387,7 @@ export const inventoryHandler = async (context: Context<AppEnvironment>) => {
   const continuation = request.cursor ? await verifyContinuation(request.cursor, secret) : null;
   if (continuation && continuation.kind !== "cursor")
     throw new ApiProblem("VALIDATION_ERROR", 400, "Invalid pagination mode");
+  assertContinuationPageSize(continuation, request.pageSize);
   const asOf = continuation ? new Date(continuation.asOf) : undefined;
   const inventoryOptions = authOptions(context, request.period, request.locationId, asOf);
   if (request.status !== undefined) inventoryOptions.status = request.status;

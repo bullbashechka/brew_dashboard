@@ -1013,35 +1013,27 @@ export const buildLocations = async (
   const filtered = locationValues.filter(
     ({ location }) => !context.locationId || location.id === context.locationId,
   );
+  const sortValue = (value: (typeof locationValues)[number]): string => {
+    switch (context.sortBy) {
+      case "name":
+        return value.location.name;
+      case "grossProfit":
+        return value.current.grossProfit;
+      case "orders":
+        return String(value.current.orders);
+      case "averageCheck":
+        return value.current.averageCheck ?? "0.00";
+      case "grossMargin":
+        return value.current.grossMargin ?? "0.00";
+      case "activeAlerts":
+        return String(value.activeAlerts);
+      default:
+        return value.current.revenue;
+    }
+  };
   filtered.sort((left, right) => {
-    const leftValue =
-      context.sortBy === "name"
-        ? left.location.name
-        : context.sortBy === "grossProfit"
-          ? left.current.grossProfit
-          : context.sortBy === "orders"
-            ? String(left.current.orders)
-            : context.sortBy === "averageCheck"
-              ? (left.current.averageCheck ?? "0.00")
-              : context.sortBy === "grossMargin"
-                ? (left.current.grossMargin ?? "0.00")
-                : context.sortBy === "activeAlerts"
-                  ? String(left.activeAlerts)
-                  : left.current.revenue;
-    const rightValue =
-      context.sortBy === "name"
-        ? right.location.name
-        : context.sortBy === "grossProfit"
-          ? right.current.grossProfit
-          : context.sortBy === "orders"
-            ? String(right.current.orders)
-            : context.sortBy === "averageCheck"
-              ? (right.current.averageCheck ?? "0.00")
-              : context.sortBy === "grossMargin"
-                ? (right.current.grossMargin ?? "0.00")
-                : context.sortBy === "activeAlerts"
-                  ? String(right.activeAlerts)
-                  : right.current.revenue;
+    const leftValue = sortValue(left);
+    const rightValue = sortValue(right);
     const compared =
       context.sortBy === "name"
         ? leftValue.localeCompare(rightValue)

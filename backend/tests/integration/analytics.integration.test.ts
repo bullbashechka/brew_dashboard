@@ -208,6 +208,45 @@ describeIntegration("Stage 5 analytics API", () => {
     const secondPage = salesResponseSchema.parse(await secondPageResponse.json());
     const firstIds = new Set(firstPage.data.recentOrders.map((order) => order.orderId));
     expect(secondPage.data.recentOrders.some((order) => firstIds.has(order.orderId))).toBe(false);
+    const mismatchedPageSize = await request(
+      `/api/v1/sales?period=6m&pageSize=3&cursor=${encodeURIComponent(cursor)}`,
+      first.cookie,
+    );
+    expect(mismatchedPageSize.status).toBe(400);
+    expect(apiErrorResponseSchema.parse(await mismatchedPageSize.json()).error.code).toBe(
+      "VALIDATION_ERROR",
+    );
+
+    const inventoryFirstPage = inventoryResponseSchema.parse(
+      await (await request("/api/v1/inventory?period=6m&pageSize=1", first.cookie)).json(),
+    );
+    const inventoryCursor = inventoryFirstPage.meta.pagination.nextCursor;
+    if (inventoryCursor) {
+      const mismatchedInventoryPageSize = await request(
+        `/api/v1/inventory?period=6m&pageSize=2&cursor=${encodeURIComponent(inventoryCursor)}`,
+        first.cookie,
+      );
+      expect(mismatchedInventoryPageSize.status).toBe(400);
+      expect(
+        apiErrorResponseSchema.parse(await mismatchedInventoryPageSize.json()).error.code,
+      ).toBe("VALIDATION_ERROR");
+    }
+    const firstPageContextResponse = await request(
+      "/api/v1/sales?period=6m&page=1&pageSize=2",
+      first.cookie,
+    );
+    const firstPageContext = salesResponseSchema.parse(await firstPageContextResponse.json()).meta
+      .pagination.pageContext;
+    if (firstPageContext) {
+      const mismatchedPageContext = await request(
+        `/api/v1/sales?period=6m&page=2&pageSize=3&pageContext=${encodeURIComponent(firstPageContext)}`,
+        first.cookie,
+      );
+      expect(mismatchedPageContext.status).toBe(400);
+      expect(apiErrorResponseSchema.parse(await mismatchedPageContext.json()).error.code).toBe(
+        "VALIDATION_ERROR",
+      );
+    }
     const tampered = `${cursor.slice(0, -2)}aa`;
     const invalid = await request(
       `/api/v1/sales?cursor=${encodeURIComponent(tampered)}`,
@@ -215,7 +254,7 @@ describeIntegration("Stage 5 analytics API", () => {
     );
     expect(invalid.status).toBe(400);
     expect(apiErrorResponseSchema.parse(await invalid.json()).error.code).toBe("VALIDATION_ERROR");
-  });
+  }, 15_000);
 
   it("keeps the tenant/time range analytics reads explainable", async () => {
     const account = await createOnboarded(

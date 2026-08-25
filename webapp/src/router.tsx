@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
   Link,
@@ -8,6 +8,7 @@ import {
   createRoute,
   createRouter,
   redirect,
+  useRouter,
 } from "@tanstack/react-router";
 import {
   locationSortBySchema,
@@ -15,7 +16,7 @@ import {
   sortDirectionSchema,
   type Profile,
 } from "@brew-dashboard/contracts";
-import { sessionQueryOptions } from "@/api/session";
+import { sessionQueryKey, sessionQueryOptions } from "@/api/session";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { AppShell } from "@/components/app-shell";
 import { localeFromProfile, translate } from "@/lib/i18n";
@@ -26,7 +27,7 @@ export type AppRouterContext = { queryClient: QueryClient };
 const rootRoute = createRootRouteWithContext<AppRouterContext>()({
   component: RootLayout,
   pendingComponent: () => <LoadingState locale="en" />,
-  errorComponent: ({ error }) => <ErrorState locale="en" error={error} />,
+  errorComponent: RootError,
   notFoundComponent: NotFoundPage,
 });
 
@@ -180,6 +181,18 @@ function RootLayout() {
     document.title = translate(locale, "appName");
   }, [locale]);
   return <Outlet />;
+}
+
+function RootError({ error }: { error: unknown }) {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  const retry = () => {
+    queryClient.removeQueries({ queryKey: sessionQueryKey, exact: true });
+    void router.invalidate({ forcePending: true });
+  };
+
+  return <ErrorState locale="en" error={error} onRetry={retry} />;
 }
 
 function NotFoundPage() {
