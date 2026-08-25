@@ -201,7 +201,11 @@ export const loadActiveProfile = async (
     demoDataStale:
       Boolean(currentNetwork.demoGeneratedForDate && currentNetwork.timezone) &&
       currentNetwork.demoGeneratedForDate !== localDateKey(now, currentNetwork.timezone!),
-    tourState: identity.appUser.tourCompletedAt ? "completed" : "pending",
+    tourState: identity.appUser.tourCompletedAt
+      ? "completed"
+      : identity.appUser.tourSkippedAt
+        ? "skipped"
+        : "pending",
     expiresAt: identity.appUser.expiresAt?.toISOString() ?? null,
   });
 

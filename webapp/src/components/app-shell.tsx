@@ -7,8 +7,10 @@ import { Bell, Coffee, LogOut, Menu, MessageSquare, X } from "lucide-react";
 import { toast } from "sonner";
 import { locationOptionsQuery, overviewQuery, type AnalyticsFilters } from "@/api/analytics";
 import type { z } from "zod";
-import { overviewResponseSchema } from "@brew-dashboard/contracts";
-import { logout, sessionQueryOptions } from "@/api/session";
+import { overviewResponseSchema, type Profile, type TourState } from "@brew-dashboard/contracts";
+import { logout, sessionQueryKey, sessionQueryOptions } from "@/api/session";
+import { saveTourState } from "@/api/tour";
+import { GuidedTour } from "@/components/guided-tour";
 import { ErrorState, LoadingState, PendingButton } from "@/components/ui/states";
 import { Button } from "@/components/ui/button";
 import { localeFromProfile, translate } from "@/lib/i18n";
@@ -66,6 +68,7 @@ export function AppShell() {
     enabled: Boolean(profile),
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const tourOpen = profile?.tourState === "pending" && section === "overview";
 
   useEffect(() => {
     if (!filters.locationId || !locations.data) return;
@@ -88,6 +91,13 @@ export function AppShell() {
   });
 
   if (!profile) return <LoadingState locale={locale} />;
+
+  const persistTourState = async (state: TourState) => {
+    const response = await saveTourState(state);
+    queryClient.setQueryData<Profile | null>(sessionQueryKey, (current) =>
+      current ? { ...current, tourState: response.data.state } : current,
+    );
+  };
 
   const updateFilters = (next: {
     period?: AnalyticsFilters["period"];
@@ -115,6 +125,7 @@ export function AppShell() {
             ...(item === "settings" ? { panel: undefined } : {}),
           }}
           onClick={() => setDrawerOpen(false)}
+          data-tour={item === "locations" ? "navigation-locations" : undefined}
           className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-stone-700 hover:bg-amber-50 hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800"
           activeProps={{ className: "bg-amber-100 text-amber-950" }}
         >
@@ -204,7 +215,10 @@ export function AppShell() {
           <AlertsControl locale={locale} query={alerts} />
         </div>
         {isAnalytics && (
-          <div className="flex flex-wrap gap-3 border-t border-stone-100 px-4 py-3 sm:px-6">
+          <div
+            data-tour="overview-filters"
+            className="flex flex-wrap gap-3 border-t border-stone-100 px-4 py-3 sm:px-6"
+          >
             <label className="grid min-w-36 gap-1 text-xs font-medium text-stone-700">
               {translate(locale, "filters.location")}
               <select
@@ -257,6 +271,18 @@ export function AppShell() {
         )}
         <Outlet />
       </main>
+      <GuidedTour
+        key={profile.tourState}
+        locale={locale}
+        open={tourOpen}
+        onNavigate={(route) =>
+          navigate({
+            to: route,
+            search: { period: filters.period, locationId: filters.locationId },
+          })
+        }
+        onPersist={persistTourState}
+      />
     </div>
   );
 }
@@ -274,7 +300,13 @@ function ShellActions({
 }) {
   return (
     <div className="space-y-2 border-t border-stone-200 pt-3">
-      <Button type="button" variant="outline" className="w-full justify-start" onClick={onFeedback}>
+      <Button
+        data-tour="feedback"
+        type="button"
+        variant="outline"
+        className="w-full justify-start"
+        onClick={onFeedback}
+      >
         <MessageSquare className="mr-2 size-4" />
         {translate(locale, "actions.feedback")}
       </Button>

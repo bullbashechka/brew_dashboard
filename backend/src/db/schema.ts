@@ -195,10 +195,15 @@ export const appUsers = app.table(
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
     tourCompletedAt: timestamp("tour_completed_at", { withTimezone: true, mode: "date" }),
+    tourSkippedAt: timestamp("tour_skipped_at", { withTimezone: true, mode: "date" }),
     ...timestampColumns,
   },
   (table) => [
     check("app_users_login_format_check", sql`${table.loginNormalized} ~ '^[a-z0-9._-]{3,64}$'`),
+    check(
+      "app_users_tour_terminal_state_check",
+      sql`not (${table.tourCompletedAt} is not null and ${table.tourSkippedAt} is not null)`,
+    ),
     unique("app_users_network_id_id_unique").on(table.networkId, table.id),
     index("app_users_status_expiry_idx").on(table.status, table.expiresAt),
   ],

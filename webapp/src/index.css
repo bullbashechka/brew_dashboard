@@ -81,6 +81,14 @@ body {
   color: #292524;
 }
 
+.tour-target-active {
+  position: relative;
+  z-index: 50;
+  border-radius: 0.5rem;
+  outline: 3px solid #f59e0b;
+  outline-offset: 4px;
+}
+
 button,
 a {
   touch-action: manipulation;

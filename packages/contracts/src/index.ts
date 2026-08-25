@@ -681,6 +681,10 @@ export const tourMutationSchema = z.strictObject({
   state: tourStateSchema,
   idempotencyKey: idempotencyKeySchema,
 });
+export const tourStateDataSchema = z.strictObject({
+  state: tourStateSchema,
+});
+export const tourStateResponseSchema = createSuccessEnvelopeSchema(tourStateDataSchema);
 export const feedbackMutationSchema = z.strictObject({
   rating: z.number().int().min(1).max(5),
   comment: z.string().max(2000).optional().default(""),
@@ -805,6 +809,9 @@ export type ResetResultData = z.infer<typeof resetResultDataSchema>;
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export type LogoutResponse = z.infer<typeof logoutResponseSchema>;
 export type OnboardingRequest = z.infer<typeof onboardingRequestSchema>;
+export type TourState = z.infer<typeof tourStateSchema>;
+export type TourStateData = z.infer<typeof tourStateDataSchema>;
+export type TourStateResponse = z.infer<typeof tourStateResponseSchema>;
 export type CurrencyCode = z.infer<typeof currencyCodeSchema>;
 export type InventoryUnit = z.infer<typeof inventoryBalanceSchema>["unit"];
 export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>;

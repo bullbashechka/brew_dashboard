@@ -14,6 +14,7 @@ import { sessionQueryOptions } from "@/api/session";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { AppShell } from "@/components/app-shell";
 import { localeFromProfile, translate } from "@/lib/i18n";
+import { LanguagePage, LoginPage, OnboardingPage } from "@/pages/first-run";
 
 export type AppRouterContext = { queryClient: QueryClient };
 
@@ -62,7 +63,7 @@ const loginRoute = createRoute({
     const profile = await getSession(context.queryClient);
     if (profile) redirectToDestination(profile);
   },
-  component: () => <PublicFoundation kind="login" />,
+  component: LoginPage,
 });
 
 const languageRoute = createRoute({
@@ -72,7 +73,7 @@ const languageRoute = createRoute({
     const profile = await getSession(context.queryClient);
     if (!profile || profile.language) redirectToDestination(profile);
   },
-  component: () => <PublicFoundation kind="language" />,
+  component: LanguagePage,
 });
 
 const onboardingRoute = createRoute({
@@ -83,7 +84,7 @@ const onboardingRoute = createRoute({
     if (!profile || !profile.language || profile.onboardingCompletedAt)
       redirectToDestination(profile);
   },
-  component: () => <PublicFoundation kind="onboarding" />,
+  component: OnboardingPage,
 });
 
 const appSearch = (search: Record<string, unknown>) => ({
@@ -159,29 +160,6 @@ declare module "@tanstack/react-router" {
 
 function safeRedirect(value: string) {
   return value.startsWith("/app/") && !value.startsWith("//") && !value.includes("\\");
-}
-
-function PublicFoundation({ kind }: { kind: "login" | "language" | "onboarding" }) {
-  const { data: profile } = useQuery(sessionQueryOptions());
-  const locale = localeFromProfile(profile);
-  const copy = {
-    login: "states.signIn",
-    language: "states.language",
-    onboarding: "states.onboarding",
-  } as const;
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-xl items-center px-5 py-10">
-      <section className="w-full rounded-2xl border border-stone-200 bg-white p-7 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-800">
-          Brew Dashboard
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold text-stone-950">
-          {translate(locale, kind === "login" ? "public.signIn" : "public.firstRun")}
-        </h1>
-        <p className="mt-3 text-stone-600">{translate(locale, copy[kind])}</p>
-      </section>
-    </main>
-  );
 }
 
 function RootLayout() {

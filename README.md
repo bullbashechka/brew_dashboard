@@ -80,6 +80,17 @@ limit. Deletion is intentionally explicit and cascades the selected account's em
 business data. Do not place database URLs, Better Auth secrets, passwords or generated output in
 tracked files or logs.
 
+## First run and guided tour (Stage 7)
+
+After sign-in, an account without configuration follows the required flow `Language → Onboarding →
+Overview`. The onboarding form accepts 1–5 case-insensitively unique location names and validates
+network, owner, ISO country/currency, and IANA timezone values through the shared contracts.
+
+The first completed onboarding opens a three-step guided tour. It can be completed, skipped, or
+started again from Settings; `PUT /api/v1/settings/tour` persists `pending`, `completed`, or
+`skipped` with the existing idempotency-key boundary. The `tour_skipped_at` migration must be
+applied before deploying this stage.
+
 ## Database workflow (Stage 2)
 
 `backend/src/db/schema.ts` is the server-only source of database types. Drizzle generates the

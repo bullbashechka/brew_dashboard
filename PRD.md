@@ -540,7 +540,7 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 | Таблица            | Ключевые поля                                                                                                                                                   |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry                                                        |
-| `app_users`        | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at` |
+| `app_users`        | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at`, `tour_skipped_at` |
 | `networks`         | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at`; `demo_generated_for_date`, `demo_data_revision`, existing `demo_generator_version` |
 
 `account_kind`: `demo | e2e`.

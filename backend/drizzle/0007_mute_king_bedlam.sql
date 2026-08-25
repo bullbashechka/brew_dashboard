@@ -1,0 +1,2 @@
+ALTER TABLE "app"."app_users" ADD COLUMN "tour_skipped_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "app"."app_users" ADD CONSTRAINT "app_users_tour_terminal_state_check" CHECK (not ("app"."app_users"."tour_completed_at" is not null and "app"."app_users"."tour_skipped_at" is not null));

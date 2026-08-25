@@ -21,6 +21,8 @@ import {
   salesResponseSchema,
   analyticsFilterQuerySchema,
   sessionResponseSchema,
+  tourMutationSchema,
+  tourStateResponseSchema,
 } from "@brew-dashboard/contracts";
 
 import {
@@ -48,6 +50,7 @@ import {
   productsHandler,
   salesHandler,
 } from "./analytics/http.ts";
+import { tourStateHandler } from "./tour/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -175,6 +178,30 @@ const onboardingCompleteRoute = createRoute({
   },
 });
 
+const tourStateRoute = createRoute({
+  method: "put",
+  path: "/settings/tour",
+  request: {
+    body: {
+      content: { "application/json": { schema: tourMutationSchema } },
+      description: "Persist guided tour state",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: tourStateResponseSchema } },
+      description: "Guided tour state persisted",
+    },
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    409: errorResponseDefinition("Tour state idempotency conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
 const analyticsErrors = {
   400: errorResponseDefinition("Analytics query validation failed"),
   401: errorResponseDefinition("Authentication required"),
@@ -292,6 +319,11 @@ app.openapi(
     typeof onboardingCompleteRoute,
     AppEnvironment
   >,
+);
+app.use("/settings/tour", requireAuthentication, requireCompletedOnboarding);
+app.openapi(
+  tourStateRoute,
+  tourStateHandler as unknown as RouteHandler<typeof tourStateRoute, AppEnvironment>,
 );
 
 for (const path of ["/overview", "/locations", "/sales", "/products", "/inventory"]) {

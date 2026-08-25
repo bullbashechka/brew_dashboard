@@ -16,7 +16,7 @@ const profile = {
   demoGeneratedForDate: "2026-01-01",
   demoDataRevision: 1,
   demoDataStale: false,
-  tourState: "pending",
+  tourState: "completed",
   expiresAt: null,
 };
 const apiError = {

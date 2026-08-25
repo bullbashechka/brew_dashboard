@@ -4,6 +4,7 @@ import {
   onboardingCompleteResponseSchema,
   priceMutationSchema,
   profileSchema,
+  tourStateResponseSchema,
 } from "../src/index.ts";
 
 const UUID = "123e4567-e89b-12d3-a456-426614174000";
@@ -128,5 +129,13 @@ describe("Stage 4 shared contracts", () => {
       requestId: UUID,
     });
     expect(response.data.generation.revision).toBe(1);
+  });
+
+  it("parses every persisted guided-tour state", () => {
+    for (const state of ["pending", "completed", "skipped"] as const) {
+      expect(
+        tourStateResponseSchema.parse({ data: { state }, meta: {}, requestId: UUID }).data.state,
+      ).toBe(state);
+    }
   });
 });

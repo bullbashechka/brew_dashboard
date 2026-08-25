@@ -273,22 +273,22 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S7.1.** Создать login form для alias/password с generic error, progress и блокировкой повторной отправки.
-- [ ] **S7.2.** Создать обязательный language step с English preselected и сохранением выбора.
-- [ ] **S7.3.** Создать onboarding form на TanStack Form: сеть, owner, количество и уникальные названия точек, country, currency и timezone.
-- [ ] **S7.4.** Согласовать client validation с shared Zod; при server error сохранять введённые значения.
-- [ ] **S7.5.** Показать progress генерации, запретить повторную отправку и перенаправить на Overview только после атомарного успеха.
-- [ ] **S7.6.** После onboarding предложить пропускаемый tour из трёх шагов: Overview KPI/filters, locations/products и inventory/feedback.
-- [ ] **S7.7.** Сохранить completed/skipped state через API и разрешить повторный запуск из Settings.
-- [ ] **S7.8.** Добавить component tests login/language/onboarding forms, validation/errors и tour state.
-- [ ] **S7.9.** Добавить Playwright journey `Login → Language → Onboarding → Overview → Tour`.
+- [x] **S7.1.** Создать login form для alias/password с generic error, progress и блокировкой повторной отправки.
+- [x] **S7.2.** Создать обязательный language step с English preselected и сохранением выбора.
+- [x] **S7.3.** Создать onboarding form на TanStack Form: сеть, owner, количество и уникальные названия точек, country, currency и timezone.
+- [x] **S7.4.** Согласовать client validation с shared Zod; при server error сохранять введённые значения.
+- [x] **S7.5.** Показать progress генерации, запретить повторную отправку и перенаправить на Overview только после атомарного успеха.
+- [x] **S7.6.** После onboarding предложить пропускаемый tour из трёх шагов: Overview KPI/filters, locations/products и inventory/feedback.
+- [x] **S7.7.** Сохранить completed/skipped state через API и разрешить повторный запуск из Settings.
+- [x] **S7.8.** Добавить component tests login/language/onboarding forms, validation/errors и tour state.
+- [x] **S7.9.** Добавить Playwright journey `Login → Language → Onboarding → Overview → Tour`.
 
 ### Критерии приёмки
 
-- [ ] Неавторизованный пользователь не попадает в `/app/*`, а пользователь без onboarding не может его обойти прямым URL.
-- [ ] Onboarding принимает ровно 1–5 уникально названных точек и корректные ISO/IANA значения.
-- [ ] Повторный submit не создаёт дубликаты; ошибка не очищает форму.
-- [ ] Tour можно завершить, пропустить и позднее запустить снова.
+- [x] Неавторизованный пользователь не попадает в `/app/*`, а пользователь без onboarding не может его обойти прямым URL.
+- [x] Onboarding принимает ровно 1–5 уникально названных точек и корректные ISO/IANA значения.
+- [x] Повторный submit не создаёт дубликаты; ошибка не очищает форму.
+- [x] Tour можно завершить, пропустить и позднее запустить снова.
 
 ---
 
@@ -386,7 +386,7 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [ ] **S11.2.** Реализовать `PUT /settings/revenue-goal` как tenant-scoped upsert текущего месяца с non-negative amount.
 - [ ] **S11.3.** После изменения цели обновить Overview progress и записать `revenue_goal_changed`.
 - [ ] **S11.4.** Реализовать `PUT /settings/language` и мгновенно переключать полный UI без потери состояния.
-- [ ] **S11.5.** Реализовать `PUT /settings/tour` и связать его с повторным запуском tour.
+- [x] **S11.5.** Реализовать `PUT /settings/tour` и связать его с повторным запуском tour.
 - [ ] **S11.6.** Реализовать `GET/PUT /feedback` как один tenant-scoped upsert: rating 1–5, comment до 2 000 и обязательный `desired_features` до 2 000 символов.
 - [ ] **S11.7.** Добавить постоянную feedback-кнопку и форму в Settings; повторное открытие показывает сохранённые значения.
 - [ ] **S11.8.** Показать dismissible feedback prompt после трёх разных section views или двух разрешённых mutations, не блокируя работу.
