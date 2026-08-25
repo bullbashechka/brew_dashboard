@@ -320,18 +320,68 @@ export const logoutStateSchema = z.strictObject({
 
 export const logoutResponseSchema = createSuccessEnvelopeSchema(logoutStateSchema);
 
-export const analyticsQuerySchema = z.strictObject({
-  locationId: uuidSchema.optional(),
+const rawLocationIdSchema = z.string().trim().min(1).max(64);
+export const locationSortBySchema = z.enum([
+  "revenue",
+  "grossProfit",
+  "orders",
+  "averageCheck",
+  "grossMargin",
+  "activeAlerts",
+  "name",
+]);
+export const sortDirectionSchema = z.enum(["asc", "desc"]);
+export const analyticsWarningSchema = z.strictObject({
+  code: z.literal("INVALID_LOCATION_FALLBACK"),
+  field: z.literal("locationId"),
+});
+export const analyticsAppliedFiltersSchema = z.strictObject({
+  period: periodSchema,
+  locationId: uuidSchema.nullable(),
+  status: stockStatusSchema.nullable(),
+  sortBy: locationSortBySchema.nullable(),
+  sortDir: sortDirectionSchema.nullable(),
+});
+export const paginationModeSchema = z.enum(["none", "cursor", "page"]);
+export const paginationMetaSchema = z.strictObject({
+  mode: paginationModeSchema,
+  page: z.number().int().min(1).nullable(),
+  pageSize: z.number().int().min(1).max(100).nullable(),
+  nextCursor: z.string().min(1).max(1024).nullable(),
+  pageContext: z.string().min(1).max(2048).nullable(),
+});
+export const analyticsMetaSchema = z.strictObject({
+  asOf: utcTimestampSchema,
+  demoDataRevision: versionSchema,
+  appliedFilters: analyticsAppliedFiltersSchema,
+  warnings: z.array(analyticsWarningSchema),
+  pagination: paginationMetaSchema,
+});
+
+export const analyticsFilterQuerySchema = z.strictObject({
+  locationId: rawLocationIdSchema.optional(),
   period: periodSchema.default("today"),
-  cursor: z.string().min(1).max(512).optional(),
+});
+export const analyticsQuerySchema = analyticsFilterQuerySchema.extend({
+  cursor: z.string().min(1).max(1024).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
-
-export const paginationMetaSchema = z.strictObject({
-  page: z.number().int().min(1).optional(),
-  pageSize: z.number().int().min(1).max(100).optional(),
-  nextCursor: z.string().min(1).max(512).nullable().optional(),
+export const locationsQuerySchema = analyticsFilterQuerySchema.extend({
+  sortBy: locationSortBySchema.default("revenue"),
+  sortDir: sortDirectionSchema.default("desc"),
+});
+export const salesQuerySchema = analyticsFilterQuerySchema.extend({
+  cursor: z.string().min(1).max(1024).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  pageContext: z.string().min(1).max(2048).optional(),
+});
+export const inventoryQuerySchema = analyticsFilterQuerySchema.extend({
+  status: stockStatusSchema.optional(),
+  cursor: z.string().min(1).max(1024).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 export const periodWindowSchema = z.strictObject({
@@ -369,6 +419,15 @@ export const financialKpisSchema = z.strictObject({
   orders: countMetricSchema,
   averageCheck: nullableMoneyMetricSchema,
 });
+export const overviewKpisSchema = z.strictObject({
+  revenue: moneyMetricSchema,
+  grossProfit: moneyMetricSchema,
+  orders: countMetricSchema,
+  averageCheck: nullableMoneyMetricSchema,
+  grossMargin: percentageMetricSchema,
+  activeAlerts: countMetricSchema,
+});
+export const salesKpisSchema = financialKpisSchema;
 
 export const alertSchema = z.strictObject({
   id: uuidSchema,
@@ -402,6 +461,7 @@ export const goalSchema = z.strictObject({
   target: nonNegativeMoneySchema,
   version: versionSchema,
   completionPercent: percentageSchema.nullable(),
+  scope: z.literal("network"),
 });
 
 export const productSummarySchema = z.strictObject({
@@ -419,7 +479,7 @@ export const overviewDataSchema = z.strictObject({
   period: periodSchema,
   locationId: uuidSchema.nullable(),
   window: periodWindowSchema,
-  kpis: financialKpisSchema,
+  kpis: overviewKpisSchema,
   trend: z.array(trendPointSchema),
   goal: goalSchema.nullable(),
   locations: z.array(
@@ -436,19 +496,20 @@ export const overviewDataSchema = z.strictObject({
   bottomProducts: z.array(productSummarySchema),
   stockSummary: stockSummarySchema,
   alerts: z.array(alertSchema),
-  activeAlerts: z.number().int().nonnegative(),
 });
 
 export const locationAnalyticsSchema = z.strictObject({
   locationId: uuidSchema,
   name: z.string(),
-  kpis: financialKpisSchema,
-  activeAlerts: z.number().int().nonnegative(),
+  kpis: overviewKpisSchema,
   performance: z.enum(["best", "weak", "standard"]),
 });
 export const locationsDataSchema = z.strictObject({
   period: periodSchema,
+  locationId: uuidSchema.nullable(),
   window: periodWindowSchema,
+  sortBy: locationSortBySchema,
+  sortDir: sortDirectionSchema,
   locations: z.array(locationAnalyticsSchema),
 });
 
@@ -478,14 +539,15 @@ export const recentOrderSchema = z.strictObject({
   locationId: uuidSchema,
   locationName: z.string(),
   occurredAt: utcTimestampSchema,
+  status: z.enum(["completed", "cancelled"]),
   total: moneySchema,
-  items: z.array(recentOrderItemSchema).min(1),
+  items: z.array(recentOrderItemSchema),
 });
 export const salesDataSchema = z.strictObject({
   period: periodSchema,
   locationId: uuidSchema.nullable(),
   window: periodWindowSchema,
-  kpis: financialKpisSchema,
+  kpis: salesKpisSchema,
   dailySeries: z.array(trendPointSchema),
   heatmap: z.array(heatmapCellSchema),
   peakHours: z.array(
@@ -503,7 +565,9 @@ export const salesDataSchema = z.strictObject({
 
 export const inventoryBalanceSchema = z.strictObject({
   inventoryItemId: uuidSchema,
-  productName: z.string(),
+  inventoryItemName: z.string(),
+  productId: uuidSchema.nullable(),
+  productName: z.string().nullable(),
   locationId: uuidSchema,
   locationName: z.string(),
   unit: z.enum(["pcs", "kg", "l"]),
@@ -514,7 +578,9 @@ export const inventoryBalanceSchema = z.strictObject({
 export const inventoryMovementSchema = z.strictObject({
   movementId: uuidSchema,
   inventoryItemId: uuidSchema,
+  inventoryItemName: z.string(),
   locationId: uuidSchema,
+  locationName: z.string(),
   type: movementTypeSchema,
   quantity: positiveQuantitySchema,
   occurredAt: utcTimestampSchema,
@@ -522,6 +588,8 @@ export const inventoryMovementSchema = z.strictObject({
 export const inventoryDataSchema = z.strictObject({
   period: periodSchema,
   locationId: uuidSchema.nullable(),
+  window: periodWindowSchema,
+  status: stockStatusSchema.nullable(),
   balances: z.array(inventoryBalanceSchema),
   movements: z.array(inventoryMovementSchema),
   alerts: z.array(alertSchema),
@@ -537,6 +605,7 @@ export const productAnalyticsSchema = z.strictObject({
   productId: uuidSchema,
   name: z.string(),
   categoryName: z.string(),
+  active: z.boolean(),
   currentPrice: nonNegativeMoneySchema,
   currentUnitCost: nonNegativeMoneySchema,
   version: versionSchema,
@@ -552,8 +621,8 @@ export const productAnalyticsSchema = z.strictObject({
       status: stockStatusSchema,
     }),
   ),
-  menuGroup: menuGroupSchema,
-  recommendation: menuRecommendationSchema,
+  menuGroup: menuGroupSchema.nullable(),
+  recommendation: menuRecommendationSchema.nullable(),
 });
 export const productsDataSchema = z.strictObject({
   period: periodSchema,
@@ -567,16 +636,25 @@ export const productsDataSchema = z.strictObject({
   products: z.array(productAnalyticsSchema),
 });
 
-export const overviewResponseSchema = createSuccessEnvelopeSchema(overviewDataSchema);
-export const locationsResponseSchema = createSuccessEnvelopeSchema(locationsDataSchema);
+export const overviewResponseSchema = createSuccessEnvelopeSchema(
+  overviewDataSchema,
+  analyticsMetaSchema,
+);
+export const locationsResponseSchema = createSuccessEnvelopeSchema(
+  locationsDataSchema,
+  analyticsMetaSchema,
+);
 export const salesResponseSchema = createSuccessEnvelopeSchema(
   salesDataSchema,
-  paginationMetaSchema,
+  analyticsMetaSchema,
 );
-export const productsResponseSchema = createSuccessEnvelopeSchema(productsDataSchema);
+export const productsResponseSchema = createSuccessEnvelopeSchema(
+  productsDataSchema,
+  analyticsMetaSchema,
+);
 export const inventoryResponseSchema = createSuccessEnvelopeSchema(
   inventoryDataSchema,
-  paginationMetaSchema,
+  analyticsMetaSchema,
 );
 
 export const priceMutationSchema = z.strictObject({

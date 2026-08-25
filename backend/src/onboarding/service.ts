@@ -158,27 +158,15 @@ export const getDemoCounts = async (
   transaction: RequestTransaction,
   networkId: string,
 ): Promise<DemoCounts> => {
-  const [
-    locationCount,
-    categoryCount,
-    productCount,
-    orderCount,
-    orderItemCount,
-    inventoryItemCount,
-    balanceCount,
-    movementCount,
-    targetCount,
-  ] = await Promise.all([
-    countForNetwork(transaction, locations, networkId),
-    countForNetwork(transaction, categories, networkId),
-    countForNetwork(transaction, products, networkId),
-    countForNetwork(transaction, orders, networkId),
-    countForNetwork(transaction, orderItems, networkId),
-    countForNetwork(transaction, inventoryItems, networkId),
-    countForNetwork(transaction, inventoryBalances, networkId),
-    countForNetwork(transaction, inventoryMovements, networkId),
-    countForNetwork(transaction, revenueTargets, networkId),
-  ]);
+  const locationCount = await countForNetwork(transaction, locations, networkId);
+  const categoryCount = await countForNetwork(transaction, categories, networkId);
+  const productCount = await countForNetwork(transaction, products, networkId);
+  const orderCount = await countForNetwork(transaction, orders, networkId);
+  const orderItemCount = await countForNetwork(transaction, orderItems, networkId);
+  const inventoryItemCount = await countForNetwork(transaction, inventoryItems, networkId);
+  const balanceCount = await countForNetwork(transaction, inventoryBalances, networkId);
+  const movementCount = await countForNetwork(transaction, inventoryMovements, networkId);
+  const targetCount = await countForNetwork(transaction, revenueTargets, networkId);
   return {
     locations: locationCount,
     categories: categoryCount,

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
   analyticsQuerySchema,
+  analyticsMetaSchema,
+  inventoryQuerySchema,
+  locationsQuerySchema,
+  overviewKpisSchema,
+  recentOrderSchema,
+  salesQuerySchema,
   apiErrorResponseSchema,
   feedbackMutationSchema,
   inventoryMovementMutationSchema,
@@ -77,6 +83,45 @@ describe("Stage 1 shared contracts", () => {
     expect(analyticsQuerySchema.safeParse({ period: "quarter" }).success).toBe(false);
     expect(analyticsQuerySchema.safeParse({ pageSize: "101" }).success).toBe(false);
     expect(periodSchema.safeParse("6m").success).toBe(true);
+  });
+
+  it("keeps analytics endpoint contracts strict and supports safe filter fallbacks", () => {
+    expect(locationsQuerySchema.parse({}).sortBy).toBe("revenue");
+    expect(inventoryQuerySchema.parse({ status: "low_stock" }).status).toBe("low_stock");
+    expect(salesQuerySchema.safeParse({ cursor: "cursor", page: 2 }).success).toBe(true);
+    expect(overviewKpisSchema.safeParse({}).success).toBe(false);
+    expect(
+      recentOrderSchema.safeParse({
+        orderId: UUID,
+        locationId: UUID,
+        locationName: "Central",
+        occurredAt: "2026-08-25T10:00:00.000Z",
+        status: "completed",
+        total: "0.00",
+        items: [],
+      }).success,
+    ).toBe(true);
+    expect(
+      analyticsMetaSchema.safeParse({
+        asOf: "2026-08-25T10:00:00.000Z",
+        demoDataRevision: 1,
+        appliedFilters: {
+          period: "today",
+          locationId: null,
+          status: null,
+          sortBy: null,
+          sortDir: null,
+        },
+        warnings: [{ code: "INVALID_LOCATION_FALLBACK", field: "locationId" }],
+        pagination: {
+          mode: "none",
+          page: null,
+          pageSize: null,
+          nextCursor: null,
+          pageContext: null,
+        },
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects unknown mutation fields and invalid writeoff quantities", () => {

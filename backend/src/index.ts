@@ -4,6 +4,10 @@ import { HTTPException } from "hono/http-exception";
 import {
   apiErrorResponseSchema,
   healthResponseSchema,
+  inventoryQuerySchema,
+  inventoryResponseSchema,
+  locationsQuerySchema,
+  locationsResponseSchema,
   loginRequestSchema,
   logoutRequestSchema,
   logoutResponseSchema,
@@ -11,6 +15,11 @@ import {
   onboardingCompleteResponseSchema,
   onboardingLanguageResponseSchema,
   onboardingRequestSchema,
+  overviewResponseSchema,
+  productsResponseSchema,
+  salesQuerySchema,
+  salesResponseSchema,
+  analyticsFilterQuerySchema,
   sessionResponseSchema,
 } from "@brew-dashboard/contracts";
 
@@ -32,6 +41,13 @@ import { mutationSecurityMiddleware, requestIdMiddleware } from "./http/middlewa
 import type { AppEnvironment } from "./http/types.ts";
 import { OperationConflictError } from "./domain/idempotency.ts";
 import { onboardingCompleteHandler, onboardingLanguageHandler } from "./onboarding/http.ts";
+import {
+  inventoryHandler,
+  locationsHandler,
+  overviewHandler,
+  productsHandler,
+  salesHandler,
+} from "./analytics/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -159,6 +175,79 @@ const onboardingCompleteRoute = createRoute({
   },
 });
 
+const analyticsErrors = {
+  400: errorResponseDefinition("Analytics query validation failed"),
+  401: errorResponseDefinition("Authentication required"),
+  403: errorResponseDefinition("Onboarding is incomplete"),
+  409: errorResponseDefinition("Analytics pagination context is stale"),
+  500: errorResponseDefinition("Internal server error"),
+};
+
+const overviewRoute = createRoute({
+  method: "get",
+  path: "/overview",
+  request: { query: analyticsFilterQuerySchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: overviewResponseSchema } },
+      description: "Overview analytics",
+    },
+    ...analyticsErrors,
+  },
+});
+
+const locationsRoute = createRoute({
+  method: "get",
+  path: "/locations",
+  request: { query: locationsQuerySchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: locationsResponseSchema } },
+      description: "Location analytics",
+    },
+    ...analyticsErrors,
+  },
+});
+
+const salesRoute = createRoute({
+  method: "get",
+  path: "/sales",
+  request: { query: salesQuerySchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: salesResponseSchema } },
+      description: "Sales analytics",
+    },
+    ...analyticsErrors,
+  },
+});
+
+const productsRoute = createRoute({
+  method: "get",
+  path: "/products",
+  request: { query: analyticsFilterQuerySchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: productsResponseSchema } },
+      description: "Product analytics",
+    },
+    ...analyticsErrors,
+  },
+});
+
+const inventoryRoute = createRoute({
+  method: "get",
+  path: "/inventory",
+  request: { query: inventoryQuerySchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: inventoryResponseSchema } },
+      description: "Inventory analytics",
+    },
+    ...analyticsErrors,
+  },
+});
+
 const validationHook = (result: { success: boolean }, context: Context<AppEnvironment>) => {
   if (result.success) return;
   if (context.req.path.endsWith("/auth/login")) return unauthenticatedResponse(context);
@@ -205,17 +294,29 @@ app.openapi(
   >,
 );
 
+for (const path of ["/overview", "/locations", "/sales", "/products", "/inventory"]) {
+  app.use(path, requireAuthentication, requireCompletedOnboarding);
+}
+
+app.openapi(
+  overviewRoute,
+  overviewHandler as unknown as RouteHandler<typeof overviewRoute, AppEnvironment>,
+);
+app.openapi(
+  locationsRoute,
+  locationsHandler as unknown as RouteHandler<typeof locationsRoute, AppEnvironment>,
+);
+app.openapi(salesRoute, salesHandler as unknown as RouteHandler<typeof salesRoute, AppEnvironment>);
+app.openapi(
+  productsRoute,
+  productsHandler as unknown as RouteHandler<typeof productsRoute, AppEnvironment>,
+);
+app.openapi(
+  inventoryRoute,
+  inventoryHandler as unknown as RouteHandler<typeof inventoryRoute, AppEnvironment>,
+);
+
 for (const path of [
-  "/overview",
-  "/overview/*",
-  "/locations",
-  "/locations/*",
-  "/sales",
-  "/sales/*",
-  "/products",
-  "/products/*",
-  "/inventory",
-  "/inventory/*",
   "/settings",
   "/settings/*",
   "/feedback",

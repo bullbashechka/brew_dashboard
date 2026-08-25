@@ -197,11 +197,11 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Критерии приёмки
 
-- [ ] Повторная генерация одной сети в один локальный день даёт одинаковый исходный набор.
-- [ ] Ошибка на любом шаге не оставляет частично созданную сеть или demo data.
-- [ ] Повторный onboarding не создаёт дубликаты.
-- [ ] Reset не затрагивает данные другого tenant и сохраняет перечисленные preferences/feedback.
-- [ ] После генерации фоновые и Cron-заказы не создаются.
+- [x] Повторная генерация одной сети в один локальный день даёт одинаковый исходный набор.
+- [x] Ошибка на любом шаге не оставляет частично созданную сеть или demo data.
+- [x] Повторный onboarding не создаёт дубликаты.
+- [x] Reset не затрагивает данные другого tenant и сохраняет перечисленные preferences/feedback.
+- [x] После генерации фоновые и Cron-заказы не создаются.
 
 ---
 
@@ -213,16 +213,18 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S5.1.** Создать общий resolver фильтров location/period, текущего и предыдущего окна в timezone сети.
-- [ ] **S5.2.** Реализовать `GET /overview`: шесть KPI, comparison, trends, monthly goal, location comparison, top/bottom products, stock summary и alerts.
-- [ ] **S5.3.** Реализовать `GET /locations`: карточки, метрики, active alerts, сортировку и явные best/weak labels.
-- [ ] **S5.4.** Реализовать `GET /sales`: KPI, daily/comparison series, weekday/hour heatmap, peak hours и breakdown по locations/categories/products.
-- [ ] **S5.5.** Добавить recent synthetic orders с позициями и cursor/page pagination; не добавлять order mutations.
-- [ ] **S5.6.** Реализовать `GET /products`: категории, current price/cost, period metrics, revenue share, balances и menu matrix/recommendations.
-- [ ] **S5.7.** Реализовать `GET /inventory`: balances, thresholds/statuses, recent movements, location/status filters и stock alerts.
-- [ ] **S5.8.** Вычислять `LOW_STOCK`, `OUT_OF_STOCK` и `SALES_DROP` при запросе без persistent alert lifecycle.
-- [ ] **S5.9.** Добавить explain/query checks для тяжёлых агрегатов и при необходимости уточнить индексы новой migration.
-- [ ] **S5.10.** Добавить integration tests формул, фильтров, comparison, pagination, timezone boundaries, error envelope и read isolation между двумя tenants.
+- [x] **S5.1.** Создать общий resolver фильтров location/period, текущего и предыдущего окна в timezone сети.
+- [x] **S5.2.** Реализовать `GET /overview`: шесть KPI, comparison, trends, monthly goal, location comparison, top/bottom products, stock summary и alerts.
+- [x] **S5.3.** Реализовать `GET /locations`: карточки, метрики, active alerts, сортировку и явные best/weak labels.
+- [x] **S5.4.** Реализовать `GET /sales`: KPI, daily/comparison series, weekday/hour heatmap, peak hours и breakdown по locations/categories/products.
+- [x] **S5.5.** Добавить recent synthetic orders с позициями и cursor/page pagination; не добавлять order mutations.
+- [x] **S5.6.** Реализовать `GET /products`: категории, current price/cost, period metrics, revenue share, balances и menu matrix/recommendations.
+- [x] **S5.7.** Реализовать `GET /inventory`: balances, thresholds/statuses, recent movements, location/status filters и stock alerts.
+- [x] **S5.8.** Вычислять `LOW_STOCK`, `OUT_OF_STOCK` и `SALES_DROP` при запросе без persistent alert lifecycle.
+- [x] **S5.9.** Добавить explain/query checks для тяжёлых агрегатов и при необходимости уточнить индексы новой migration.
+- [x] **S5.10.** Добавить integration tests формул, фильтров, comparison, pagination, timezone boundaries, error envelope и read isolation между двумя tenants.
+
+Серверная реализация, общие контракты, unit-тесты и isolated integration/explain сценарии добавлены. Полный integration-прогон ожидает доступный локальный PostgreSQL; production database и миграции этапа не изменялись.
 
 ### Критерии приёмки
 

@@ -87,6 +87,107 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     idempotencyKey,
   });
 
+  type TenantDataSnapshot = {
+    locations: unknown[];
+    categories: unknown[];
+    products: unknown[];
+    orders: unknown[];
+    orderItems: unknown[];
+    inventoryItems: unknown[];
+    inventoryBalances: unknown[];
+    inventoryMovements: unknown[];
+    revenueTargets: unknown[];
+    demoGenerations: unknown[];
+  };
+
+  const readTenantDataSnapshot = async (networkId: string): Promise<TenantDataSnapshot> => {
+    const result = await ownerClient.query<TenantDataSnapshot>(
+      `SELECT
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.locations value WHERE value.network_id = $1), '[]'::jsonb) AS locations,
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.categories value WHERE value.network_id = $1), '[]'::jsonb) AS categories,
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.products value WHERE value.network_id = $1), '[]'::jsonb) AS products,
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.orders value WHERE value.network_id = $1), '[]'::jsonb) AS orders,
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.order_items value WHERE value.network_id = $1), '[]'::jsonb) AS "orderItems",
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.inventory_items value WHERE value.network_id = $1), '[]'::jsonb) AS "inventoryItems",
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.inventory_balances value WHERE value.network_id = $1), '[]'::jsonb) AS "inventoryBalances",
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.inventory_movements value WHERE value.network_id = $1), '[]'::jsonb) AS "inventoryMovements",
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                   FROM app.revenue_targets value WHERE value.network_id = $1), '[]'::jsonb) AS "revenueTargets",
+         COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id'
+                                           ORDER BY value.generated_for_date, value.id)
+                   FROM app.demo_generations value WHERE value.network_id = $1), '[]'::jsonb) AS "demoGenerations"`,
+      [networkId],
+    );
+    return result.rows[0]!;
+  };
+
+  const readNetworkGenerationState = async (networkId: string) => {
+    const result = await ownerClient.query<{
+      name: string | null;
+      ownerName: string | null;
+      countryCode: string | null;
+      currencyCode: string | null;
+      timeZone: string | null;
+      completedAt: string | null;
+      generatedForDate: string | null;
+      generatorVersion: string | null;
+      revision: number;
+    }>(
+      `SELECT name,
+              owner_name AS "ownerName",
+              country_code AS "countryCode",
+              currency_code AS "currencyCode",
+              timezone AS "timeZone",
+              onboarding_completed_at::text AS "completedAt",
+              demo_generated_for_date::text AS "generatedForDate",
+              demo_generator_version AS "generatorVersion",
+              demo_data_revision AS revision
+       FROM app.networks WHERE id = $1`,
+      [networkId],
+    );
+    return result.rows[0]!;
+  };
+
+  const readPreservedSnapshot = async (networkId: string) => {
+    const result = await ownerClient.query<{ snapshot: unknown }>(
+      `SELECT jsonb_build_object(
+         'network', jsonb_build_object(
+           'name', network.name,
+           'ownerName', network.owner_name,
+           'countryCode', network.country_code,
+           'currencyCode', network.currency_code,
+           'timeZone', network.timezone,
+           'language', network.language
+         ),
+         'account', (SELECT to_jsonb(value) - 'id' - 'auth_user_id' - 'network_id' -
+                                    'last_login_at' - 'created_at' - 'updated_at'
+                     FROM app.app_users value WHERE value.network_id = $1),
+         'locations', COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id'
+                                                       ORDER BY value.sort_order, value.id)
+                                FROM app.locations value WHERE value.network_id = $1), '[]'::jsonb),
+         'feedback', COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                               FROM app.feedback_responses value WHERE value.network_id = $1), '[]'::jsonb),
+         'events', COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
+                             FROM app.product_events value WHERE value.network_id = $1), '[]'::jsonb)
+       ) AS snapshot
+       FROM app.networks network WHERE network.id = $1`,
+      [networkId],
+    );
+    return result.rows[0]!.snapshot;
+  };
+
+  const expectNoMaterializedData = (snapshot: TenantDataSnapshot) => {
+    for (const rows of Object.values(snapshot)) expect(rows).toEqual([]);
+  };
+
   beforeAll(async () => {
     await ownerClient.connect();
   });
@@ -140,6 +241,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     expect(firstBody.data.profile.demoDataRevision).toBe(1);
     expect(firstBody.data.counts.products).toBe(12);
     expect(firstBody.data.counts.inventoryBalances).toBe(36);
+    const firstSnapshot = await readTenantDataSnapshot(account.networkId);
 
     const repeat = await request("/api/v1/onboarding/complete", {
       method: "POST",
@@ -150,6 +252,18 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     const repeatBody = onboardingCompleteResponseSchema.parse(await repeat.json());
     expect(repeatBody.data.profile.demoDataRevision).toBe(1);
     expect(repeatBody.data.counts).toEqual(firstBody.data.counts);
+    expect(await readTenantDataSnapshot(account.networkId)).toEqual(firstSnapshot);
+
+    const completedReplay = await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: { ...payload, idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    expect(completedReplay.status).toBe(200);
+    expect(
+      onboardingCompleteResponseSchema.parse(await completedReplay.json()).data.counts,
+    ).toEqual(firstBody.data.counts);
+    expect(await readTenantDataSnapshot(account.networkId)).toEqual(firstSnapshot);
 
     const payloadConflict = await request("/api/v1/onboarding/complete", {
       method: "POST",
@@ -158,14 +272,12 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     });
     expect(payloadConflict.status).toBe(409);
 
-    const current = await ownerClient.query<{ count: string; revision: number }>(
-      `SELECT count(*)::text AS count, max(n.demo_data_revision)::int AS revision
-       FROM app.products p JOIN app.networks n ON n.id = p.network_id
-       WHERE p.network_id = $1`,
-      [account.networkId],
-    );
-    expect(current.rows[0]?.count).toBe("12");
-    expect(current.rows[0]?.revision).toBe(1);
+    expect(await readNetworkGenerationState(account.networkId)).toMatchObject({
+      completedAt: expect.any(String),
+      generatedForDate: expect.any(String),
+      generatorVersion: "v1",
+      revision: 1,
+    });
   });
 
   it("lets the first concurrent onboarding win and returns its state to the other tab", async () => {
@@ -190,57 +302,10 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     expect(firstBody.data.profile.demoDataRevision).toBe(1);
   });
 
-  it("rolls back every phase when demo materialization fails and permits a retry", async () => {
-    const account = await createE2eAccount(`stage4-rollback-${crypto.randomUUID().slice(0, 8)}`);
-    const cookie = await login(account, "198.51.100.54");
-    await request("/api/v1/onboarding/language", {
-      method: "PUT",
-      body: { language: "en", idempotencyKey: crypto.randomUUID() },
-      cookie,
-    });
-    const payload = onboardingPayload(crypto.randomUUID());
-
-    await expect(
-      withRequestDatabase(runtimeUrl!, (db) =>
-        db.transaction(async (transaction) => {
-          await setTenantContext(transaction, account.networkId);
-          return completeOnboarding(transaction, {
-            authUserId: account.authUserId,
-            networkId: account.networkId,
-            request: payload,
-            hooks: {
-              afterPhase: (phase) => {
-                if (phase === "products") throw new Error("injected stage4 failure");
-              },
-            },
-          });
-        }),
-      ),
-    ).rejects.toThrow("injected stage4 failure");
-
-    const rolledBack = await ownerClient.query<{
-      locations: string;
-      products: string;
-      revision: number;
-    }>(
-      `SELECT (SELECT count(*)::text FROM app.locations WHERE network_id = $1) AS locations,
-              (SELECT count(*)::text FROM app.products WHERE network_id = $1) AS products,
-              (SELECT demo_data_revision FROM app.networks WHERE id = $1) AS revision`,
-      [account.networkId],
-    );
-    expect(rolledBack.rows[0]).toEqual({ locations: "0", products: "0", revision: 0 });
-
-    const retry = await request("/api/v1/onboarding/complete", {
-      method: "POST",
-      body: payload,
-      cookie,
-    });
-    expect(retry.status).toBe(200);
-  });
-
   it("rolls back after every onboarding materialization phase", async () => {
     const phases = [
       "locations",
+      "generated",
       "categories",
       "products",
       "orders",
@@ -250,19 +315,16 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       "network",
       "completion-marker",
     ];
+    const account = await createE2eAccount(`stage4-phases-${crypto.randomUUID().slice(0, 8)}`);
+    const cookie = await login(account, "198.51.100.54");
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "en", idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    const payload = onboardingPayload(crypto.randomUUID());
 
     for (const phase of phases) {
-      const account = await createE2eAccount(
-        `stage4-phase-${phase}-${crypto.randomUUID().slice(0, 6)}`,
-      );
-      const cookie = await login(account, `198.51.100.${60 + phases.indexOf(phase)}`);
-      await request("/api/v1/onboarding/language", {
-        method: "PUT",
-        body: { language: "en", idempotencyKey: crypto.randomUUID() },
-        cookie,
-      });
-      const payload = onboardingPayload(crypto.randomUUID());
-
       await expect(
         withRequestDatabase(runtimeUrl!, (db) =>
           db.transaction(async (transaction) => {
@@ -281,53 +343,33 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
         ),
       ).rejects.toThrow(`injected ${phase} failure`);
 
-      const rolledBack = await ownerClient.query<{
-        locations: string;
-        products: string;
-        generations: string;
-        completedAt: string | null;
-        revision: number;
-      }>(
-        `SELECT (SELECT count(*)::text FROM app.locations WHERE network_id = $1) AS locations,
-                (SELECT count(*)::text FROM app.products WHERE network_id = $1) AS products,
-                (SELECT count(*)::text FROM app.demo_generations WHERE network_id = $1) AS generations,
-                (SELECT onboarding_completed_at::text FROM app.networks WHERE id = $1) AS "completedAt",
-                (SELECT demo_data_revision FROM app.networks WHERE id = $1) AS revision`,
-        [account.networkId],
-      );
-      expect(rolledBack.rows[0]).toEqual({
-        locations: "0",
-        products: "0",
-        generations: "0",
+      expectNoMaterializedData(await readTenantDataSnapshot(account.networkId));
+      expect(await readNetworkGenerationState(account.networkId)).toEqual({
+        name: null,
+        ownerName: null,
+        countryCode: null,
+        currencyCode: null,
+        timeZone: null,
         completedAt: null,
+        generatedForDate: null,
+        generatorVersion: null,
         revision: 0,
       });
-
-      const retry = await request("/api/v1/onboarding/complete", {
-        method: "POST",
-        body: payload,
-        cookie,
-      });
-      expect(retry.status).toBe(200);
     }
-  });
 
-  it("rolls back an incomplete onboarding and preserves tenant data through Reset", async () => {
-    const account = await createE2eAccount(`stage4-reset-${crypto.randomUUID().slice(0, 8)}`);
-    const cookie = await login(account, "198.51.100.53");
-    const withoutLanguage = await request("/api/v1/onboarding/complete", {
+    const retry = await request("/api/v1/onboarding/complete", {
       method: "POST",
-      body: onboardingPayload(crypto.randomUUID()),
+      body: payload,
       cookie,
     });
-    expect(withoutLanguage.status).toBe(409);
-    const empty = await ownerClient.query<{ locations: string; products: string }>(
-      `SELECT (SELECT count(*)::text FROM app.locations WHERE network_id = $1) AS locations,
-              (SELECT count(*)::text FROM app.products WHERE network_id = $1) AS products`,
-      [account.networkId],
-    );
-    expect(empty.rows[0]).toEqual({ locations: "0", products: "0" });
+    expect(retry.status).toBe(200);
+  }, 30_000);
 
+  it("rolls back every Reset phase to the previous complete dataset", async () => {
+    const account = await createE2eAccount(
+      `stage4-reset-phases-${crypto.randomUUID().slice(0, 8)}`,
+    );
+    const cookie = await login(account, "198.51.100.55");
     await request("/api/v1/onboarding/language", {
       method: "PUT",
       body: { language: "en", idempotencyKey: crypto.randomUUID() },
@@ -340,17 +382,116 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     });
     expect(complete.status).toBe(200);
 
+    const beforeData = await readTenantDataSnapshot(account.networkId);
+    const beforeNetwork = await readNetworkGenerationState(account.networkId);
+    const phases = [
+      "generated",
+      "cleared",
+      "categories",
+      "products",
+      "orders",
+      "inventory",
+      "goal",
+      "generation",
+      "network",
+    ];
+
+    for (const phase of phases) {
+      await expect(
+        withRequestDatabase(runtimeUrl!, (db) =>
+          db.transaction(async (transaction) => {
+            await setTenantContext(transaction, account.networkId);
+            return resetDemoData(transaction, {
+              authUserId: account.authUserId,
+              networkId: account.networkId,
+              idempotencyKey: crypto.randomUUID(),
+              hooks: {
+                afterPhase: (currentPhase) => {
+                  if (currentPhase === phase) throw new Error(`injected reset ${phase} failure`);
+                },
+              },
+            });
+          }),
+        ),
+      ).rejects.toThrow(`injected reset ${phase} failure`);
+
+      expect(await readTenantDataSnapshot(account.networkId)).toEqual(beforeData);
+      expect(await readNetworkGenerationState(account.networkId)).toEqual(beforeNetwork);
+    }
+
+    const retry = await withRequestDatabase(runtimeUrl!, (db) =>
+      db.transaction(async (transaction) => {
+        await setTenantContext(transaction, account.networkId);
+        return resetDemoData(transaction, {
+          authUserId: account.authUserId,
+          networkId: account.networkId,
+          idempotencyKey: crypto.randomUUID(),
+        });
+      }),
+    );
+    expect(retry.generation.revision).toBe(2);
+  }, 30_000);
+
+  it("regenerates deterministically while preserving preferences and tenant isolation", async () => {
+    const account = await createE2eAccount(`stage4-reset-${crypto.randomUUID().slice(0, 8)}`);
+    const otherAccount = await createE2eAccount(
+      `stage4-reset-other-${crypto.randomUUID().slice(0, 8)}`,
+    );
+    const cookie = await login(account, "198.51.100.53");
+    const otherCookie = await login(otherAccount, "198.51.100.56");
+    const withoutLanguage = await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: onboardingPayload(crypto.randomUUID()),
+      cookie,
+    });
+    expect(withoutLanguage.status).toBe(409);
+    expectNoMaterializedData(await readTenantDataSnapshot(account.networkId));
+
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "en", idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    const complete = await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: onboardingPayload(crypto.randomUUID()),
+      cookie,
+    });
+    expect(complete.status).toBe(200);
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "ru", idempotencyKey: crypto.randomUUID() },
+      cookie: otherCookie,
+    });
+    const otherComplete = await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: {
+        ...onboardingPayload(crypto.randomUUID()),
+        networkName: "Other tenant",
+        ownerName: "Other Owner",
+      },
+      cookie: otherCookie,
+    });
+    expect(otherComplete.status).toBe(200);
+
+    await ownerClient.query(
+      `UPDATE app.app_users SET tour_completed_at = '2026-08-25T05:00:00.000Z'
+       WHERE network_id = $1`,
+      [account.networkId],
+    );
     await ownerClient.query(
       `INSERT INTO app.feedback_responses
        (network_id, rating, comment, desired_features)
        VALUES ($1, 5, 'keep this', 'reset preservation')`,
       [account.networkId],
     );
-    const before = await ownerClient.query<{ id: string; price: string }>(
-      `SELECT id, current_price AS price FROM app.products
-       WHERE network_id = $1 ORDER BY id LIMIT 1`,
-      [account.networkId],
-    );
+    const beforeData = await readTenantDataSnapshot(account.networkId);
+    const beforePreserved = await readPreservedSnapshot(account.networkId);
+    const otherBefore = {
+      data: await readTenantDataSnapshot(otherAccount.networkId),
+      network: await readNetworkGenerationState(otherAccount.networkId),
+      preserved: await readPreservedSnapshot(otherAccount.networkId),
+    };
 
     const resetKey = crypto.randomUUID();
     const reset = await withRequestDatabase(runtimeUrl!, (db) =>
@@ -364,16 +505,27 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       }),
     );
     expect(reset.generation.revision).toBe(2);
+    expect(await readTenantDataSnapshot(account.networkId)).toEqual(beforeData);
+    expect(await readPreservedSnapshot(account.networkId)).toEqual(beforePreserved);
+    expect({
+      data: await readTenantDataSnapshot(otherAccount.networkId),
+      network: await readNetworkGenerationState(otherAccount.networkId),
+      preserved: await readPreservedSnapshot(otherAccount.networkId),
+    }).toEqual(otherBefore);
 
-    const after = await ownerClient.query<{ id: string; price: string; feedback: string }>(
-      `SELECT p.id, p.current_price AS price,
-              (SELECT comment FROM app.feedback_responses WHERE network_id = $1) AS feedback
-       FROM app.products p WHERE p.network_id = $1 ORDER BY p.id LIMIT 1`,
+    const latestOrder = await ownerClient.query<{ orderedAt: Date | null; count: number }>(
+      `SELECT max(ordered_at) AS "orderedAt", count(*)::int AS count
+       FROM app.orders WHERE network_id = $1`,
       [account.networkId],
     );
-    expect(after.rows[0]?.id).toBe(before.rows[0]?.id);
-    expect(after.rows[0]?.price).toBe(before.rows[0]?.price);
-    expect(after.rows[0]?.feedback).toBe("keep this");
+    expect(latestOrder.rows[0]!.orderedAt!.getTime()).toBeLessThanOrEqual(
+      new Date(reset.generation.anchor).getTime(),
+    );
+    const health = await request("/api/v1/health");
+    const currentSession = await request("/api/v1/auth/me", { cookie });
+    expect(health.status).toBe(200);
+    expect(currentSession.status).toBe(200);
+    expect(await readTenantDataSnapshot(account.networkId)).toEqual(beforeData);
 
     const resetRepeat = await withRequestDatabase(runtimeUrl!, (db) =>
       db.transaction(async (transaction) => {
@@ -386,6 +538,25 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       }),
     );
     expect(resetRepeat.generation.revision).toBe(2);
+    expect(await readTenantDataSnapshot(account.networkId)).toEqual(beforeData);
+
+    await expect(
+      withRequestDatabase(runtimeUrl!, (db) =>
+        db.transaction(async (transaction) => {
+          await setTenantContext(transaction, otherAccount.networkId);
+          return resetDemoData(transaction, {
+            authUserId: account.authUserId,
+            networkId: otherAccount.networkId,
+            idempotencyKey: crypto.randomUUID(),
+          });
+        }),
+      ),
+    ).rejects.toThrow("does not own this network");
+    expect({
+      data: await readTenantDataSnapshot(otherAccount.networkId),
+      network: await readNetworkGenerationState(otherAccount.networkId),
+      preserved: await readPreservedSnapshot(otherAccount.networkId),
+    }).toEqual(otherBefore);
 
     const [concurrentFirst, concurrentSecond] = await Promise.all([
       withRequestDatabase(runtimeUrl!, (db) =>
@@ -409,9 +580,11 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
         }),
       ),
     ]);
-    expect([concurrentFirst.generation.revision, concurrentSecond.generation.revision].sort()).toEqual(
-      [3, 4],
-    );
+    expect(
+      [concurrentFirst.generation.revision, concurrentSecond.generation.revision].sort(),
+    ).toEqual([3, 4]);
+    expect(await readTenantDataSnapshot(account.networkId)).toEqual(beforeData);
+    expect(await readPreservedSnapshot(account.networkId)).toEqual(beforePreserved);
 
     await expect(
       withRequestDatabase(runtimeUrl!, (db) =>
@@ -429,5 +602,5 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
         }),
       ),
     ).rejects.toBeDefined();
-  });
+  }, 30_000);
 });

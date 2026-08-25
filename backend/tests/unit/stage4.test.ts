@@ -9,6 +9,7 @@ import {
 } from "../../src/domain/demo-generator.ts";
 import { hashOperationPayload } from "../../src/domain/idempotency.ts";
 import { localDateTimeToUtc } from "../../src/domain/periods.ts";
+import worker from "../../src/index.ts";
 
 const networkId = "11111111-1111-4111-8111-111111111111";
 
@@ -121,5 +122,18 @@ describe("Stage 4 deterministic demo generator", () => {
     expect(first).toBe(samePayload);
     expect(first).not.toBe(otherOperation);
     expect(first).not.toBe(reorderedArray);
+  });
+
+  it("exposes no scheduled or queue handler and configures no background trigger", async () => {
+    expect(Object.keys(worker).sort()).toEqual(["fetch"]);
+
+    const wranglerConfig = await Bun.file(
+      new URL("../../../wrangler.jsonc", import.meta.url),
+    ).text();
+    expect(wranglerConfig).not.toContain('"scheduled"');
+    expect(wranglerConfig).not.toContain('"queue"');
+    expect(wranglerConfig).not.toContain('"queues"');
+    expect(wranglerConfig).not.toContain('"crons"');
+    expect(wranglerConfig).not.toContain('"triggers"');
   });
 });
