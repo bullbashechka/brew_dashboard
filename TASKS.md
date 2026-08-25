@@ -244,24 +244,24 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S6.1.** Настроить TanStack Router для `/login`, `/first-run/language`, `/first-run/onboarding` и всех `/app/*` routes.
-- [ ] **S6.2.** Реализовать root redirect и route guards по session/onboarding state, включая возврат на login после `401`.
-- [ ] **S6.3.** Создать same-origin API client с envelope parsing, request ID в ошибке и очисткой TanStack Query cache при `401`.
-- [ ] **S6.4.** Создать desktop shell с sidebar/top filters и mobile/tablet shell с compact header и drawer navigation.
-- [ ] **S6.5.** Добавить alerts badge/dropdown, постоянный доступ к feedback и logout; не создавать отдельный Alerts route.
-- [ ] **S6.6.** Реализовать глобальные location/period filters в URL query parameters с восстановлением после reload.
-- [ ] **S6.7.** Настроить RU/EN dictionaries, English default/fallback, локализацию validation, states, dates, numbers и currency; пользовательские названия не переводить.
-- [ ] **S6.8.** Собрать светлую визуальную систему на shadcn/ui: off-white/cream surfaces, coffee accent и различимые success/warning/critical/chart colors.
-- [ ] **S6.9.** Создать переиспользуемые skeleton, error/retry, empty, progress/disabled, toast и form-error patterns без потери введённых значений.
-- [ ] **S6.10.** Настроить code splitting routes и приоритет загрузки KPI перед тяжёлыми charts.
-- [ ] **S6.11.** Добавить test, который падает на отсутствующем RU/EN translation key.
+- [x] **S6.1.** Настроить TanStack Router для `/login`, `/first-run/language`, `/first-run/onboarding` и всех `/app/*` routes.
+- [x] **S6.2.** Реализовать root redirect и route guards по session/onboarding state, включая возврат на login после `401`.
+- [x] **S6.3.** Создать same-origin API client с envelope parsing, request ID в ошибке и очисткой TanStack Query cache при `401`.
+- [x] **S6.4.** Создать desktop shell с sidebar/top filters и mobile/tablet shell с compact header и drawer navigation.
+- [x] **S6.5.** Добавить alerts badge/dropdown, постоянный доступ к feedback и logout; не создавать отдельный Alerts route.
+- [x] **S6.6.** Реализовать глобальные location/period filters в URL query parameters с восстановлением после reload.
+- [x] **S6.7.** Настроить RU/EN dictionaries, English default/fallback, локализацию validation, states, dates, numbers и currency; пользовательские названия не переводить.
+- [x] **S6.8.** Собрать светлую визуальную систему на shadcn/ui: off-white/cream surfaces, coffee accent и различимые success/warning/critical/chart colors.
+- [x] **S6.9.** Создать переиспользуемые skeleton, error/retry, empty, progress/disabled, toast и form-error patterns без потери введённых значений.
+- [x] **S6.10.** Настроить code splitting routes и приоритет загрузки KPI перед тяжёлыми charts.
+- [x] **S6.11.** Добавить test, который падает на отсутствующем RU/EN translation key.
 
 ### Критерии приёмки
 
-- [ ] Reload сохраняет location/period в URL, а неизвестные client routes корректно обрабатывает SPA fallback.
-- [ ] Навигация работает без page-level horizontal scroll на 320 px, tablet и desktop.
-- [ ] Focus видим, status не передаётся только цветом, dialogs/navigation используют semantic primitives.
-- [ ] Во всех routes есть безопасное поведение при loading, empty, error и unauthenticated state.
+- [x] Reload сохраняет location/period в URL, а неизвестные client routes корректно обрабатывает SPA fallback.
+- [x] Навигация работает без page-level horizontal scroll на 320 px, tablet и desktop.
+- [x] Focus видим, status не передаётся только цветом, dialogs/navigation используют semantic primitives.
+- [x] Во всех routes есть безопасное поведение при loading, empty, error и unauthenticated state.
 
 ---
 
