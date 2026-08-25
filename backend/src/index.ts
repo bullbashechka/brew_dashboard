@@ -7,10 +7,21 @@ import {
   loginRequestSchema,
   logoutRequestSchema,
   logoutResponseSchema,
+  languageRequestSchema,
+  onboardingCompleteResponseSchema,
+  onboardingLanguageResponseSchema,
+  onboardingRequestSchema,
   sessionResponseSchema,
 } from "@brew-dashboard/contracts";
 
-import { loginHandler, logoutHandler, meHandler, requireAuthentication } from "./auth/http.ts";
+import {
+  loginHandler,
+  logoutHandler,
+  meHandler,
+  requireAuthentication,
+  requireCompletedOnboarding,
+  requireIncompleteOnboarding,
+} from "./auth/http.ts";
 import {
   ApiProblem,
   ensureRequestId,
@@ -19,6 +30,8 @@ import {
 } from "./http/errors.ts";
 import { mutationSecurityMiddleware, requestIdMiddleware } from "./http/middleware.ts";
 import type { AppEnvironment } from "./http/types.ts";
+import { OperationConflictError } from "./domain/idempotency.ts";
+import { onboardingCompleteHandler, onboardingLanguageHandler } from "./onboarding/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -98,6 +111,54 @@ const meRoute = createRoute({
   },
 });
 
+const onboardingLanguageRoute = createRoute({
+  method: "put",
+  path: "/onboarding/language",
+  request: {
+    body: {
+      content: { "application/json": { schema: languageRequestSchema } },
+      description: "Persist the first selected language",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: onboardingLanguageResponseSchema } },
+      description: "Selected onboarding language",
+    },
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Origin rejected"),
+    409: errorResponseDefinition("Onboarding language conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const onboardingCompleteRoute = createRoute({
+  method: "post",
+  path: "/onboarding/complete",
+  request: {
+    body: {
+      content: { "application/json": { schema: onboardingRequestSchema } },
+      description: "Complete onboarding and create deterministic demo data",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: onboardingCompleteResponseSchema } },
+      description: "Completed onboarding and generated demo data",
+    },
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Origin rejected"),
+    409: errorResponseDefinition("Onboarding conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
 const validationHook = (result: { success: boolean }, context: Context<AppEnvironment>) => {
   if (result.success) return;
   if (context.req.path.endsWith("/auth/login")) return unauthenticatedResponse(context);
@@ -127,11 +188,54 @@ app.openapi(
 app.use("/auth/me", requireAuthentication);
 app.openapi(meRoute, meHandler as unknown as RouteHandler<typeof meRoute, AppEnvironment>);
 
+app.use("/onboarding/language", requireAuthentication, requireIncompleteOnboarding);
+app.openapi(
+  onboardingLanguageRoute,
+  onboardingLanguageHandler as unknown as RouteHandler<
+    typeof onboardingLanguageRoute,
+    AppEnvironment
+  >,
+);
+app.use("/onboarding/complete", requireAuthentication);
+app.openapi(
+  onboardingCompleteRoute,
+  onboardingCompleteHandler as unknown as RouteHandler<
+    typeof onboardingCompleteRoute,
+    AppEnvironment
+  >,
+);
+
+for (const path of [
+  "/overview",
+  "/overview/*",
+  "/locations",
+  "/locations/*",
+  "/sales",
+  "/sales/*",
+  "/products",
+  "/products/*",
+  "/inventory",
+  "/inventory/*",
+  "/settings",
+  "/settings/*",
+  "/feedback",
+  "/feedback/*",
+  "/events",
+  "/events/*",
+  "/demo",
+  "/demo/*",
+]) {
+  app.use(path, requireAuthentication, requireCompletedOnboarding);
+}
+
 app.notFound((context) => errorResponse(context, "NOT_FOUND", 404, "Not found"));
 
 app.onError((error, context) => {
   if (error instanceof ApiProblem) {
     return errorResponse(context, error.code, error.status, error.message, error.fields);
+  }
+  if (error instanceof OperationConflictError) {
+    return errorResponse(context, "CONFLICT", 409, error.message);
   }
   if (error instanceof HTTPException && error.status === 400) {
     if (context.req.path.endsWith("/auth/login")) return unauthenticatedResponse(context);

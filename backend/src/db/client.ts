@@ -46,5 +46,8 @@ export const lockLogin = (transaction: RequestTransaction, loginNormalized: stri
 export const lockAuthUser = (transaction: RequestTransaction, authUserId: string) =>
   advisoryLock(transaction, `brew-dashboard:user:${authUserId}`);
 
+export const lockNetwork = (transaction: RequestTransaction, networkId: string) =>
+  advisoryLock(transaction, `brew-dashboard:network:${networkId}`);
+
 export const lockActiveDemoLimit = (transaction: RequestTransaction) =>
   advisoryLock(transaction, "brew-dashboard:active-demo-limit");

@@ -290,7 +290,8 @@ bun run admin:create-user -- --login <login>
 - сеть, точки и демо-набор создаются одной идемпотентной database operation;
 - повторный запрос не создаёт дубликаты;
 - при ошибке значения формы сохраняются;
-- доступ к `/app/*` до успешного завершения закрыт.
+- `onboarding_completed_at` и completed idempotency marker записываются последними;
+- доступ к `/app/*` и business API до успешного завершения закрыт.
 
 ## 9. Демо-данные
 
@@ -312,14 +313,21 @@ bun run admin:create-user -- --login <login>
 - low-stock, out-of-stock и sales-drop conditions;
 - обязательные данные для Today и Yesterday.
 
+Если в сети только одна точка, она считается нейтральной: демо не присваивает ей labels `best` или
+`weak`. Сильная и слабая точки вычисляются и показываются только для сетей с двумя и более точками.
+
 Данные синтетические и не заявляются как данные реальной кофейни.
 
 ### 9.2. Детерминированность
 
 - generator имеет version и стабильный seed для сети и локальной даты;
+- `demo_generations.created_at` — неизменяемый UTC anchor конкретной локальной даты;
+- `demo_data_revision` равен `0` до onboarding, `1` после первой генерации и увеличивается на каждый новый Reset;
 - повторный Reset в один локальный день создаёт одинаковый исходный набор;
 - после генерации новые заказы автоматически не добавляются;
-- когда Today/Yesterday устаревают, Overview предлагает выполнить Reset, но не меняет данные без подтверждения.
+- когда Today/Yesterday устаревают, Overview предлагает выполнить Reset, но не меняет данные без подтверждения;
+- stale-набор остаётся доступным для просмотра и изменений; mutation из старой вкладки с устаревшей
+  `expectedDemoDataRevision` получает `409 CONFLICT` без потери введённого значения.
 
 ### 9.3. Разрешённые изменения
 
@@ -337,6 +345,9 @@ bun run admin:create-user -- --login <login>
 - writeoff вводится положительным количеством и не может превышать текущий остаток;
 - inventory movements не редактируются и не удаляются, но Reset восстанавливает весь набор;
 - изменения сохраняются между сессиями и влияют только на текущую сеть.
+
+Все price, inventory movement и revenue-goal mutations передают `expectedDemoDataRevision`;
+Reset выигрывает у stale mutation и требует повторного подтверждения актуального значения.
 
 ### 9.4. Reset demo data
 
@@ -530,7 +541,7 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry                                                        |
 | `app_users`        | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at` |
-| `networks`         | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at`                                 |
+| `networks`         | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at`; `demo_generated_for_date`, `demo_data_revision`, existing `demo_generator_version` |
 
 `account_kind`: `demo | e2e`.
 
@@ -549,7 +560,7 @@ Event содержит `user_id`, `network_id`, type, timestamp, optional route 
 | `revenue_targets`     | `network_id`, `month`, `amount`, UNIQUE network/month                                              |
 | `feedback_responses`  | `network_id UNIQUE`, `rating`, `comment`, `desired_features`, `submitted_at`, `updated_at`         |
 | `product_events`      | `network_id`, `user_id`, `type`, `route`, `metadata`, `occurred_at`                                |
-| `demo_generations`    | `network_id`, `generated_for_date`, `seed`, `version`, `created_at`                                |
+| `demo_generations`    | `network_id`, `generated_for_date`, `seed`, `version`, immutable UTC anchor in `created_at`          |
 
 Все business tables используют UUID, `created_at`/`updated_at` по необходимости и обязательный `network_id`. Soft delete отсутствует.
 
@@ -645,6 +656,8 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 - Все UUID проверяются на tenant ownership.
 - Onboarding и demo generation выполняются атомарно и идемпотентно.
 - Inventory movement и balance update выполняются одной database function.
+- Runtime role не имеет прямого DML к inventory balances/movements; onboarding и Reset используют
+  узкую tenant-scoped `SECURITY DEFINER` baseline function с полной проверкой location×item coverage.
 - Reset полностью заменяет demo data одной атомарной database operation.
 - Feedback и revenue goal используют upsert с уникальным tenant scope.
 - Product event принимает только whitelist type и schema-validated metadata.

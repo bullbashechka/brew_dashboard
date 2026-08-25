@@ -36,9 +36,10 @@ const displayNameSchema = z
   .string()
   .refine((value) => !invisibleControlPattern.test(value), "Name contains an unsupported character")
   .refine((value) => normalizeDisplayName(value).length >= 2, "Name must be at least 2 characters")
+  .refine((value) => normalizeDisplayName(value).length <= 80, "Name must be at most 80 characters")
   .refine(
-    (value) => normalizeDisplayName(value).length <= 80,
-    "Name must be at most 80 characters",
+    (value) => normalizedNameKey(value).length <= 80,
+    "Normalized name must be at most 80 characters",
   );
 
 const moneyPattern = /^-?(?:0|[1-9]\d{0,11})\.\d{2}$/;
@@ -93,6 +94,7 @@ export const currencyCodeSchema = z
 export const timeZoneSchema = z.string().refine(isValidTimeZone, "Expected an IANA timezone");
 export const versionSchema = z.number().int().positive();
 export const idempotencyKeySchema = uuidSchema;
+export const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const apiErrorCodeSchema = z.enum([
   "VALIDATION_ERROR",
@@ -189,20 +191,65 @@ export const onboardingRequestSchema = z
     }
   });
 
-export const profileSchema = z.strictObject({
-  userId: uuidSchema,
-  login: loginSchema,
-  networkId: uuidSchema,
-  networkName: z.string().nullable(),
-  ownerName: z.string().nullable(),
-  country: countryCodeSchema.nullable(),
-  currency: currencyCodeSchema.nullable(),
-  timeZone: timeZoneSchema.nullable(),
-  language: languageSchema.nullable(),
-  onboardingCompletedAt: utcTimestampSchema.nullable(),
-  tourState: tourStateSchema,
-  expiresAt: utcTimestampSchema.nullable(),
-});
+export const profileSchema = z
+  .strictObject({
+    userId: uuidSchema,
+    login: loginSchema,
+    networkId: uuidSchema,
+    networkName: z.string().nullable(),
+    ownerName: z.string().nullable(),
+    country: countryCodeSchema.nullable(),
+    currency: currencyCodeSchema.nullable(),
+    timeZone: timeZoneSchema.nullable(),
+    language: languageSchema.nullable(),
+    effectiveLanguage: languageSchema,
+    onboardingCompletedAt: utcTimestampSchema.nullable(),
+    demoGeneratorVersion: z.string().min(1).max(32).nullable(),
+    demoGeneratedForDate: dateKeySchema.nullable(),
+    demoDataRevision: z.number().int().nonnegative(),
+    demoDataStale: z.boolean(),
+    tourState: tourStateSchema,
+    expiresAt: utcTimestampSchema.nullable(),
+  })
+  .superRefine((profile, context) => {
+    const expectedLanguage = profile.language ?? "en";
+    if (profile.effectiveLanguage !== expectedLanguage) {
+      context.addIssue({
+        code: "custom",
+        path: ["effectiveLanguage"],
+        message: "Effective language must match language or the en fallback",
+      });
+    }
+
+    const isComplete = profile.onboardingCompletedAt !== null;
+    if (!isComplete) {
+      if (
+        profile.demoGeneratorVersion !== null ||
+        profile.demoGeneratedForDate !== null ||
+        profile.demoDataRevision !== 0 ||
+        profile.demoDataStale
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["demoDataRevision"],
+          message: "Incomplete onboarding cannot expose generated demo data",
+        });
+      }
+      return;
+    }
+
+    if (
+      profile.demoGeneratorVersion === null ||
+      profile.demoGeneratedForDate === null ||
+      profile.demoDataRevision < 1
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["demoGeneratorVersion"],
+        message: "Completed onboarding requires a pinned demo generation",
+      });
+    }
+  });
 
 export const sessionStateSchema = z.strictObject({
   authenticated: z.literal(true),
@@ -210,6 +257,62 @@ export const sessionStateSchema = z.strictObject({
 });
 
 export const sessionResponseSchema = createSuccessEnvelopeSchema(sessionStateSchema);
+
+export const demoCountsSchema = z.strictObject({
+  locations: z.number().int().nonnegative(),
+  categories: z.number().int().nonnegative(),
+  products: z.number().int().nonnegative(),
+  orders: z.number().int().nonnegative(),
+  orderItems: z.number().int().nonnegative(),
+  inventoryItems: z.number().int().nonnegative(),
+  inventoryBalances: z.number().int().nonnegative(),
+  inventoryMovements: z.number().int().nonnegative(),
+  revenueTargets: z.number().int().nonnegative(),
+});
+
+export const demoGenerationSchema = z.strictObject({
+  version: z.string().min(1).max(32),
+  generatedForDate: dateKeySchema,
+  anchor: utcTimestampSchema,
+  seed: z.number().int().nonnegative(),
+  revision: z.number().int().positive(),
+  stale: z.boolean(),
+});
+
+export const onboardingLanguageDataSchema = z.strictObject({
+  language: languageSchema,
+  effectiveLanguage: languageSchema,
+});
+export const onboardingLanguageResponseSchema = createSuccessEnvelopeSchema(
+  onboardingLanguageDataSchema,
+);
+
+export const onboardingCompleteDataSchema = z
+  .strictObject({
+    profile: profileSchema,
+    generation: demoGenerationSchema,
+    counts: demoCountsSchema,
+  })
+  .superRefine(({ profile, generation }, context) => {
+    if (
+      profile.demoGeneratorVersion !== generation.version ||
+      profile.demoGeneratedForDate !== generation.generatedForDate ||
+      profile.demoDataRevision !== generation.revision ||
+      profile.demoDataStale !== generation.stale
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["generation"],
+        message: "Profile and generation state must come from one observation",
+      });
+    }
+  });
+export const onboardingCompleteResponseSchema = createSuccessEnvelopeSchema(
+  onboardingCompleteDataSchema,
+);
+
+export const resetResultDataSchema = onboardingCompleteDataSchema;
+export const resetResultResponseSchema = createSuccessEnvelopeSchema(resetResultDataSchema);
 
 export const logoutStateSchema = z.strictObject({
   authenticated: z.literal(false),
@@ -479,6 +582,7 @@ export const inventoryResponseSchema = createSuccessEnvelopeSchema(
 export const priceMutationSchema = z.strictObject({
   price: nonNegativeMoneySchema,
   expectedVersion: versionSchema,
+  expectedDemoDataRevision: versionSchema.default(1),
   idempotencyKey: idempotencyKeySchema,
 });
 export const inventoryMovementMutationSchema = z.strictObject({
@@ -486,11 +590,13 @@ export const inventoryMovementMutationSchema = z.strictObject({
   locationId: uuidSchema,
   type: movementTypeSchema,
   quantity: positiveQuantitySchema,
+  expectedDemoDataRevision: versionSchema.default(1),
   idempotencyKey: idempotencyKeySchema,
 });
 export const revenueGoalMutationSchema = z.strictObject({
   monthlyGoal: nonNegativeMoneySchema,
   expectedVersion: versionSchema.nullable(),
+  expectedDemoDataRevision: versionSchema.default(1),
   idempotencyKey: idempotencyKeySchema,
 });
 export const tourMutationSchema = z.strictObject({
@@ -613,6 +719,11 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type Profile = z.infer<typeof profileSchema>;
+export type DemoCounts = z.infer<typeof demoCountsSchema>;
+export type DemoGeneration = z.infer<typeof demoGenerationSchema>;
+export type OnboardingLanguageData = z.infer<typeof onboardingLanguageDataSchema>;
+export type OnboardingCompleteData = z.infer<typeof onboardingCompleteDataSchema>;
+export type ResetResultData = z.infer<typeof resetResultDataSchema>;
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export type LogoutResponse = z.infer<typeof logoutResponseSchema>;
 export type OnboardingRequest = z.infer<typeof onboardingRequestSchema>;

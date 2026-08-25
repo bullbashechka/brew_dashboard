@@ -150,6 +150,8 @@ export const networks = app
         mode: "date",
       }),
       demoGeneratorVersion: varchar("demo_generator_version", { length: 32 }),
+      demoGeneratedForDate: date("demo_generated_for_date"),
+      demoDataRevision: integer("demo_data_revision").default(0).notNull(),
       ...timestampColumns,
     },
     (table) => [
@@ -169,6 +171,7 @@ export const networks = app
         "networks_owner_name_length_check",
         sql`${table.ownerName} is null or char_length(btrim(${table.ownerName})) between 2 and 80`,
       ),
+      check("networks_demo_data_revision_check", sql`${table.demoDataRevision} >= 0`),
       tenantPolicy("networks", "id"),
     ],
   )

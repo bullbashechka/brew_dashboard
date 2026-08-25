@@ -174,19 +174,26 @@ backup schedules не являются частью MVP и не требуютс
 
 **Зависимости:** этапы 1–3.
 
+Граница этапа: S4 закрывает server/API boundary, состояние генерации, atomic onboarding и внутреннюю
+Reset operation. Клиентский redirect `/app/*` на первый незавершённый шаг и полноценные onboarding-экраны
+остаются в S6.2 и этапах 6–8/11. Для одной точки демо-набор не присваивает `best`/`weak`: точка
+считается нейтральной; labels сильной/слабой точки появляются только при наличии двух и более точек.
+Серверная реализация и unit/integration сценарии добавлены; implementation-задачи этапа завершены.
+Непроверенные критерии приёмки остаются открытыми до полного локального прогона на isolated PostgreSQL.
+
 ### Задачи
 
-- [ ] **S4.1.** Реализовать `PUT /onboarding/language` с English по умолчанию и fallback.
-- [ ] **S4.2.** Реализовать server validation названия сети и owner name длиной 2–80, 1–5 точек (default 3) с уникальными названиями длиной 2–80, ISO country/currency и IANA timezone.
-- [ ] **S4.3.** Создать versioned deterministic generator со стабильным seed сети и локальной даты.
-- [ ] **S4.4.** Генерировать до 20 товаров, до 3 000 заказов за шесть месяцев и текущий день, 1–3 позиции с price/cost snapshots, inventory, movements и месячную цель.
-- [ ] **S4.5.** Гарантировать в наборе сильную/слабую точку, утренние/дневные пики, top/bottom products, четыре menu groups, low/out-of-stock, sales drop и данные Today/Yesterday.
-- [ ] **S4.6.** Реализовать атомарную database operation завершения onboarding: сеть, точки, демо-набор и `onboarding_completed_at` создаются один раз.
-- [ ] **S4.7.** Реализовать `POST /onboarding/complete`; повтор одного и того же запроса возвращает согласованный результат без дубликатов.
-- [ ] **S4.8.** Запретить доступ к `/app/*` и business API до успешного завершения onboarding.
-- [ ] **S4.9.** Вычислять устаревание Today/Yesterday и возвращать признак для предложения Reset без автоматического изменения данных.
-- [ ] **S4.10.** Реализовать атомарную и идемпотентную reset operation: заменить только demo data и сохранить account, owner/network preferences, locations, tour state и feedback.
-- [ ] **S4.11.** Добавить unit/integration tests детерминированности, локальной даты, generator invariants, onboarding idempotency, rollback при ошибке и atomic Reset.
+- [x] **S4.1.** Реализовать `PUT /onboarding/language` с English по умолчанию и fallback.
+- [x] **S4.2.** Реализовать server validation названия сети и owner name длиной 2–80, 1–5 точек (default 3) с уникальными названиями длиной 2–80, ISO country/currency и IANA timezone.
+- [x] **S4.3.** Создать versioned deterministic generator со стабильным seed сети и локальной даты.
+- [x] **S4.4.** Генерировать до 20 товаров, до 3 000 заказов за шесть месяцев и текущий день, 1–3 позиции с price/cost snapshots, inventory, movements и месячную цель.
+- [x] **S4.5.** Гарантировать в наборе сильную/слабую точку, утренние/дневные пики, top/bottom products, четыре menu groups, low/out-of-stock, sales drop и данные Today/Yesterday.
+- [x] **S4.6.** Реализовать атомарную database operation завершения onboarding: сеть, точки, демо-набор и `onboarding_completed_at` создаются один раз.
+- [x] **S4.7.** Реализовать `POST /onboarding/complete`; повтор одного и того же запроса возвращает согласованный результат без дубликатов.
+- [x] **S4.8.** Запретить доступ к `/app/*` и business API до успешного завершения onboarding.
+- [x] **S4.9.** Вычислять устаревание Today/Yesterday и возвращать признак для предложения Reset без автоматического изменения данных.
+- [x] **S4.10.** Реализовать атомарную и идемпотентную reset operation: заменить только demo data и сохранить account, owner/network preferences, locations, tour state и feedback.
+- [x] **S4.11.** Добавить unit/integration tests детерминированности, локальной даты, generator invariants, onboarding idempotency, rollback при ошибке и atomic Reset.
 
 ### Критерии приёмки
 

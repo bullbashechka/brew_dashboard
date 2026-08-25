@@ -7,7 +7,7 @@ export type PeriodWindow = {
   comparisonEnd: Date;
 };
 
-type LocalParts = {
+export type LocalParts = {
   year: number;
   month: number;
   day: number;
@@ -82,6 +82,25 @@ const fromLocal = (value: LocalParts, timeZone: string): Date => {
     candidate = next;
   }
   return new Date(candidate);
+};
+
+const sameLocalParts = (left: LocalParts, right: LocalParts): boolean =>
+  left.year === right.year &&
+  left.month === right.month &&
+  left.day === right.day &&
+  left.hour === right.hour &&
+  left.minute === right.minute &&
+  left.second === right.second &&
+  left.millisecond === right.millisecond;
+
+/**
+ * Convert a wall-clock timestamp without inventing a time during a DST gap.
+ * The fixed-point conversion starts with the pre-transition offset, so an
+ * ambiguous fold resolves to the earliest UTC occurrence.
+ */
+export const localDateTimeToUtc = (value: LocalParts, timeZone: string): Date | null => {
+  const candidate = fromLocal(value, timeZone);
+  return sameLocalParts(parts(candidate, timeZone), value) ? candidate : null;
 };
 
 const calendarDate = (value: LocalParts, months: number, days: number): LocalParts => {

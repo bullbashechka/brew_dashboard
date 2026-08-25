@@ -25,6 +25,7 @@ import {
 } from "./better-auth.ts";
 import { LoginRateLimitError, consumeLoginPairRateLimit } from "./rate-limit.ts";
 import { normalizeLogin } from "./login.ts";
+import { localDateKey } from "../domain/periods.ts";
 
 type SessionPayload = {
   session: {
@@ -150,11 +151,11 @@ const isLoginPayload = (value: unknown): value is LoginPayload => {
   );
 };
 
-const loadActiveProfile = async (
+export const loadActiveProfile = async (
   transaction: RequestTransaction,
   authUserId: string,
+  now = new Date(),
 ): Promise<LoadedProfile | null> => {
-  const now = new Date();
   const rows = await transaction
     .select({
       appUser: appUsers,
@@ -192,7 +193,14 @@ const loadActiveProfile = async (
     currency: currentNetwork.currencyCode,
     timeZone: currentNetwork.timezone,
     language: currentNetwork.language,
+    effectiveLanguage: currentNetwork.language ?? "en",
     onboardingCompletedAt: currentNetwork.onboardingCompletedAt?.toISOString() ?? null,
+    demoGeneratorVersion: currentNetwork.demoGeneratorVersion,
+    demoGeneratedForDate: currentNetwork.demoGeneratedForDate,
+    demoDataRevision: currentNetwork.demoDataRevision,
+    demoDataStale:
+      Boolean(currentNetwork.demoGeneratedForDate && currentNetwork.timezone) &&
+      currentNetwork.demoGeneratedForDate !== localDateKey(now, currentNetwork.timezone!),
     tourState: identity.appUser.tourCompletedAt ? "completed" : "pending",
     expiresAt: identity.appUser.expiresAt?.toISOString() ?? null,
   });
@@ -354,6 +362,26 @@ export const requireAuthentication = async (
       return context.res;
     }),
   );
+};
+
+export const requireCompletedOnboarding = async (
+  context: Context<AppEnvironment>,
+  next: Next,
+): Promise<Response | void> => {
+  if (!context.get("auth").profile.onboardingCompletedAt) {
+    return errorResponse(context, "FORBIDDEN", 403, "Complete onboarding before using the app");
+  }
+  await next();
+};
+
+export const requireIncompleteOnboarding = async (
+  context: Context<AppEnvironment>,
+  next: Next,
+): Promise<Response | void> => {
+  if (context.get("auth").profile.onboardingCompletedAt) {
+    return errorResponse(context, "CONFLICT", 409, "Onboarding has already been completed");
+  }
+  await next();
 };
 
 export const logoutHandler = async (context: Context<AppEnvironment>) => {
