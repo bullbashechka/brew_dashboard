@@ -1,13 +1,21 @@
 import { queryOptions } from "@tanstack/react-query";
-import { locationsResponseSchema, overviewResponseSchema } from "@brew-dashboard/contracts";
+import {
+  locationsResponseSchema,
+  overviewResponseSchema,
+  type AnalyticsQuery,
+  type LocationsData,
+} from "@brew-dashboard/contracts";
 import { requestApi } from "./client";
 
-export type AnalyticsPeriod = "today" | "7d" | "30d" | "6m";
+export type AnalyticsPeriod = AnalyticsQuery["period"];
 export type AnalyticsFilters = { period: AnalyticsPeriod; locationId?: string | undefined };
+export type LocationSorting = Pick<LocationsData, "sortBy" | "sortDir">;
 
-const queryString = (filters: AnalyticsFilters) => {
+const queryString = (filters: AnalyticsFilters & Partial<LocationSorting>) => {
   const params = new URLSearchParams({ period: filters.period });
   if (filters.locationId) params.set("locationId", filters.locationId);
+  if (filters.sortBy) params.set("sortBy", filters.sortBy);
+  if (filters.sortDir) params.set("sortDir", filters.sortDir);
   return params.toString();
 };
 
@@ -32,6 +40,17 @@ export const overviewQuery = (networkId: string, filters: AnalyticsFilters) =>
       requestApi({
         path: `/api/v1/overview?${queryString(filters)}`,
         schema: overviewResponseSchema,
+        signal,
+      }),
+  });
+
+export const locationsQuery = (networkId: string, filters: AnalyticsFilters & LocationSorting) =>
+  queryOptions({
+    queryKey: ["tenant", networkId, "locations", filters],
+    queryFn: ({ signal }) =>
+      requestApi({
+        path: `/api/v1/locations?${queryString(filters)}`,
+        schema: locationsResponseSchema,
         signal,
       }),
   });

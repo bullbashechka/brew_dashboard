@@ -19,6 +19,7 @@
     "typecheck": "bun run --cwd packages/contracts typecheck && bun run --cwd backend typecheck && bun run --cwd webapp typecheck",
     "test": "bun run --cwd packages/contracts test && bun run --cwd backend test:unit && bun run --cwd webapp test",
     "test:integration": "bun run --cwd backend test:integration",
+    "test:integration:docker": "docker compose up -d --wait postgres-test && DATABASE_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:54329/postgres' bun run test:integration",
     "test:e2e": "bun run --cwd webapp test:e2e",
     "db:generate": "bun run --cwd backend db:generate",
     "db:check": "bun run --cwd backend db:check",

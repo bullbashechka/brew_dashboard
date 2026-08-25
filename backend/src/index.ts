@@ -20,6 +20,8 @@ import {
   salesQuerySchema,
   salesResponseSchema,
   analyticsFilterQuerySchema,
+  resetMutationSchema,
+  resetResultResponseSchema,
   sessionResponseSchema,
   tourMutationSchema,
   tourStateResponseSchema,
@@ -51,6 +53,7 @@ import {
   salesHandler,
 } from "./analytics/http.ts";
 import { tourStateHandler } from "./tour/http.ts";
+import { resetDemoHandler } from "./demo/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -202,6 +205,30 @@ const tourStateRoute = createRoute({
   },
 });
 
+const resetDemoRoute = createRoute({
+  method: "post",
+  path: "/demo/reset",
+  request: {
+    body: {
+      content: { "application/json": { schema: resetMutationSchema } },
+      description: "Regenerate the current tenant's deterministic demo data",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: resetResultResponseSchema } },
+      description: "Demo data reset completed",
+    },
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    409: errorResponseDefinition("Demo reset idempotency or generation conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
 const analyticsErrors = {
   400: errorResponseDefinition("Analytics query validation failed"),
   401: errorResponseDefinition("Authentication required"),
@@ -324,6 +351,11 @@ app.use("/settings/tour", requireAuthentication, requireCompletedOnboarding);
 app.openapi(
   tourStateRoute,
   tourStateHandler as unknown as RouteHandler<typeof tourStateRoute, AppEnvironment>,
+);
+app.use("/demo/reset", requireAuthentication, requireCompletedOnboarding);
+app.openapi(
+  resetDemoRoute,
+  resetDemoHandler as unknown as RouteHandler<typeof resetDemoRoute, AppEnvironment>,
 );
 
 for (const path of ["/overview", "/locations", "/sales", "/products", "/inventory"]) {

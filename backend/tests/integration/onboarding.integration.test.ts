@@ -3,6 +3,7 @@ import {
   apiErrorResponseSchema,
   onboardingCompleteResponseSchema,
   onboardingLanguageResponseSchema,
+  resetResultResponseSchema,
 } from "@brew-dashboard/contracts";
 import { sql } from "drizzle-orm";
 import { Client } from "pg";
@@ -602,5 +603,46 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
         }),
       ),
     ).rejects.toBeDefined();
+  }, 30_000);
+
+  it("serves an authenticated idempotent demo reset endpoint", async () => {
+    const account = await createE2eAccount(`stage8-reset-${crypto.randomUUID().slice(0, 8)}`);
+    const cookie = await login(account, "198.51.100.58");
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "en", idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: onboardingPayload(crypto.randomUUID()),
+      cookie,
+    });
+
+    const idempotencyKey = crypto.randomUUID();
+    const first = await request("/api/v1/demo/reset", {
+      method: "POST",
+      body: { idempotencyKey },
+      cookie,
+    });
+    expect(first.status).toBe(200);
+    const firstBody = resetResultResponseSchema.parse(await first.json());
+    expect(firstBody.data.profile.demoDataRevision).toBe(2);
+    expect(firstBody.data.generation.revision).toBe(2);
+
+    const replay = await request("/api/v1/demo/reset", {
+      method: "POST",
+      body: { idempotencyKey },
+      cookie,
+    });
+    expect(replay.status).toBe(200);
+    expect(resetResultResponseSchema.parse(await replay.json()).data.generation.revision).toBe(2);
+
+    const guest = await request("/api/v1/demo/reset", {
+      method: "POST",
+      body: { idempotencyKey: crypto.randomUUID() },
+    });
+    expect(guest.status).toBe(401);
+    expect(apiErrorResponseSchema.parse(await guest.json()).error.code).toBe("UNAUTHENTICATED");
   }, 30_000);
 });

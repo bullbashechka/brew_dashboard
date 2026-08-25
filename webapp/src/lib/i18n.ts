@@ -65,6 +65,7 @@ const en = {
   },
   actions: {
     retry: "Try again",
+    cancel: "Cancel",
     logout: "Log out",
     feedback: "Feedback",
     close: "Close",
@@ -86,6 +87,65 @@ const en = {
     lowStock: "Low stock",
     outOfStock: "Out of stock",
     salesDrop: "Sales drop",
+  },
+  metrics: {
+    revenue: "Revenue",
+    grossProfit: "Gross profit",
+    orders: "Orders",
+    averageCheck: "Average check",
+    grossMargin: "Gross margin",
+    activeAlerts: "Active alerts",
+  },
+  comparison: {
+    versusPrevious: "vs previous period",
+    notAvailable: "N/A",
+    increase: "Increase of {value}",
+    decrease: "Decrease of {value}",
+    unchanged: "No change",
+  },
+  overview: {
+    title: "Overview",
+    description: "The clearest view of your performance for the selected period.",
+    trend: "Revenue and gross profit trend",
+    currentPeriod: "Current period",
+    previousPeriod: "Previous period",
+    monthlyGoal: "Monthly revenue goal",
+    networkWide: "Network-wide",
+    goalNotSet: "Goal not set",
+    locationComparison: "Location comparison",
+    topProducts: "Top products",
+    bottomProducts: "Products to watch",
+    stockSummary: "Stock summary",
+    inStock: "In stock",
+    lowStock: "Low stock",
+    outOfStock: "Out of stock",
+    recentAlerts: "Recent active alerts",
+    updatedAt: "Data as of {value}",
+  },
+  locations: {
+    title: "Locations",
+    description: "See how every location performs in the selected period.",
+    sortBy: "Sort by",
+    direction: "Direction",
+    ascending: "Ascending",
+    descending: "Descending",
+    best: "Best performing location",
+    weak: "Needs attention",
+    standard: "Standard performance",
+    locationName: "Location",
+  },
+  reset: {
+    staleTitle: "Today’s demo data is out of date",
+    staleDescription: "Reset to refresh Today and Yesterday with a new deterministic demo set.",
+    open: "Reset demo data",
+    title: "Reset demo data?",
+    description: "This replaces the generated business data for your network.",
+    resetItems:
+      "Will reset: products, orders, inventory balances, movements, and the monthly goal.",
+    keepItems: "Will keep: your account, network, locations, language, tour state, and feedback.",
+    confirm: "Reset demo data",
+    pending: "Resetting demo data…",
+    complete: "Demo data has been reset.",
   },
   states: {
     loading: "Loading…",
@@ -178,6 +238,7 @@ const ru: typeof en = {
   },
   actions: {
     retry: "Повторить",
+    cancel: "Отмена",
     logout: "Выйти",
     feedback: "Обратная связь",
     close: "Закрыть",
@@ -199,6 +260,65 @@ const ru: typeof en = {
     lowStock: "Низкий остаток",
     outOfStock: "Нет в наличии",
     salesDrop: "Падение продаж",
+  },
+  metrics: {
+    revenue: "Выручка",
+    grossProfit: "Валовая прибыль",
+    orders: "Заказы",
+    averageCheck: "Средний чек",
+    grossMargin: "Валовая маржа",
+    activeAlerts: "Активные предупреждения",
+  },
+  comparison: {
+    versusPrevious: "к предыдущему периоду",
+    notAvailable: "Н/Д",
+    increase: "Рост на {value}",
+    decrease: "Снижение на {value}",
+    unchanged: "Без изменений",
+  },
+  overview: {
+    title: "Обзор",
+    description: "Главные показатели за выбранный период.",
+    trend: "Динамика выручки и валовой прибыли",
+    currentPeriod: "Текущий период",
+    previousPeriod: "Предыдущий период",
+    monthlyGoal: "Месячная цель по выручке",
+    networkWide: "По всей сети",
+    goalNotSet: "Цель не задана",
+    locationComparison: "Сравнение точек",
+    topProducts: "Лидеры продаж",
+    bottomProducts: "Товары для внимания",
+    stockSummary: "Состояние остатков",
+    inStock: "В наличии",
+    lowStock: "Низкий остаток",
+    outOfStock: "Нет в наличии",
+    recentAlerts: "Последние активные предупреждения",
+    updatedAt: "Данные на {value}",
+  },
+  locations: {
+    title: "Точки",
+    description: "Смотрите результаты каждой точки за выбранный период.",
+    sortBy: "Сортировка",
+    direction: "Направление",
+    ascending: "По возрастанию",
+    descending: "По убыванию",
+    best: "Лучшая точка",
+    weak: "Требует внимания",
+    standard: "Обычный результат",
+    locationName: "Точка",
+  },
+  reset: {
+    staleTitle: "Демо-данные за сегодня устарели",
+    staleDescription:
+      "Выполните Reset, чтобы обновить данные Today и Yesterday новым детерминированным набором.",
+    open: "Сбросить демо-данные",
+    title: "Сбросить демо-данные?",
+    description: "Будут заменены сгенерированные бизнес-данные сети.",
+    resetItems: "Будут сброшены: товары, заказы, остатки, движения и месячная цель.",
+    keepItems: "Сохранятся: аккаунт, сеть, точки, язык, состояние тура и обратная связь.",
+    confirm: "Сбросить демо-данные",
+    pending: "Сбрасываем демо-данные…",
+    complete: "Демо-данные сброшены.",
   },
   states: {
     loading: "Загрузка…",
@@ -291,6 +411,18 @@ export const formatCurrency = (value: string | number, profile?: Profile | null)
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value));
+
+export const formatNumber = (value: string | number, profile?: Profile | null) =>
+  new Intl.NumberFormat(localeTag(localeFromProfile(profile))).format(Number(value));
+
+export const formatPercent = (value: string | number | null, profile?: Profile | null) =>
+  value === null
+    ? translate(localeFromProfile(profile), "comparison.notAvailable")
+    : new Intl.NumberFormat(localeTag(localeFromProfile(profile)), {
+        style: "percent",
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      }).format(Number(value) / 100);
 
 export const formatDate = (value: string | Date, profile?: Profile | null) =>
   new Intl.DateTimeFormat(localeTag(localeFromProfile(profile)), {

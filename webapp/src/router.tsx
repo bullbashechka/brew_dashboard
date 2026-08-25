@@ -9,7 +9,12 @@ import {
   createRouter,
   redirect,
 } from "@tanstack/react-router";
-import { periodSchema, type Profile } from "@brew-dashboard/contracts";
+import {
+  locationSortBySchema,
+  periodSchema,
+  sortDirectionSchema,
+  type Profile,
+} from "@brew-dashboard/contracts";
 import { sessionQueryOptions } from "@/api/session";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { AppShell } from "@/components/app-shell";
@@ -111,9 +116,14 @@ const appRoute = createRoute({
 const overviewRoute = createRoute({ getParentRoute: () => appRoute, path: "overview" }).lazy(() =>
   import("./pages/overview.lazy").then((module) => module.Route),
 );
-const locationsRoute = createRoute({ getParentRoute: () => appRoute, path: "locations" }).lazy(() =>
-  import("./pages/locations.lazy").then((module) => module.Route),
-);
+const locationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "locations",
+  validateSearch: (search: Record<string, unknown>) => ({
+    sortBy: locationSortBySchema.safeParse(search.sortBy).data ?? "revenue",
+    sortDir: sortDirectionSchema.safeParse(search.sortDir).data ?? "desc",
+  }),
+}).lazy(() => import("./pages/locations.lazy").then((module) => module.Route));
 const salesRoute = createRoute({ getParentRoute: () => appRoute, path: "sales" }).lazy(() =>
   import("./pages/sales.lazy").then((module) => module.Route),
 );

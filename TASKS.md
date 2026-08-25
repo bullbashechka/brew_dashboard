@@ -300,14 +300,14 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S8.1.** Реализовать Overview KPI: Revenue, Gross Profit, Orders, Average Check, Gross Margin и Active Alerts.
-- [ ] **S8.2.** Для финансовых KPI показать absolute value и comparison; `N/A` отображать явно.
-- [ ] **S8.3.** Добавить Revenue/Gross Profit trend, comparison series и responsive chart containers.
-- [ ] **S8.4.** Добавить monthly goal progress, location comparison, top/bottom products, stock summary и последние active alerts.
-- [ ] **S8.5.** Показать ненавязчивое предложение Reset, когда Today/Yesterday data устарели; выполнять reset только после подтверждения.
-- [ ] **S8.6.** Реализовать Locations cards/table с шестью метриками, active alerts и сортировкой.
-- [ ] **S8.7.** Обозначить лучшую и слабую точку текстом, иконкой и цветом; не создавать detail page или CRUD.
-- [ ] **S8.8.** Добавить mobile card/column-priority representations, loading/empty/error states и component tests.
+- [x] **S8.1.** Реализовать Overview KPI: Revenue, Gross Profit, Orders, Average Check, Gross Margin и Active Alerts.
+- [x] **S8.2.** Для финансовых KPI показать absolute value и comparison; `N/A` отображать явно.
+- [x] **S8.3.** Добавить Revenue/Gross Profit trend, comparison series и responsive chart containers.
+- [x] **S8.4.** Добавить monthly goal progress, location comparison, top/bottom products, stock summary и последние active alerts.
+- [x] **S8.5.** Показать ненавязчивое предложение Reset, когда Today/Yesterday data устарели; выполнять reset только после подтверждения.
+- [x] **S8.6.** Реализовать Locations cards/table с шестью метриками, active alerts и сортировкой.
+- [x] **S8.7.** Обозначить лучшую и слабую точку текстом, иконкой и цветом; не создавать detail page или CRUD.
+- [x] **S8.8.** Добавить mobile card/column-priority representations, loading/empty/error states и component tests.
 
 ### Критерии приёмки
 
@@ -392,7 +392,7 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [ ] **S11.8.** Показать dismissible feedback prompt после трёх разных section views или двух разрешённых mutations, не блокируя работу.
 - [ ] **S11.9.** Реализовать `POST /events` только для whitelist; не писать passwords, cookies, arbitrary form text или feedback contents.
 - [ ] **S11.10.** Отправлять `login_succeeded`, `onboarding_completed`, `section_viewed`, `filter_changed`, все mutation events, `demo_reset` и `feedback_submitted` без дубликатов от React Strict Mode/retries.
-- [ ] **S11.11.** Реализовать `POST /demo/reset` и Reset confirmation/progress/duplicate-submit lock через атомарную operation этапа 4; после success полностью инвалидировать tenant analytics cache.
+- [x] **S11.11.** Реализовать `POST /demo/reset` и Reset confirmation/progress/duplicate-submit lock через атомарную operation этапа 4; после success полностью инвалидировать tenant analytics cache. Выполнено досрочно в этапе 8; постоянный entry point в Settings остаётся частью S11.1.
 - [ ] **S11.12.** Проверить, что Reset сохраняет account/network preferences, locations, tour state и feedback и фиксирует `demo_reset`.
 - [ ] **S11.13.** Добавить integration/component tests goal, language, tour, feedback, event whitelist/sanitization и atomic Reset.
 - [ ] **S11.14.** Добавить Playwright journeys goal, feedback persistence и Reset preservation.

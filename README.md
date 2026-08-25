@@ -5,6 +5,7 @@ Bun monorepo for the Brew Dashboard MVP. The active application surfaces are:
 - `webapp/` — React, TypeScript, Vite and Playwright client;
 - `backend/` — Hono API and its current server-side foundation;
 - `packages/contracts/` — shared Zod schemas and TypeScript API contracts.
+- Docker Compose + PostgreSQL 16 — local-only isolated database for integration tests.
 
 Product intent and architecture live in [PRD.md](PRD.md); implementation stages and acceptance criteria live in [TASKS.md](TASKS.md).
 
@@ -40,6 +41,26 @@ For local Hyperdrive development, provide
 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in the shell environment rather than
 committing a connection string. The production `HYPERDRIVE` binding is configured in
 `wrangler.jsonc`; Stage 3 opens a request-scoped connection through that cache-disabled binding.
+
+## Local integration database
+
+Following the local-development convention used by the
+[Vibe Coding Template](https://github.com/di-sukharev/vibe), Docker Compose is the default
+PostgreSQL path for this repository's database-backed tests. It is deliberately limited to a
+loopback-only, disposable test service; production remains Cloudflare Hyperdrive backed by Railway
+and does not use Docker.
+
+Run the isolated integration suite (the command starts the database and waits for it):
+
+```bash
+bun run test:integration:docker
+```
+
+The runner creates a random database, applies migrations, creates the temporary `brew_runtime`
+role, and removes all three afterwards. The Compose service accepts passwordless connections only
+on `127.0.0.1` to avoid tracking local credentials; do not expose its port or use it outside local
+development. Stop it with `docker compose down`; use `docker compose down -v` only when an
+intentional full reset of this disposable test database is needed.
 
 The repository intentionally contains only the active `webapp`, `backend` and
 `packages/contracts` workspaces. Product screens and business API flows are introduced by later
@@ -137,7 +158,7 @@ it creates a random database, applies every migration, runs the RLS/constraint t
 database in a `finally` block:
 
 ```bash
-DATABASE_TEST_ADMIN_URL='postgresql://localhost/postgres' bun run test:integration
+bun run test:integration:docker
 ```
 
 Production release order is: apply migrations with the unpooled owner URL, smoke-test the database

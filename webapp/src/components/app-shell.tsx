@@ -71,15 +71,29 @@ export function AppShell() {
   const tourOpen = profile?.tourState === "pending" && section === "overview";
 
   useEffect(() => {
-    if (!filters.locationId || !locations.data) return;
-    if (locations.data.some((location) => location.locationId === filters.locationId)) return;
+    if (!filters.locationId) return;
+    const missingFromOptions =
+      Boolean(locations.data) &&
+      !locations.data!.some((location) => location.locationId === filters.locationId);
+    const apiFellBack = alerts.data?.meta.warnings.some(
+      (warning) => warning.code === "INVALID_LOCATION_FALLBACK",
+    );
+    if (!missingFromOptions && !apiFellBack) return;
     void navigate({
       to: pathname,
       search: { period: filters.period, locationId: undefined },
       replace: true,
     });
     toast.message(translate(locale, "filters.allLocations"));
-  }, [filters.locationId, filters.period, locale, locations.data, navigate, pathname]);
+  }, [
+    alerts.data?.meta.warnings,
+    filters.locationId,
+    filters.period,
+    locale,
+    locations.data,
+    navigate,
+    pathname,
+  ]);
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
@@ -103,11 +117,29 @@ export function AppShell() {
     period?: AnalyticsFilters["period"];
     locationId?: string | null;
   }) => {
+    const locationsSearch =
+      section === "locations"
+        ? {
+            sortBy:
+              search.sortBy === "revenue" ||
+              search.sortBy === "grossProfit" ||
+              search.sortBy === "orders" ||
+              search.sortBy === "averageCheck" ||
+              search.sortBy === "grossMargin" ||
+              search.sortBy === "activeAlerts" ||
+              search.sortBy === "name"
+                ? search.sortBy
+                : "revenue",
+            sortDir:
+              search.sortDir === "asc" || search.sortDir === "desc" ? search.sortDir : "desc",
+          }
+        : {};
     void navigate({
       to: pathname,
       search: {
         period: next.period ?? filters.period,
         locationId: next.locationId === null ? undefined : (next.locationId ?? filters.locationId),
+        ...locationsSearch,
       },
       replace: true,
     });
