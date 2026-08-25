@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "architecture-review": {
+      "source": "o-marsters-1997/my-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/code/architecture-review/SKILL.md",
+      "computedHash": "c53751dd5bfb50b7c70a59cc9780e44e5e61f362055c3552eddf3712ca13ae7f"
+    },
+    "code-review-and-quality": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-and-quality/SKILL.md",
+      "computedHash": "6231479cc74c7ed70a5618b81b3f94034d9806c0319a1a23d15f9b94a368c581"
+    },
+    "code-review": {
+      "source": "danielkerridge/claude-code-power-platform-skills",
+      "sourceType": "github",
+      "skillPath": "code-review/SKILL.md",
+      "computedHash": "fa5eed39d616f123ba0869585fa042af2d9e987e946c34ee21a8317cc85d43fb"
+    },
+    "differential-review": {
+      "source": "trailofbits/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/differential-review/skills/differential-review/SKILL.md",
+      "computedHash": "d997520fbef18003be46d460cc002a3e41cfdd889e2d7bc4818e4e0e29667a45"
+    },
+    "plan-perf-audit": {
+      "source": "kensaurus/cursor-kenji",
+      "sourceType": "github",
+      "skillPath": "skills/plan-perf-audit/SKILL.md",
+      "computedHash": "9545de872f068502166cbc344caf04947f4c9ace6b51ce81693b63ff5ec1810a"
+    },
+    "security": {
+      "source": "tartinerlabs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/security/SKILL.md",
+      "computedHash": "3e4c21b40803e67dc0317da9765d332ef51329ddcbd87afd2211c064f0a4ff76"
+    }
+  }
+}

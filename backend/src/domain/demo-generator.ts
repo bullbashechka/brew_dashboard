@@ -192,6 +192,7 @@ const PRODUCT_BLUEPRINTS: readonly ProductBlueprint[] = [
 
 const CATEGORY_NAMES = ["Coffee", "Food", "Cold drinks"] as const;
 const WEIGHTED_PRODUCTS = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11];
+const CURRENT_DAY_WEIGHTED_PRODUCTS = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5];
 
 export const isDemoDataStale = (
   generatedForDate: string | null,
@@ -418,9 +419,13 @@ export const generateDemoData = async (input: DemoGeneratorInput): Promise<Gener
           ? slotIndex * 3 + itemIndex
           : isPreviousSalesBaseline
             ? 0
-            : globalOrderIndex < PRODUCT_BLUEPRINTS.length && itemIndex === 0
-              ? globalOrderIndex
-              : WEIGHTED_PRODUCTS[Math.floor(random() * WEIGHTED_PRODUCTS.length)]!;
+            : dayOffset === 0
+              ? CURRENT_DAY_WEIGHTED_PRODUCTS[
+                  Math.floor(random() * CURRENT_DAY_WEIGHTED_PRODUCTS.length)
+                ]!
+              : globalOrderIndex < PRODUCT_BLUEPRINTS.length && itemIndex === 0
+                ? globalOrderIndex
+                : WEIGHTED_PRODUCTS[Math.floor(random() * WEIGHTED_PRODUCTS.length)]!;
         const blueprint = PRODUCT_BLUEPRINTS[productIndex]!;
         const quantity = isCurrentSeedOrder
           ? productIndex <= 5
@@ -601,9 +606,17 @@ export const verifyDemoData = (data: GeneratedDemoData): void => {
     throw new DemoGeneratorVerificationError("Cancelled-order coverage is missing");
   }
 
+  const ordersById = new Map(data.orders.map((order) => [order.id, order]));
+  const itemsByOrder = new Map<string, DemoOrderItemRecord[]>();
+  for (const item of data.orderItems) {
+    const items = itemsByOrder.get(item.orderId) ?? [];
+    items.push(item);
+    itemsByOrder.set(item.orderId, items);
+  }
+
   const unitsByProduct = new Map<string, number>();
   for (const item of data.orderItems) {
-    const order = data.orders.find((candidate) => candidate.id === item.orderId);
+    const order = ordersById.get(item.orderId);
     if (order?.status !== "completed") continue;
     unitsByProduct.set(
       item.productId,
@@ -644,8 +657,7 @@ export const verifyDemoData = (data: GeneratedDemoData): void => {
       ) {
         continue;
       }
-      for (const item of data.orderItems) {
-        if (item.orderId !== order.id) continue;
+      for (const item of itemsByOrder.get(order.id) ?? []) {
         periodUnits.set(
           item.productId,
           (periodUnits.get(item.productId) ?? 0) + Number(item.quantity),

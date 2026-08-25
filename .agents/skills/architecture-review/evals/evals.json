@@ -1,0 +1,23 @@
+{
+  "skill_name": "architecture-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Can you do a staff-level architecture review of this codebase and tell me where the biggest design risks are? Don't change anything — I just want an honest read.",
+      "expected_output": "A read-only architecture review: discovery/system map first, then a consolidated report at docs/architecture-review.md covering all six dimensions with evidence (file paths), cross-cutting themes, and a prioritised remediation roadmap that hands off to improve-codebase-architecture. No source files modified.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Is this service well-architected? I'm worried the modules are too tightly coupled and one of them is doing way too much. Give me an honest assessment of the coupling and cohesion, but don't fix anything yet.",
+      "expected_output": "A review that maps the system then assesses all dimensions, with the modularity lens (deep modules, coupling/cohesion, god-module detection) prominent. Findings are evidence-grounded and qualitative; ends with prioritised next steps and a hand-off. Read-only.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We're about to grow the team and scale up. Review the architecture of this project for security and maintainability before we do — what's going to bite us?",
+      "expected_output": "A full review (all six lenses still run and appear in the report) that prioritises the named concerns — security and maintainability — in the executive summary and recommendations. Language-agnostic, architectural findings (not style nitpicks), written to docs/architecture-review.md, ending in a prioritised roadmap. Read-only.",
+      "files": []
+    }
+  ]
+}

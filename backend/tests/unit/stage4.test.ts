@@ -60,6 +60,19 @@ describe("Stage 4 deterministic demo generator", () => {
     }
   });
 
+  it("keeps all menu groups on today despite extra generated sales", async () => {
+    const anchor = new Date("2026-08-25T04:30:00.000Z");
+    for (const suffix of ["000000000012", "000000000015"]) {
+      const data = await generateDemoData(
+        inputFor(2, {
+          networkId: `00000000-0000-4000-8000-${suffix}`,
+          anchor,
+        }),
+      );
+      expect(() => verifyDemoData(data)).not.toThrow();
+    }
+  });
+
   it("handles DST gap/fold, leap day and month-end anchors", async () => {
     expect(
       localDateTimeToUtc(
