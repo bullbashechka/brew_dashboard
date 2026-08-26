@@ -699,6 +699,15 @@ export const revenueGoalMutationSchema = z.strictObject({
   expectedDemoDataRevision: versionSchema.default(1),
   idempotencyKey: idempotencyKeySchema,
 });
+export const revenueGoalMutationDataSchema = z.strictObject({
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  monthlyGoal: nonNegativeMoneySchema.nullable(),
+  version: versionSchema.nullable(),
+  demoDataRevision: versionSchema,
+});
+export const revenueGoalMutationResponseSchema = createSuccessEnvelopeSchema(
+  revenueGoalMutationDataSchema,
+);
 export const tourMutationSchema = z.strictObject({
   state: tourStateSchema,
   idempotencyKey: idempotencyKeySchema,
@@ -714,6 +723,17 @@ export const feedbackMutationSchema = z.strictObject({
   expectedVersion: versionSchema.nullable(),
   idempotencyKey: idempotencyKeySchema,
 });
+export const feedbackResponseDataSchema = z.strictObject({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(2000),
+  desiredFeatures: z.string().min(1).max(2000),
+  version: versionSchema,
+  submittedAt: utcTimestampSchema,
+  updatedAt: utcTimestampSchema,
+});
+export const feedbackResponseSchema = createSuccessEnvelopeSchema(
+  feedbackResponseDataSchema.nullable(),
+);
 export const resetMutationSchema = z.strictObject({
   idempotencyKey: idempotencyKeySchema,
 });
@@ -750,19 +770,8 @@ export const productEventTypeSchema = z.enum([
   "feedback_submitted",
 ]);
 
+/** Browser telemetry is intentionally limited to navigation and filter events. */
 export const productEventRequestSchema = z.discriminatedUnion("type", [
-  z.strictObject({
-    eventId: uuidSchema,
-    type: z.literal("login_succeeded"),
-    route: sectionSchema.optional(),
-    metadata: productEventMetadataSchemas.login_succeeded,
-  }),
-  z.strictObject({
-    eventId: uuidSchema,
-    type: z.literal("onboarding_completed"),
-    route: sectionSchema.optional(),
-    metadata: productEventMetadataSchemas.onboarding_completed,
-  }),
   z.strictObject({
     eventId: uuidSchema,
     type: z.literal("section_viewed"),
@@ -775,32 +784,41 @@ export const productEventRequestSchema = z.discriminatedUnion("type", [
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.filter_changed,
   }),
+]);
+
+/** Business events are emitted by trusted server paths, never accepted from the browser. */
+export const serverProductEventRequestSchema = z.discriminatedUnion("type", [
   z.strictObject({
-    eventId: uuidSchema,
+    type: z.literal("login_succeeded"),
+    route: sectionSchema.optional(),
+    metadata: productEventMetadataSchemas.login_succeeded,
+  }),
+  z.strictObject({
+    type: z.literal("onboarding_completed"),
+    route: sectionSchema.optional(),
+    metadata: productEventMetadataSchemas.onboarding_completed,
+  }),
+  z.strictObject({
     type: z.literal("product_price_changed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.product_price_changed,
   }),
   z.strictObject({
-    eventId: uuidSchema,
     type: z.literal("inventory_movement_created"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.inventory_movement_created,
   }),
   z.strictObject({
-    eventId: uuidSchema,
     type: z.literal("revenue_goal_changed"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.revenue_goal_changed,
   }),
   z.strictObject({
-    eventId: uuidSchema,
     type: z.literal("demo_reset"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.demo_reset,
   }),
   z.strictObject({
-    eventId: uuidSchema,
     type: z.literal("feedback_submitted"),
     route: sectionSchema.optional(),
     metadata: productEventMetadataSchemas.feedback_submitted,
@@ -816,6 +834,9 @@ export const storedProductEventSchema = z.strictObject({
   metadata: z.record(z.string(), z.unknown()),
   occurredAt: utcTimestampSchema,
 });
+export const productEventResponseSchema = createSuccessEnvelopeSchema(
+  z.strictObject({ eventId: uuidSchema }),
+);
 
 export type HealthData = z.infer<typeof healthDataSchema>;
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
@@ -852,4 +873,13 @@ export type InventoryMovementMutationData = z.infer<typeof inventoryMovementMuta
 export type InventoryMovementMutationResponse = z.infer<
   typeof inventoryMovementMutationResponseSchema
 >;
+export type RevenueGoalMutation = z.infer<typeof revenueGoalMutationSchema>;
+export type RevenueGoalMutationData = z.infer<typeof revenueGoalMutationDataSchema>;
+export type RevenueGoalMutationResponse = z.infer<typeof revenueGoalMutationResponseSchema>;
+export type FeedbackMutation = z.infer<typeof feedbackMutationSchema>;
+export type FeedbackResponseData = z.infer<typeof feedbackResponseDataSchema>;
+export type FeedbackResponse = z.infer<typeof feedbackResponseSchema>;
+export type ProductEventType = z.infer<typeof productEventTypeSchema>;
 export type ProductEventRequest = z.infer<typeof productEventRequestSchema>;
+export type ServerProductEventRequest = z.infer<typeof serverProductEventRequestSchema>;
+export type ProductEventResponse = z.infer<typeof productEventResponseSchema>;

@@ -49,5 +49,11 @@ export const lockAuthUser = (transaction: RequestTransaction, authUserId: string
 export const lockNetwork = (transaction: RequestTransaction, networkId: string) =>
   advisoryLock(transaction, `brew-dashboard:network:${networkId}`);
 
+export const lockProductEvent = (transaction: RequestTransaction, eventId: string) =>
+  advisoryLock(transaction, `brew-dashboard:product-event:${eventId}`);
+
+export const lockRateLimit = (transaction: RequestTransaction, key: string) =>
+  advisoryLock(transaction, `brew-dashboard:rate-limit:${key}`);
+
 export const lockActiveDemoLimit = (transaction: RequestTransaction) =>
   advisoryLock(transaction, "brew-dashboard:active-demo-limit");

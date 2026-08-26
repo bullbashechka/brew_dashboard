@@ -20,6 +20,7 @@ import { productsQuery, updateProductPrice, type AnalyticsFilters } from "@/api/
 import { ApiClientError } from "@/api/client";
 import { sessionQueryOptions } from "@/api/session";
 import { PriceDialog } from "@/components/product-price-dialog";
+import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
@@ -66,6 +67,7 @@ function ProductsPage() {
       toast.success(translate(locale, "products.saved"));
       setEditingProductId(null);
       if (profile) {
+        recordFeedbackMutation(profile.networkId);
         void queryClient.invalidateQueries({
           queryKey: ["tenant", profile.networkId, "products"],
         });

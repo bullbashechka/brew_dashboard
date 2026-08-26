@@ -382,27 +382,27 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S11.1.** Создать Settings с read-only network/owner, language, monthly goal, restart tour, feedback, reset и logout; currency/timezone оставить read-only.
-- [ ] **S11.2.** Реализовать `PUT /settings/revenue-goal` как tenant-scoped upsert текущего месяца с non-negative amount.
-- [ ] **S11.3.** После изменения цели обновить Overview progress и записать `revenue_goal_changed`.
-- [ ] **S11.4.** Реализовать `PUT /settings/language` и мгновенно переключать полный UI без потери состояния.
+- [x] **S11.1.** Создать Settings с read-only network/owner, language, monthly goal, restart tour, feedback, reset и logout; currency/timezone оставить read-only.
+- [x] **S11.2.** Реализовать `PUT /settings/revenue-goal` как tenant-scoped upsert текущего месяца с non-negative amount.
+- [x] **S11.3.** После изменения цели обновить Overview progress и записать `revenue_goal_changed`.
+- [x] **S11.4.** Реализовать `PUT /settings/language` и мгновенно переключать полный UI без потери состояния.
 - [x] **S11.5.** Реализовать `PUT /settings/tour` и связать его с повторным запуском tour.
-- [ ] **S11.6.** Реализовать `GET/PUT /feedback` как один tenant-scoped upsert: rating 1–5, comment до 2 000 и обязательный `desired_features` до 2 000 символов.
-- [ ] **S11.7.** Добавить постоянную feedback-кнопку и форму в Settings; повторное открытие показывает сохранённые значения.
-- [ ] **S11.8.** Показать dismissible feedback prompt после трёх разных section views или двух разрешённых mutations, не блокируя работу.
-- [ ] **S11.9.** Реализовать `POST /events` только для whitelist; не писать passwords, cookies, arbitrary form text или feedback contents.
-- [ ] **S11.10.** Отправлять `login_succeeded`, `onboarding_completed`, `section_viewed`, `filter_changed`, все mutation events, `demo_reset` и `feedback_submitted` без дубликатов от React Strict Mode/retries.
+- [x] **S11.6.** Реализовать `GET/PUT /feedback` как один tenant-scoped upsert: rating 1–5, comment до 2 000 и обязательный `desired_features` до 2 000 символов.
+- [x] **S11.7.** Добавить постоянную feedback-кнопку и форму в Settings; повторное открытие показывает сохранённые значения.
+- [x] **S11.8.** Показать dismissible feedback prompt после трёх разных section views или двух разрешённых mutations, не блокируя работу.
+- [x] **S11.9.** Реализовать `POST /events` только для client navigation/filter whitelist; не писать passwords, cookies, arbitrary form text или feedback contents.
+- [x] **S11.10.** Отправлять client `section_viewed`/`filter_changed` через public API, а `login_succeeded`, `onboarding_completed`, все mutation events, `demo_reset` и `feedback_submitted` только из trusted server paths без дубликатов от retries.
 - [x] **S11.11.** Реализовать `POST /demo/reset` и Reset confirmation/progress/duplicate-submit lock через атомарную operation этапа 4; после success полностью инвалидировать tenant analytics cache. Выполнено досрочно в этапе 8; постоянный entry point в Settings остаётся частью S11.1.
-- [ ] **S11.12.** Проверить, что Reset сохраняет account/network preferences, locations, tour state и feedback и фиксирует `demo_reset`.
-- [ ] **S11.13.** Добавить integration/component tests goal, language, tour, feedback, event whitelist/sanitization и atomic Reset.
-- [ ] **S11.14.** Добавить Playwright journeys goal, feedback persistence и Reset preservation.
+- [x] **S11.12.** Проверить, что Reset сохраняет account/network preferences, locations, tour state и feedback и фиксирует `demo_reset`.
+- [x] **S11.13.** Добавить integration/component tests goal, language, tour, feedback, event whitelist/sanitization и atomic Reset.
+- [x] **S11.14.** Добавить Playwright journeys goal, feedback persistence и Reset preservation.
 
 ### Критерии приёмки
 
-- [ ] Все Settings mutations tenant-scoped, idempotent там, где это требуется, и имеют согласованные состояния UI.
-- [ ] Feedback переживает Reset и доступен администратору только через Railway database view/SQL client; admin UI отсутствует.
-- [ ] Текст feedback и произвольные form values не появляются в events или application logs.
-- [ ] После Reset все аналитические экраны показывают восстановленный детерминированный набор текущей сети.
+- [x] Все Settings mutations tenant-scoped, idempotent там, где это требуется, и имеют согласованные состояния UI.
+- [x] Feedback переживает Reset и доступен администратору только через Railway database view/SQL client; admin UI отсутствует.
+- [x] Текст feedback и произвольные form values не появляются в events или application logs.
+- [x] После Reset все аналитические экраны показывают восстановленный детерминированный набор текущей сети.
 
 ---
 
@@ -429,6 +429,7 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [ ] **S12.13.** Добавить наблюдение за 5xx, login failures, onboarding/reset failures и API latency; stack оставлять только в server logs.
 - [ ] **S12.14.** Показывать пользователю localized safe error и request ID для обращения за помощью.
 - [ ] **S12.15.** Выполнить `bun audit`, разобрать findings и не ослаблять security controls ради прохождения тестов.
+- [ ] **S12.16.** Определить и реализовать retention/cleanup policy для `product_events` до production rollout; проверить storage budget и admin analytics history.
 
 ### Критерии приёмки
 

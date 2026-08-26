@@ -27,6 +27,12 @@ import {
   analyticsFilterQuerySchema,
   resetMutationSchema,
   resetResultResponseSchema,
+  feedbackMutationSchema,
+  feedbackResponseSchema,
+  productEventRequestSchema,
+  productEventResponseSchema,
+  revenueGoalMutationSchema,
+  revenueGoalMutationResponseSchema,
   sessionResponseSchema,
   tourMutationSchema,
   tourStateResponseSchema,
@@ -62,6 +68,13 @@ import { tourStateHandler } from "./tour/http.ts";
 import { resetDemoHandler } from "./demo/http.ts";
 import { productPriceHandler } from "./products/http.ts";
 import { inventoryMovementHandler } from "./inventory/http.ts";
+import {
+  feedbackGetHandler,
+  feedbackPutHandler,
+  revenueGoalHandler,
+  settingsLanguageHandler,
+} from "./settings/http.ts";
+import { productEventHandler } from "./events/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -207,6 +220,121 @@ const tourStateRoute = createRoute({
     401: errorResponseDefinition("Authentication required"),
     403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
     409: errorResponseDefinition("Tour state idempotency conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const settingsLanguageRoute = createRoute({
+  method: "put",
+  path: "/settings/language",
+  request: {
+    body: {
+      content: { "application/json": { schema: languageRequestSchema } },
+      description: "Update the completed network language preference",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: onboardingLanguageResponseSchema } },
+      description: "Language preference persisted",
+    },
+    400: errorResponseDefinition("Language validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    409: errorResponseDefinition("Language idempotency conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const revenueGoalRoute = createRoute({
+  method: "put",
+  path: "/settings/revenue-goal",
+  request: {
+    body: {
+      content: { "application/json": { schema: revenueGoalMutationSchema } },
+      description: "Upsert or clear the current network month revenue goal",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: revenueGoalMutationResponseSchema } },
+      description: "Revenue goal saved",
+    },
+    400: errorResponseDefinition("Revenue goal validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    409: errorResponseDefinition("Revenue goal or demo data changed"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const feedbackGetRoute = createRoute({
+  method: "get",
+  path: "/feedback",
+  responses: {
+    200: {
+      content: { "application/json": { schema: feedbackResponseSchema } },
+      description: "Current network feedback response",
+    },
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const feedbackPutRoute = createRoute({
+  method: "put",
+  path: "/feedback",
+  request: {
+    body: {
+      content: { "application/json": { schema: feedbackMutationSchema } },
+      description: "Create or update the current network feedback response",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: feedbackResponseSchema } },
+      description: "Feedback response saved",
+    },
+    400: errorResponseDefinition("Feedback validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    409: errorResponseDefinition("Feedback idempotency or version conflict"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const productEventRoute = createRoute({
+  method: "post",
+  path: "/events",
+  request: {
+    body: {
+      content: { "application/json": { schema: productEventRequestSchema } },
+      description: "Record one schema-validated product event",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: productEventResponseSchema } },
+      description: "Product event accepted",
+    },
+    400: errorResponseDefinition("Product event validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    409: errorResponseDefinition("Event ID conflict"),
+    429: errorResponseDefinition("Product event rate limit exceeded"),
     413: errorResponseDefinition("Request body too large"),
     415: errorResponseDefinition("Unsupported media type"),
     500: errorResponseDefinition("Internal server error"),
@@ -412,6 +540,29 @@ app.use("/settings/tour", requireAuthentication, requireCompletedOnboarding);
 app.openapi(
   tourStateRoute,
   tourStateHandler as unknown as RouteHandler<typeof tourStateRoute, AppEnvironment>,
+);
+for (const path of ["/settings/language", "/settings/revenue-goal", "/feedback", "/events"]) {
+  app.use(path, requireAuthentication, requireCompletedOnboarding);
+}
+app.openapi(
+  settingsLanguageRoute,
+  settingsLanguageHandler as unknown as RouteHandler<typeof settingsLanguageRoute, AppEnvironment>,
+);
+app.openapi(
+  revenueGoalRoute,
+  revenueGoalHandler as unknown as RouteHandler<typeof revenueGoalRoute, AppEnvironment>,
+);
+app.openapi(
+  feedbackGetRoute,
+  feedbackGetHandler as unknown as RouteHandler<typeof feedbackGetRoute, AppEnvironment>,
+);
+app.openapi(
+  feedbackPutRoute,
+  feedbackPutHandler as unknown as RouteHandler<typeof feedbackPutRoute, AppEnvironment>,
+);
+app.openapi(
+  productEventRoute,
+  productEventHandler as unknown as RouteHandler<typeof productEventRoute, AppEnvironment>,
 );
 app.use("/demo/reset", requireAuthentication, requireCompletedOnboarding);
 app.openapi(

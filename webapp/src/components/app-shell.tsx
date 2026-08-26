@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -10,10 +10,18 @@ import type { z } from "zod";
 import { overviewResponseSchema, type Profile, type TourState } from "@brew-dashboard/contracts";
 import { logout, sessionQueryKey, sessionQueryOptions } from "@/api/session";
 import { saveTourState } from "@/api/tour";
+import { feedbackQuery, sendProductEvent } from "@/api/settings";
+import { FeedbackDialog } from "@/components/feedback";
 import { GuidedTour } from "@/components/guided-tour";
 import { ErrorState, LoadingState, PendingButton } from "@/components/ui/states";
 import { Button } from "@/components/ui/button";
 import { localeFromProfile, translate } from "@/lib/i18n";
+import {
+  dismissFeedbackPrompt,
+  feedbackMutationEvent,
+  readFeedbackPromptState,
+  recordFeedbackSection,
+} from "@/lib/feedback-prompt";
 import { useQueryClient } from "@tanstack/react-query";
 
 const sections = ["overview", "locations", "sales", "products", "inventory", "settings"] as const;
@@ -59,6 +67,10 @@ export function AppShell() {
   );
   const { data: profile } = useQuery(sessionQueryOptions());
   const locale = localeFromProfile(profile);
+  const feedback = useQuery({
+    ...feedbackQuery(profile?.networkId ?? "pending"),
+    enabled: Boolean(profile),
+  });
   const inventoryStatus =
     search.status === "in_stock" ||
     search.status === "low_stock" ||
@@ -74,6 +86,13 @@ export function AppShell() {
     enabled: Boolean(profile),
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [promptState, setPromptState] = useState({
+    sections: [] as string[],
+    mutations: 0,
+    dismissed: false,
+  });
+  const lastSectionEvent = useRef<Section | null>(null);
   // Keep an in-progress tour mounted while it navigates between its three routes.
   // The persisted state remains `pending` until the user finishes or skips it.
   const tourOpen = profile?.tourState === "pending";
@@ -108,6 +127,32 @@ export function AppShell() {
     pathname,
   ]);
 
+  useEffect(() => {
+    if (!profile) return;
+    const nextPromptState = recordFeedbackSection(profile.networkId, section);
+    const updatePrompt = window.setTimeout(() => setPromptState(nextPromptState), 0);
+    if (lastSectionEvent.current === section) return;
+    lastSectionEvent.current = section;
+    void sendProductEvent({
+      eventId: crypto.randomUUID(),
+      type: "section_viewed",
+      route: section,
+      metadata: { section },
+    }).catch(() => undefined);
+    return () => window.clearTimeout(updatePrompt);
+  }, [profile, section]);
+
+  useEffect(() => {
+    if (!profile) return;
+    const onMutation = (event: Event) => {
+      const detail = (event as CustomEvent<{ networkId?: string }>).detail;
+      if (detail?.networkId !== profile.networkId) return;
+      setPromptState(readFeedbackPromptState(profile.networkId));
+    };
+    window.addEventListener(feedbackMutationEvent, onMutation);
+    return () => window.removeEventListener(feedbackMutationEvent, onMutation);
+  }, [profile]);
+
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
     onSuccess: async () => {
@@ -118,6 +163,13 @@ export function AppShell() {
   });
 
   if (!profile) return <LoadingState locale={locale} />;
+
+  const showFeedbackPrompt =
+    feedback.isSuccess &&
+    feedback.data.data === null &&
+    !feedbackOpen &&
+    !promptState.dismissed &&
+    (promptState.sections.length >= 3 || promptState.mutations >= 2);
 
   const persistTourState = async (state: TourState) => {
     const response = await saveTourState(state);
@@ -157,6 +209,16 @@ export function AppShell() {
       },
       replace: true,
     });
+    const filter = next.period !== undefined ? "period" : "location";
+    const nextPeriod = next.period ?? filters.period;
+    const nextLocationId =
+      next.locationId === null ? null : (next.locationId ?? filters.locationId ?? null);
+    void sendProductEvent({
+      eventId: crypto.randomUUID(),
+      type: "filter_changed",
+      route: section,
+      metadata: { filter, period: nextPeriod, locationId: nextLocationId },
+    }).catch(() => undefined);
   };
 
   const navigation = (compact = false) => (
@@ -197,12 +259,7 @@ export function AppShell() {
         <div className="mt-6 flex-1">{navigation()}</div>
         <ShellActions
           locale={locale}
-          onFeedback={() =>
-            void navigate({
-              to: "/app/settings",
-              search: { period: filters.period, locationId: filters.locationId, panel: "feedback" },
-            })
-          }
+          onFeedback={() => setFeedbackOpen(true)}
           onLogout={() => logoutMutation.mutate()}
           pending={logoutMutation.isPending}
         />
@@ -241,14 +298,7 @@ export function AppShell() {
                   locale={locale}
                   onFeedback={() => {
                     setDrawerOpen(false);
-                    void navigate({
-                      to: "/app/settings",
-                      search: {
-                        period: filters.period,
-                        locationId: filters.locationId,
-                        panel: "feedback",
-                      },
-                    });
+                    setFeedbackOpen(true);
                   }}
                   onLogout={() => logoutMutation.mutate()}
                   pending={logoutMutation.isPending}
@@ -320,6 +370,40 @@ export function AppShell() {
         )}
         <Outlet />
       </main>
+      {showFeedbackPrompt && (
+        <aside
+          className="fixed bottom-4 right-4 z-30 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-lg"
+          aria-label={translate(locale, "feedback.promptTitle")}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-amber-950">
+                {translate(locale, "feedback.promptTitle")}
+              </p>
+              <p className="mt-1 text-sm text-amber-950/80">
+                {translate(locale, "feedback.promptDescription")}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={translate(locale, "actions.close")}
+              onClick={() => setPromptState(dismissFeedbackPrompt(profile.networkId))}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <Button className="mt-3" type="button" onClick={() => setFeedbackOpen(true)}>
+            {translate(locale, "actions.feedback")}
+          </Button>
+        </aside>
+      )}
+      <FeedbackDialog
+        profile={profile}
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        onSubmitted={() => setPromptState(dismissFeedbackPrompt(profile.networkId))}
+      />
       <GuidedTour
         key={profile.tourState}
         locale={locale}

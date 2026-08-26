@@ -15,6 +15,7 @@ import {
 import { ApiClientError } from "@/api/client";
 import { sessionQueryOptions } from "@/api/session";
 import { InventoryMovementDialog } from "@/components/inventory-movement-dialog";
+import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
@@ -103,6 +104,7 @@ function InventoryPage() {
     mutationFn: createInventoryMovement,
     onSuccess: async (response) => {
       if (profile) {
+        recordFeedbackMutation(profile.networkId);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["tenant", profile.networkId, "inventory"] }),
           queryClient.invalidateQueries({ queryKey: ["tenant", profile.networkId, "overview"] }),

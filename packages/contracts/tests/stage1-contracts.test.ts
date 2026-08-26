@@ -9,6 +9,7 @@ import {
   salesQuerySchema,
   apiErrorResponseSchema,
   feedbackMutationSchema,
+  feedbackResponseSchema,
   inventoryMovementMutationResponseSchema,
   inventoryMovementMutationSchema,
   loginRequestSchema,
@@ -16,7 +17,11 @@ import {
   periodSchema,
   priceMutationSchema,
   productEventRequestSchema,
+  productEventResponseSchema,
+  revenueGoalMutationResponseSchema,
+  revenueGoalMutationSchema,
   resetMutationSchema,
+  serverProductEventRequestSchema,
   utcTimestampSchema,
 } from "../src/index.ts";
 
@@ -226,6 +231,59 @@ describe("Stage 1 shared contracts", () => {
         metadata: { password: "secret" },
       }).success,
     ).toBe(false);
+
+    const serverEvents = [
+      { type: "login_succeeded", metadata: {} },
+      { type: "onboarding_completed", metadata: { locationCount: 3 } },
+      { type: "product_price_changed", metadata: { productId: UUID } },
+      {
+        type: "inventory_movement_created",
+        metadata: { inventoryItemId: UUID, locationId: UUID, type: "receipt" },
+      },
+      { type: "revenue_goal_changed", metadata: {} },
+      { type: "demo_reset", metadata: { generatorVersion: "v1" } },
+      { type: "feedback_submitted", metadata: { rating: 5 } },
+    ] as const;
+    for (const event of serverEvents) {
+      expect(serverProductEventRequestSchema.safeParse(event).success).toBe(true);
+      expect(productEventRequestSchema.safeParse({ eventId: UUID, ...event }).success).toBe(false);
+    }
+  });
+
+  it("models goal clearing and Settings feedback/event responses", () => {
+    expect(
+      revenueGoalMutationSchema.safeParse({
+        monthlyGoal: "0.00",
+        expectedVersion: null,
+        expectedDemoDataRevision: 1,
+        idempotencyKey: UUID,
+      }).success,
+    ).toBe(true);
+    expect(
+      revenueGoalMutationResponseSchema.safeParse({
+        data: { month: "2026-08", monthlyGoal: null, version: null, demoDataRevision: 2 },
+        meta: {},
+        requestId: UUID,
+      }).success,
+    ).toBe(true);
+    expect(
+      feedbackResponseSchema.safeParse({
+        data: {
+          rating: 4,
+          comment: "",
+          desiredFeatures: "Inventory exports",
+          version: 1,
+          submittedAt: "2026-08-26T10:00:00.000Z",
+          updatedAt: "2026-08-26T10:00:00.000Z",
+        },
+        meta: {},
+        requestId: UUID,
+      }).success,
+    ).toBe(true);
+    expect(
+      productEventResponseSchema.safeParse({ data: { eventId: UUID }, meta: {}, requestId: UUID })
+        .success,
+    ).toBe(true);
   });
 
   it("keeps error envelopes and reset payload strict", () => {

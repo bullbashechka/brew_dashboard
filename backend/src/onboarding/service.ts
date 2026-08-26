@@ -35,6 +35,7 @@ import {
   revenueTargets,
 } from "../db/schema.ts";
 import { ApiProblem } from "../http/errors.ts";
+import { recordServerProductEvent } from "../events/service.ts";
 
 export const ONBOARDING_LANGUAGE_OPERATION = "onboarding.language";
 export const ONBOARDING_COMPLETE_OPERATION = "onboarding.complete";
@@ -426,6 +427,14 @@ export const completeOnboarding = async (
     .set({ onboardingCompletedAt: startedAt, updatedAt: new Date() })
     .where(eq(networks.id, input.networkId));
   await input.hooks?.afterPhase?.("completion-marker");
+  await recordServerProductEvent(transaction, {
+    authUserId: input.authUserId,
+    networkId: input.networkId,
+    type: "onboarding_completed",
+    route: "overview",
+    metadata: { locationCount: storedLocations.length },
+    occurredAt: startedAt,
+  });
   await completeIdempotency(transaction, { id: claim.id, resourceId: input.networkId });
 
   network = await selectNetworkForUpdate(transaction, input.networkId);
@@ -513,6 +522,14 @@ export const resetDemoData = async (
     })
     .where(eq(networks.id, input.networkId));
   await input.hooks?.afterPhase?.("network");
+  await recordServerProductEvent(transaction, {
+    authUserId: input.authUserId,
+    networkId: input.networkId,
+    type: "demo_reset",
+    route: "settings",
+    metadata: { generatorVersion: data.version },
+    occurredAt: startedAt,
+  });
   await completeIdempotency(transaction, { id: claim.id, resourceId: input.networkId });
   network = await selectNetworkForUpdate(transaction, input.networkId);
   return currentResultForNetwork(transaction, network, startedAt);

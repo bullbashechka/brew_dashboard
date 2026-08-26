@@ -15,6 +15,7 @@ import {
   type RequestTransaction,
 } from "../db/client.ts";
 import { appUsers, authSessions, authUsers, networks } from "../db/schema.ts";
+import { recordServerProductEvent } from "../events/service.ts";
 import { errorResponse, unauthenticatedResponse } from "../http/errors.ts";
 import type { AppEnvironment } from "../http/types.ts";
 import {
@@ -286,10 +287,18 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
           return { kind: "invalid" as const, clearCookie: true };
         }
 
+        const now = new Date();
         await transaction
           .update(appUsers)
-          .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+          .set({ lastLoginAt: now, updatedAt: now })
           .where(eq(appUsers.authUserId, payload.user.id));
+        await recordServerProductEvent(transaction, {
+          authUserId: payload.user.id,
+          networkId: profile.networkId,
+          type: "login_succeeded",
+          metadata: {},
+          occurredAt: now,
+        });
 
         return { kind: "success" as const, profile: profile.profile, response };
       }),

@@ -539,6 +539,8 @@ Currency и timezone после onboarding не редактируются.
 
 Event содержит `user_id`, `network_id`, type, timestamp, optional route и небольшую schema-validated metadata. В metadata запрещены password, cookies, arbitrary form text и feedback contents.
 
+Browser-facing `POST /events` принимает только `section_viewed` и `filter_changed`; server-authoritative типы (`login_succeeded`, `onboarding_completed`, mutation events, `demo_reset` и `feedback_submitted`) записываются только из trusted server paths. Client telemetry ограничена 30 новыми событиями за 60 секунд и 300 за 24 часа на tenant; idempotent replay не расходует квоту и возвращает `Retry-After` при `429`.
+
 ## 13. Схема данных Railway PostgreSQL
 
 ### 13.1. Auth и tenancy
@@ -624,7 +626,7 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 | `PUT`   | `/settings/tour`             | Сохранить tour state             |
 | `GET`   | `/feedback`                  | Получить текущий ответ           |
 | `PUT`   | `/feedback`                  | Upsert текущего ответа           |
-| `POST`  | `/events`                    | Записать whitelist product event |
+| `POST`  | `/events`                    | Записать client navigation/filter event |
 | `POST`  | `/demo/reset`                | Восстановить исходный набор      |
 
 Других business mutations в Demo MVP нет.
@@ -669,6 +671,7 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 - Reset полностью заменяет demo data одной атомарной database operation.
 - Feedback и revenue goal используют upsert с уникальным tenant scope.
 - Product event принимает только whitelist type и schema-validated metadata.
+- Browser product events ограничены navigation/filter типами и quota 30/60 секунд, 300/24 часа на tenant; server-authoritative events не принимаются из browser.
 - Размер JSON body ограничен 256 KiB.
 
 ## 16. Локализация и визуальная система

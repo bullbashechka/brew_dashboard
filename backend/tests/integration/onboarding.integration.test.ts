@@ -1,9 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
   apiErrorResponseSchema,
+  feedbackResponseSchema,
   onboardingCompleteResponseSchema,
   onboardingLanguageResponseSchema,
+  productEventResponseSchema,
+  revenueGoalMutationResponseSchema,
   resetResultResponseSchema,
+  sessionResponseSchema,
 } from "@brew-dashboard/contracts";
 import { sql } from "drizzle-orm";
 import { Client } from "pg";
@@ -87,6 +91,24 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     timeZone: "Asia/Almaty",
     idempotencyKey,
   });
+
+  const completeAccount = async (loginPrefix: string, ip: string) => {
+    const account = await createE2eAccount(`${loginPrefix}-${crypto.randomUUID().slice(0, 8)}`);
+    const cookie = await login(account, ip);
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "en", idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: onboardingPayload(crypto.randomUUID()),
+      cookie,
+    });
+    const session = await request("/api/v1/auth/me", { cookie });
+    const profile = sessionResponseSchema.parse(await session.json()).data.profile;
+    return { account, cookie, profile };
+  };
 
   type TenantDataSnapshot = {
     locations: unknown[];
@@ -175,9 +197,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
                                                        ORDER BY value.sort_order, value.id)
                                 FROM app.locations value WHERE value.network_id = $1), '[]'::jsonb),
          'feedback', COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
-                               FROM app.feedback_responses value WHERE value.network_id = $1), '[]'::jsonb),
-         'events', COALESCE((SELECT jsonb_agg(to_jsonb(value) - 'network_id' ORDER BY value.id)
-                             FROM app.product_events value WHERE value.network_id = $1), '[]'::jsonb)
+                               FROM app.feedback_responses value WHERE value.network_id = $1), '[]'::jsonb)
        ) AS snapshot
        FROM app.networks network WHERE network.id = $1`,
       [networkId],
@@ -645,4 +665,213 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     expect(guest.status).toBe(401);
     expect(apiErrorResponseSchema.parse(await guest.json()).error.code).toBe("UNAUTHENTICATED");
   }, 30_000);
+
+  it("persists Settings goal and feedback while accepting only strict product events", async () => {
+    const account = await createE2eAccount(`stage11-settings-${crypto.randomUUID().slice(0, 8)}`);
+    const cookie = await login(account, "198.51.100.61");
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "en", idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: onboardingPayload(crypto.randomUUID()),
+      cookie,
+    });
+    const session = await request("/api/v1/auth/me", { cookie });
+    const profile = sessionResponseSchema.parse(await session.json()).data.profile;
+
+    const goal = await request("/api/v1/settings/revenue-goal", {
+      method: "PUT",
+      cookie,
+      body: {
+        monthlyGoal: "12345.00",
+        expectedVersion: 1,
+        expectedDemoDataRevision: profile.demoDataRevision,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    });
+    expect(goal.status).toBe(200);
+    expect(revenueGoalMutationResponseSchema.parse(await goal.json()).data.monthlyGoal).toBe(
+      "12345.00",
+    );
+
+    const emptyFeedback = await request("/api/v1/feedback", { cookie });
+    expect(feedbackResponseSchema.parse(await emptyFeedback.json()).data).toBeNull();
+    const feedback = await request("/api/v1/feedback", {
+      method: "PUT",
+      cookie,
+      body: {
+        rating: 4,
+        comment: "Useful dashboard",
+        desiredFeatures: "POS import",
+        expectedVersion: null,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    });
+    expect(feedback.status).toBe(200);
+    expect(feedbackResponseSchema.parse(await feedback.json()).data?.desiredFeatures).toBe(
+      "POS import",
+    );
+
+    const eventId = crypto.randomUUID();
+    const event = await request("/api/v1/events", {
+      method: "POST",
+      cookie,
+      body: {
+        eventId,
+        type: "section_viewed",
+        route: "settings",
+        metadata: { section: "settings" },
+      },
+    });
+    expect(productEventResponseSchema.parse(await event.json()).data.eventId).toBe(eventId);
+    const replay = await request("/api/v1/events", {
+      method: "POST",
+      cookie,
+      body: {
+        eventId,
+        type: "section_viewed",
+        route: "settings",
+        metadata: { section: "settings" },
+      },
+    });
+    expect(replay.status).toBe(200);
+    const rejected = await request("/api/v1/events", {
+      method: "POST",
+      cookie,
+      body: {
+        eventId: crypto.randomUUID(),
+        type: "section_viewed",
+        metadata: { section: "settings", comment: "must not persist" },
+      },
+    });
+    expect(rejected.status).toBe(400);
+
+    const reset = await request("/api/v1/demo/reset", {
+      method: "POST",
+      cookie,
+      body: { idempotencyKey: crypto.randomUUID() },
+    });
+    expect(reset.status).toBe(200);
+    const afterReset = await request("/api/v1/feedback", { cookie });
+    expect(feedbackResponseSchema.parse(await afterReset.json()).data?.comment).toBe(
+      "Useful dashboard",
+    );
+    const events = await ownerClient.query<{ type: string; count: number }>(
+      `SELECT type::text AS type, count(*)::int AS count
+       FROM app.product_events
+       WHERE network_id = $1 AND type IN ('feedback_submitted', 'demo_reset')
+       GROUP BY type`,
+      [account.networkId],
+    );
+    expect(events.rows.sort((left, right) => left.type.localeCompare(right.type))).toEqual([
+      { type: "demo_reset", count: 1 },
+      { type: "feedback_submitted", count: 1 },
+    ]);
+  }, 30_000);
+
+  it("keeps server events private and rate-limits client telemetry", async () => {
+    const first = await completeAccount("stage11-event-limit", "198.51.100.62");
+    const serverOnlyEvents = [
+      { type: "login_succeeded", metadata: {} },
+      { type: "onboarding_completed", metadata: { locationCount: 3 } },
+      { type: "product_price_changed", metadata: { productId: crypto.randomUUID() } },
+      {
+        type: "inventory_movement_created",
+        metadata: {
+          inventoryItemId: crypto.randomUUID(),
+          locationId: crypto.randomUUID(),
+          type: "receipt",
+        },
+      },
+      { type: "revenue_goal_changed", metadata: {} },
+      { type: "demo_reset", metadata: { generatorVersion: "v1" } },
+      { type: "feedback_submitted", metadata: { rating: 5 } },
+    ] as const;
+    for (const event of serverOnlyEvents) {
+      const response = await request("/api/v1/events", {
+        method: "POST",
+        cookie: first.cookie,
+        body: { eventId: crypto.randomUUID(), ...event },
+      });
+      expect(response.status).toBe(400);
+      expect(apiErrorResponseSchema.parse(await response.json()).error.code).toBe(
+        "VALIDATION_ERROR",
+      );
+    }
+
+    for (let index = 0; index < 30; index += 1) {
+      const response = await request("/api/v1/events", {
+        method: "POST",
+        cookie: first.cookie,
+        body: {
+          eventId: crypto.randomUUID(),
+          type: "section_viewed",
+          route: "overview",
+          metadata: { section: "overview" },
+        },
+      });
+      expect(response.status).toBe(200);
+    }
+    const burstLimited = await request("/api/v1/events", {
+      method: "POST",
+      cookie: first.cookie,
+      body: {
+        eventId: crypto.randomUUID(),
+        type: "filter_changed",
+        route: "overview",
+        metadata: { filter: "period", period: "today", locationId: null },
+      },
+    });
+    expect(burstLimited.status).toBe(429);
+    expect(apiErrorResponseSchema.parse(await burstLimited.json()).error.code).toBe("RATE_LIMITED");
+    expect(Number(burstLimited.headers.get("retry-after"))).toBeGreaterThan(0);
+
+    const serverMutationAfterBurst = await request("/api/v1/feedback", {
+      method: "PUT",
+      cookie: first.cookie,
+      body: {
+        rating: 5,
+        desiredFeatures: "Server events still work",
+        expectedVersion: null,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    });
+    expect(serverMutationAfterBurst.status).toBe(200);
+
+    const second = await completeAccount("stage11-event-daily", "198.51.100.63");
+    const dailyKey = `product-events:daily:${second.account.networkId}`;
+    await ownerClient.query(
+      `INSERT INTO auth.rate_limits (id, key, count, last_request)
+       VALUES ($1, $2, 300, $3)
+       ON CONFLICT (key) DO UPDATE SET count = EXCLUDED.count, last_request = EXCLUDED.last_request`,
+      [crypto.randomUUID(), dailyKey, Date.now()],
+    );
+    const dailyLimited = await request("/api/v1/events", {
+      method: "POST",
+      cookie: second.cookie,
+      body: {
+        eventId: crypto.randomUUID(),
+        type: "section_viewed",
+        route: "settings",
+        metadata: { section: "settings" },
+      },
+    });
+    expect(dailyLimited.status).toBe(429);
+    expect(apiErrorResponseSchema.parse(await dailyLimited.json()).error.code).toBe("RATE_LIMITED");
+    expect(Number(dailyLimited.headers.get("retry-after"))).toBeGreaterThan(0);
+    const serverMutationAfterDaily = await request("/api/v1/feedback", {
+      method: "PUT",
+      cookie: second.cookie,
+      body: {
+        rating: 4,
+        desiredFeatures: "Server events bypass client quota",
+        expectedVersion: null,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    });
+    expect(serverMutationAfterDaily.status).toBe(200);
+  }, 60_000);
 });

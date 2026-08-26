@@ -1,12 +1,8 @@
-import {
-  priceMutationSchema,
-  productEventMetadataSchemas,
-  type PriceMutation,
-} from "@brew-dashboard/contracts";
+import { priceMutationSchema, type PriceMutation } from "@brew-dashboard/contracts";
 import { and, eq } from "drizzle-orm";
 
 import { lockNetwork, type RequestTransaction } from "../db/client.ts";
-import { appUsers, idempotencyKeys, networks, productEvents, products } from "../db/schema.ts";
+import { idempotencyKeys, networks, products } from "../db/schema.ts";
 import { calculateCurrentUnitMargin } from "../domain/metrics.ts";
 import { subtract, parseDecimal, toMoney } from "../domain/decimal.ts";
 import {
@@ -16,6 +12,7 @@ import {
 } from "../domain/idempotency.ts";
 import { assertDemoDataRevision } from "../onboarding/service.ts";
 import { ApiProblem } from "../http/errors.ts";
+import { recordServerProductEvent } from "../events/service.ts";
 
 export const PRODUCT_PRICE_OPERATION = "products.price";
 
@@ -108,23 +105,12 @@ export const updateProductPrice = async (
   const updatedProduct = updated[0];
   if (!updatedProduct) throw new ApiProblem("NOT_FOUND", 404, "Product not found");
 
-  const users = await transaction
-    .select({ id: appUsers.id })
-    .from(appUsers)
-    .where(and(eq(appUsers.networkId, input.networkId), eq(appUsers.authUserId, input.authUserId)))
-    .limit(1);
-  const user = users[0];
-  if (!user) throw new Error("Authenticated app user is unavailable");
-
-  await transaction.insert(productEvents).values({
-    id: crypto.randomUUID(),
+  await recordServerProductEvent(transaction, {
+    authUserId: input.authUserId,
     networkId: input.networkId,
-    userId: user.id,
     type: "product_price_changed",
     route: "products",
-    metadata: productEventMetadataSchemas.product_price_changed.parse({
-      productId: updatedProduct.id,
-    }),
+    metadata: { productId: updatedProduct.id },
     occurredAt: now,
   });
   await completeIdempotency(transaction, {

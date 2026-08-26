@@ -1,17 +1,17 @@
 import {
   inventoryMovementMutationDataSchema,
   inventoryMovementMutationSchema,
-  productEventMetadataSchemas,
   type InventoryMovementMutation,
 } from "@brew-dashboard/contracts";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { lockNetwork, type RequestTransaction } from "../db/client.ts";
-import { appUsers, networks, productEvents } from "../db/schema.ts";
+import { networks } from "../db/schema.ts";
 import { getStockStatus } from "../domain/inventory.ts";
 import { claimIdempotency, hashOperationPayload } from "../domain/idempotency.ts";
 import { ApiProblem } from "../http/errors.ts";
 import { assertDemoDataRevision } from "../onboarding/service.ts";
+import { recordServerProductEvent } from "../events/service.ts";
 
 export const INVENTORY_MOVEMENT_OPERATION = "inventory_movement";
 
@@ -186,14 +186,6 @@ export const createInventoryMovement = async (
     );
   }
 
-  const userRows = await transaction
-    .select({ id: appUsers.id })
-    .from(appUsers)
-    .where(and(eq(appUsers.networkId, input.networkId), eq(appUsers.authUserId, input.authUserId)))
-    .limit(1);
-  const user = userRows[0];
-  if (!user) throw new Error("Authenticated app user is unavailable");
-
   const now = new Date();
   let movementId: string;
   try {
@@ -224,17 +216,16 @@ export const createInventoryMovement = async (
     network.demoDataRevision,
   );
   await input.hooks?.afterMovementApplied?.();
-  await transaction.insert(productEvents).values({
-    id: crypto.randomUUID(),
+  await recordServerProductEvent(transaction, {
+    authUserId: input.authUserId,
     networkId: input.networkId,
-    userId: user.id,
     type: "inventory_movement_created",
     route: "inventory",
-    metadata: productEventMetadataSchemas.inventory_movement_created.parse({
+    metadata: {
       inventoryItemId: request.inventoryItemId,
       locationId: request.locationId,
       type: request.type,
-    }),
+    },
     occurredAt: now,
   });
   return data;
