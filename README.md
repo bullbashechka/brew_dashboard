@@ -112,6 +112,15 @@ started again from Settings; `PUT /api/v1/settings/tour` persists `pending`, `co
 `skipped` with the existing idempotency-key boundary. The `tour_skipped_at` migration must be
 applied before deploying this stage.
 
+## Sales and Products (Stage 9)
+
+Sales is a read-only view of generated orders: it has no order CRUD, cancellation, or refund
+actions. Product price edits use `PATCH /api/v1/products/:productId/price` with the current
+product version, demo-data revision, and an idempotency key. The mutation updates only the current
+selling price; order-item price and cost snapshots remain unchanged, so historical Revenue and
+Gross Profit stay stable. Each successful edit also records the tenant-scoped
+`product_price_changed` event with product ID metadata only.
+
 ## Database workflow (Stage 2)
 
 `backend/src/db/schema.ts` is the server-only source of database types. Drizzle generates the

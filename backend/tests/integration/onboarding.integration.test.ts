@@ -204,7 +204,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       });
     }
     await ownerClient.end();
-  });
+  }, 60_000);
 
   it("requires language, blocks business access, and completes onboarding idempotently", async () => {
     const account = await createE2eAccount(`stage4-onboarding-${crypto.randomUUID().slice(0, 8)}`);

@@ -1,5 +1,6 @@
 import {
   calculateComparisonPercent,
+  calculateCurrentUnitMargin,
   calculateFinancialMetrics,
   calculateGoalCompletion,
   classifyMenuProducts,
@@ -19,6 +20,7 @@ import {
   isZero,
   multiply,
   parseDecimal,
+  subtract,
   toMoney,
   toPercentage,
   toQuantity,
@@ -776,16 +778,26 @@ const productAnalytics = (context: AnalyticsContext) => {
   const medians = menu.medians;
   const balanceByProduct = new Map<
     string,
-    Array<{ locationId: string; onHand: string; status: ReturnType<typeof getStockStatus> }>
+    Array<{
+      locationId: string;
+      locationName: string;
+      onHand: string;
+      status: ReturnType<typeof getStockStatus>;
+    }>
   >();
   const itemMap = new Map(context.snapshot.inventoryItems.map((item) => [item.id, item]));
+  const locationMap = new Map(
+    context.snapshot.locations.map((location) => [location.id, location]),
+  );
   for (const balance of context.snapshot.balances) {
     if (context.locationId && balance.locationId !== context.locationId) continue;
     const productId = itemMap.get(balance.inventoryItemId)?.productId;
-    if (!productId) continue;
+    const location = locationMap.get(balance.locationId);
+    if (!productId || !location) continue;
     const list = balanceByProduct.get(productId) ?? [];
     list.push({
       locationId: balance.locationId,
+      locationName: location.name,
       onHand: balance.onHand,
       status: getStockStatus(balance.onHand, balance.minThreshold),
     });
@@ -797,10 +809,17 @@ const productAnalytics = (context: AnalyticsContext) => {
     return {
       productId: product.id,
       name: product.name,
+      categoryId: product.categoryId,
       categoryName: product.categoryName,
       active: product.active,
       currentPrice: product.currentPrice,
       currentUnitCost: product.currentUnitCost,
+      unitContribution:
+        classification?.unitContribution ??
+        toMoney(
+          subtract(parseDecimal(product.currentPrice), parseDecimal(product.currentUnitCost)),
+        ),
+      currentUnitMargin: calculateCurrentUnitMargin(product.currentPrice, product.currentUnitCost),
       version: product.version,
       unitsSold: summary.summary.unitsSold,
       revenue: summary.summary.revenue,

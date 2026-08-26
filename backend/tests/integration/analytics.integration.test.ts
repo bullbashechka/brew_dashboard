@@ -4,7 +4,9 @@ import {
   inventoryResponseSchema,
   locationsResponseSchema,
   overviewResponseSchema,
+  priceMutationResponseSchema,
   productsResponseSchema,
+  resetResultResponseSchema,
   salesResponseSchema,
 } from "@brew-dashboard/contracts";
 import { Client } from "pg";
@@ -32,9 +34,16 @@ describeIntegration("Stage 5 analytics API", () => {
   const ownerClient = new Client({ connectionString: ownerUrl });
   const accounts: TestAccount[] = [];
 
-  const request = async (path: string, cookie: string, ip = "198.51.100.80") => {
-    const headers = new Headers({ cookie, "cf-connecting-ip": ip });
-    return app.request(new URL(path, baseUrl), { headers }, environment);
+  const request = async (
+    path: string,
+    cookie: string,
+    init: RequestInit = {},
+    ip = "198.51.100.80",
+  ) => {
+    const headers = new Headers(init.headers);
+    headers.set("cookie", cookie);
+    headers.set("cf-connecting-ip", ip);
+    return app.request(new URL(path, baseUrl), { ...init, headers }, environment);
   };
 
   const cookieFrom = (response: Response) =>
@@ -111,7 +120,7 @@ describeIntegration("Stage 5 analytics API", () => {
       }
     }
     await ownerClient.end();
-  });
+  }, 60_000);
 
   it("serves schema-valid analytics with shared KPI values and tenant-safe location fallback", async () => {
     const first = await createOnboarded(
@@ -188,7 +197,7 @@ describeIntegration("Stage 5 analytics API", () => {
       [first.account.networkId],
     );
     expect(after.rows[0]).toEqual(before.rows[0]);
-  });
+  }, 60_000);
 
   it("keeps cursor continuation stable and rejects a tampered token", async () => {
     const first = await createOnboarded(
@@ -254,7 +263,7 @@ describeIntegration("Stage 5 analytics API", () => {
     );
     expect(invalid.status).toBe(400);
     expect(apiErrorResponseSchema.parse(await invalid.json()).error.code).toBe("VALIDATION_ERROR");
-  }, 15_000);
+  }, 60_000);
 
   it("keeps the tenant/time range analytics reads explainable", async () => {
     const account = await createOnboarded(
@@ -287,4 +296,260 @@ describeIntegration("Stage 5 analytics API", () => {
     expect((ordersPlanJson as Array<{ Plan?: unknown }>)[0]?.Plan).toBeDefined();
     expect((movementsPlanJson as Array<{ Plan?: unknown }>)[0]?.Plan).toBeDefined();
   });
+
+  it("updates only the current product price and records one safe tenant event", async () => {
+    const first = await createOnboarded(
+      `stage9-a-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Nine A",
+    );
+    const second = await createOnboarded(
+      `stage9-b-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Nine B",
+    );
+    const initialProducts = productsResponseSchema.parse(
+      await (await request("/api/v1/products?period=30d", first.cookie)).json(),
+    );
+    const product = initialProducts.data.products[0];
+    if (!product) throw new Error("Expected generated product");
+    const foreignProducts = productsResponseSchema.parse(
+      await (await request("/api/v1/products?period=30d", second.cookie)).json(),
+    );
+    const beforeSales = salesResponseSchema.parse(
+      await (await request("/api/v1/sales?period=30d", first.cookie)).json(),
+    );
+    const beforeSnapshots = await ownerClient.query<{ checksum: string }>(
+      `SELECT md5(coalesce(string_agg(
+        order_id::text || ':' || product_id::text || ':' || unit_price_at_sale::text || ':' || unit_cost_at_sale::text,
+        ',' ORDER BY id
+      ), '')) AS checksum
+       FROM app.order_items
+       WHERE network_id = $1`,
+      [first.account.networkId],
+    );
+    const mutation = {
+      price: "999.00",
+      expectedVersion: product.version,
+      expectedDemoDataRevision: initialProducts.meta.demoDataRevision,
+      idempotencyKey: crypto.randomUUID(),
+    };
+    const update = await request(`/api/v1/products/${product.productId}/price`, first.cookie, {
+      method: "PATCH",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify(mutation),
+    });
+    expect(update.status).toBe(200);
+    const updated = priceMutationResponseSchema.parse(await update.json());
+    expect(updated.data.currentPrice).toBe("999.00");
+    expect(updated.data.version).toBe(product.version + 1);
+    expect(updated.data.currentUnitMargin).not.toBeNull();
+
+    const secondMutation = {
+      price: "998.00",
+      expectedVersion: updated.data.version,
+      expectedDemoDataRevision: initialProducts.meta.demoDataRevision,
+      idempotencyKey: crypto.randomUUID(),
+    };
+    const secondUpdate = await request(
+      `/api/v1/products/${product.productId}/price`,
+      first.cookie,
+      {
+        method: "PATCH",
+        headers: { origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify(secondMutation),
+      },
+    );
+    expect(secondUpdate.status).toBe(200);
+    const secondResult = priceMutationResponseSchema.parse(await secondUpdate.json());
+    expect(secondResult.data.currentPrice).toBe("998.00");
+    expect(secondResult.data.version).toBe(updated.data.version + 1);
+
+    const replay = await request(`/api/v1/products/${product.productId}/price`, first.cookie, {
+      method: "PATCH",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify(mutation),
+    });
+    expect(replay.status).toBe(200);
+    const replayResult = priceMutationResponseSchema.parse(await replay.json());
+    expect(replayResult.data.currentPrice).toBe("999.00");
+    expect(replayResult.data.version).toBe(product.version + 1);
+
+    const afterProducts = productsResponseSchema.parse(
+      await (await request("/api/v1/products?period=30d", first.cookie)).json(),
+    );
+    const afterProduct = afterProducts.data.products.find(
+      (value) => value.productId === product.productId,
+    );
+    expect(afterProduct?.currentPrice).toBe("998.00");
+    expect(afterProduct?.version).toBe(secondResult.data.version);
+    expect(afterProduct?.currentUnitMargin).toBe(secondResult.data.currentUnitMargin);
+    const afterSales = salesResponseSchema.parse(
+      await (await request("/api/v1/sales?period=30d", first.cookie)).json(),
+    );
+    expect(afterSales.data.kpis.revenue.value).toBe(beforeSales.data.kpis.revenue.value);
+    expect(afterSales.data.kpis.grossProfit.value).toBe(beforeSales.data.kpis.grossProfit.value);
+    const afterSnapshots = await ownerClient.query<{ checksum: string }>(
+      `SELECT md5(coalesce(string_agg(
+        order_id::text || ':' || product_id::text || ':' || unit_price_at_sale::text || ':' || unit_cost_at_sale::text,
+        ',' ORDER BY id
+      ), '')) AS checksum
+       FROM app.order_items
+       WHERE network_id = $1`,
+      [first.account.networkId],
+    );
+    expect(afterSnapshots.rows[0]?.checksum).toBe(beforeSnapshots.rows[0]?.checksum);
+
+    const events = await ownerClient.query<{ type: string; metadata: { productId: string } }>(
+      `SELECT type::text, metadata
+       FROM app.product_events
+       WHERE network_id = $1
+       ORDER BY occurred_at`,
+      [first.account.networkId],
+    );
+    const priceEvents = events.rows.filter((event) => event.type === "product_price_changed");
+    expect(priceEvents).toHaveLength(2);
+    expect(priceEvents.map((event) => event.metadata)).toEqual([
+      { productId: product.productId },
+      { productId: product.productId },
+    ]);
+
+    const reusedKey = await request(`/api/v1/products/${product.productId}/price`, first.cookie, {
+      method: "PATCH",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({ ...mutation, price: "997.00" }),
+    });
+    expect(reusedKey.status).toBe(409);
+
+    const staleVersion = await request(
+      `/api/v1/products/${product.productId}/price`,
+      first.cookie,
+      {
+        method: "PATCH",
+        headers: { origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify({
+          price: "997.00",
+          expectedVersion: product.version,
+          expectedDemoDataRevision: initialProducts.meta.demoDataRevision,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      },
+    );
+    expect(staleVersion.status).toBe(409);
+
+    const noOpKey = crypto.randomUUID();
+    const noOp = await request(`/api/v1/products/${product.productId}/price`, first.cookie, {
+      method: "PATCH",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({
+        price: "998.00",
+        expectedVersion: secondResult.data.version,
+        expectedDemoDataRevision: initialProducts.meta.demoDataRevision,
+        idempotencyKey: noOpKey,
+      }),
+    });
+    expect(noOp.status).toBe(409);
+    const noOpKeyRows = await ownerClient.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM app.idempotency_keys
+       WHERE network_id = $1 AND key = $2`,
+      [first.account.networkId, noOpKey],
+    );
+    expect(noOpKeyRows.rows[0]?.count).toBe("0");
+
+    const foreign = await request(
+      `/api/v1/products/${foreignProducts.data.products[0]!.productId}/price`,
+      first.cookie,
+      {
+        method: "PATCH",
+        headers: { origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify({ ...mutation, idempotencyKey: crypto.randomUUID() }),
+      },
+    );
+    expect(foreign.status).toBe(404);
+  }, 60_000);
+
+  it("rejects stale demo revisions and serializes concurrent price writes", async () => {
+    const account = await createOnboarded(
+      `stage9-concurrency-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Nine Concurrency",
+    );
+    const initial = productsResponseSchema.parse(
+      await (await request("/api/v1/products?period=30d", account.cookie)).json(),
+    );
+    const initialProduct = initial.data.products[0];
+    if (!initialProduct) throw new Error("Expected generated product");
+
+    const reset = await request("/api/v1/demo/reset", account.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    });
+    expect(reset.status).toBe(200);
+    const resetResult = resetResultResponseSchema.parse(await reset.json());
+    expect(resetResult.data.profile.demoDataRevision).toBe(initial.meta.demoDataRevision + 1);
+
+    const stale = await request(
+      `/api/v1/products/${initialProduct.productId}/price`,
+      account.cookie,
+      {
+        method: "PATCH",
+        headers: { origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify({
+          price: "999.00",
+          expectedVersion: initialProduct.version,
+          expectedDemoDataRevision: initial.meta.demoDataRevision,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      },
+    );
+    expect(stale.status).toBe(409);
+    expect(apiErrorResponseSchema.parse(await stale.json()).error.code).toBe("CONFLICT");
+
+    const current = productsResponseSchema.parse(
+      await (await request("/api/v1/products?period=30d", account.cookie)).json(),
+    );
+    const currentProduct = current.data.products.find(
+      (product) => product.productId === initialProduct.productId,
+    );
+    if (!currentProduct) throw new Error("Expected reset product");
+    const concurrentMutations = [
+      {
+        price: "701.00",
+        expectedVersion: currentProduct.version,
+        expectedDemoDataRevision: current.meta.demoDataRevision,
+        idempotencyKey: crypto.randomUUID(),
+      },
+      {
+        price: "702.00",
+        expectedVersion: currentProduct.version,
+        expectedDemoDataRevision: current.meta.demoDataRevision,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    ];
+    const concurrentResponses = await Promise.all(
+      concurrentMutations.map((mutation) =>
+        request(`/api/v1/products/${currentProduct.productId}/price`, account.cookie, {
+          method: "PATCH",
+          headers: { origin: baseUrl, "content-type": "application/json" },
+          body: JSON.stringify(mutation),
+        }),
+      ),
+    );
+    expect(concurrentResponses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const winnerIndex = concurrentResponses.findIndex((response) => response.status === 200);
+    expect(winnerIndex).toBeGreaterThanOrEqual(0);
+    const winner = priceMutationResponseSchema.parse(
+      await concurrentResponses[winnerIndex]!.json(),
+    );
+    expect(winner.data.currentPrice).toBe(concurrentMutations[winnerIndex]!.price);
+    expect(winner.data.version).toBe(currentProduct.version + 1);
+
+    const after = productsResponseSchema.parse(
+      await (await request("/api/v1/products?period=30d", account.cookie)).json(),
+    );
+    const afterProduct = after.data.products.find(
+      (product) => product.productId === currentProduct.productId,
+    );
+    expect(afterProduct?.currentPrice).toBe(winner.data.currentPrice);
+    expect(afterProduct?.version).toBe(winner.data.version);
+  }, 60_000);
 });

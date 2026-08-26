@@ -153,7 +153,8 @@ test("completes Login → Language → Onboarding → Overview → Tour and can 
   await page.getByLabel("Timezone").fill("Asia/Almaty");
   await page.getByRole("button", { name: "Create my dashboard" }).click();
 
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/overview/);
+  await expect(page.getByTestId("page-overview")).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("Step 1 of 3");
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page).toHaveURL(/\/app\/locations/);

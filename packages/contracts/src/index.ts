@@ -604,10 +604,13 @@ export const menuRecommendationSchema = z.enum([
 export const productAnalyticsSchema = z.strictObject({
   productId: uuidSchema,
   name: z.string(),
+  categoryId: uuidSchema,
   categoryName: z.string(),
   active: z.boolean(),
   currentPrice: nonNegativeMoneySchema,
   currentUnitCost: nonNegativeMoneySchema,
+  unitContribution: moneySchema,
+  currentUnitMargin: percentageSchema.nullable(),
   version: versionSchema,
   unitsSold: quantitySchema,
   revenue: moneySchema,
@@ -617,6 +620,7 @@ export const productAnalyticsSchema = z.strictObject({
   balances: z.array(
     z.strictObject({
       locationId: uuidSchema,
+      locationName: z.string(),
       onHand: quantitySchema,
       status: stockStatusSchema,
     }),
@@ -663,6 +667,16 @@ export const priceMutationSchema = z.strictObject({
   expectedDemoDataRevision: versionSchema.default(1),
   idempotencyKey: idempotencyKeySchema,
 });
+export const priceMutationDataSchema = z.strictObject({
+  productId: uuidSchema,
+  currentPrice: nonNegativeMoneySchema,
+  currentUnitCost: nonNegativeMoneySchema,
+  unitContribution: moneySchema,
+  currentUnitMargin: percentageSchema.nullable(),
+  version: versionSchema,
+  demoDataRevision: versionSchema,
+});
+export const priceMutationResponseSchema = createSuccessEnvelopeSchema(priceMutationDataSchema);
 export const inventoryMovementMutationSchema = z.strictObject({
   inventoryItemId: uuidSchema,
   locationId: uuidSchema,
@@ -820,5 +834,9 @@ export type OverviewData = z.infer<typeof overviewDataSchema>;
 export type LocationsData = z.infer<typeof locationsDataSchema>;
 export type SalesData = z.infer<typeof salesDataSchema>;
 export type ProductsData = z.infer<typeof productsDataSchema>;
+export type ProductAnalytics = z.infer<typeof productAnalyticsSchema>;
 export type InventoryData = z.infer<typeof inventoryDataSchema>;
+export type PriceMutation = z.infer<typeof priceMutationSchema>;
+export type PriceMutationData = z.infer<typeof priceMutationDataSchema>;
+export type PriceMutationResponse = z.infer<typeof priceMutationResponseSchema>;
 export type ProductEventRequest = z.infer<typeof productEventRequestSchema>;

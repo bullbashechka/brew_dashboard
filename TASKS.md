@@ -311,10 +311,10 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Критерии приёмки
 
-- [ ] Смена глобального фильтра согласованно обновляет все виджеты и comparison.
-- [ ] Overview и Locations показывают одну и ту же финансовую модель и формат валюты.
-- [ ] KPI читаемы в 1–2 колонки на mobile, charts не создают горизонтальный скролл страницы.
-- [ ] Playwright проверяет смену location/period и согласованное обновление аналитики.
+- [x] Смена глобального фильтра согласованно обновляет все виджеты и comparison.
+- [x] Overview и Locations показывают одну и ту же финансовую модель и формат валюты.
+- [x] KPI читаемы в 1–2 колонки на mobile, charts не создают горизонтальный скролл страницы.
+- [x] Playwright проверяет смену location/period и согласованное обновление аналитики.
 
 ---
 
@@ -326,23 +326,23 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S9.1.** Реализовать Sales KPI, daily/comparison trends, weekday/hour heatmap и peak hours.
-- [ ] **S9.2.** Добавить breakdown по точкам, категориям и товарам.
-- [ ] **S9.3.** Добавить recent orders и items с pagination и адаптивным table/card отображением.
-- [ ] **S9.4.** Реализовать Products list по категориям с current price/cost, units sold, Revenue, Gross Profit, Gross Margin, revenue share и balances.
-- [ ] **S9.5.** Визуализировать menu engineering matrix `Stars`, `Workhorses`, `Puzzles`, `Dogs` и rule-based recommendations.
-- [ ] **S9.6.** Реализовать `PATCH /products/:productId/price`: non-negative current price, tenant ownership и отсутствие изменений historical order items.
-- [ ] **S9.7.** Добавить price dialog с progress, disabled duplicate submit, toast и сохранением значения при ошибке.
-- [ ] **S9.8.** После изменения цены точечно инвалидировать Products current margin/matrix и связанные актуальные reads, не переписывая historical sales.
-- [ ] **S9.9.** Записать событие `product_price_changed` с безопасной schema metadata.
-- [ ] **S9.10.** Добавить integration/component tests и Playwright journey изменения цены.
+- [x] **S9.1.** Реализовать Sales KPI, daily/comparison trends, weekday/hour heatmap и peak hours.
+- [x] **S9.2.** Добавить breakdown по точкам, категориям и товарам.
+- [x] **S9.3.** Добавить recent orders и items с pagination и адаптивным table/card отображением.
+- [x] **S9.4.** Реализовать Products list по категориям с current price/cost, units sold, Revenue, Gross Profit, Gross Margin, revenue share и balances.
+- [x] **S9.5.** Визуализировать menu engineering matrix `Stars`, `Workhorses`, `Puzzles`, `Dogs` и rule-based recommendations.
+- [x] **S9.6.** Реализовать `PATCH /products/:productId/price`: non-negative current price, tenant ownership и отсутствие изменений historical order items.
+- [x] **S9.7.** Добавить price dialog с progress, disabled duplicate submit, toast и сохранением значения при ошибке.
+- [x] **S9.8.** После изменения цены точечно инвалидировать Products current margin/matrix и связанные актуальные reads, не переписывая historical sales.
+- [x] **S9.9.** Записать событие `product_price_changed` с безопасной schema metadata.
+- [x] **S9.10.** Добавить integration/component tests и Playwright journey изменения цены.
 
 ### Критерии приёмки
 
-- [ ] Sales остаётся полностью read-only; order CRUD, cancel и refunds отсутствуют.
-- [ ] Изменение цены сразу меняет current unit margin и при необходимости menu group/recommendation.
-- [ ] Revenue и Gross Profit исторических продаж до и после изменения цены совпадают.
-- [ ] Heatmap, matrix и таблицы доступны и адаптивны на desktop/mobile.
+- [x] Sales остаётся полностью read-only; order CRUD, cancel и refunds отсутствуют.
+- [x] Изменение цены сразу меняет current unit margin и при необходимости menu group/recommendation.
+- [x] Revenue и Gross Profit исторических продаж до и после изменения цены совпадают.
+- [x] Heatmap, matrix и таблицы доступны и адаптивны на desktop/mobile.
 
 ---
 

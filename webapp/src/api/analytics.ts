@@ -2,8 +2,13 @@ import { queryOptions } from "@tanstack/react-query";
 import {
   locationsResponseSchema,
   overviewResponseSchema,
+  priceMutationResponseSchema,
+  priceMutationSchema,
+  productsResponseSchema,
+  salesResponseSchema,
   type AnalyticsQuery,
   type LocationsData,
+  type PriceMutation,
 } from "@brew-dashboard/contracts";
 import { requestApi } from "./client";
 
@@ -53,4 +58,40 @@ export const locationsQuery = (networkId: string, filters: AnalyticsFilters & Lo
         schema: locationsResponseSchema,
         signal,
       }),
+  });
+
+export const salesInfiniteQuery = (networkId: string, filters: AnalyticsFilters) => ({
+  queryKey: ["tenant", networkId, "sales", filters],
+  initialPageParam: undefined as string | undefined,
+  queryFn: ({ signal, pageParam }: { signal: AbortSignal; pageParam: string | undefined }) => {
+    const params = new URLSearchParams(queryString(filters));
+    params.set("pageSize", "10");
+    if (pageParam) params.set("cursor", pageParam);
+    return requestApi({
+      path: `/api/v1/sales?${params.toString()}`,
+      schema: salesResponseSchema,
+      signal,
+    });
+  },
+  getNextPageParam: (lastPage: { meta: { pagination: { nextCursor: string | null } } }) =>
+    lastPage.meta.pagination.nextCursor ?? undefined,
+});
+
+export const productsQuery = (networkId: string, filters: AnalyticsFilters) =>
+  queryOptions({
+    queryKey: ["tenant", networkId, "products", filters],
+    queryFn: ({ signal }) =>
+      requestApi({
+        path: `/api/v1/products?${queryString(filters)}`,
+        schema: productsResponseSchema,
+        signal,
+      }),
+  });
+
+export const updateProductPrice = (productId: string, request: PriceMutation) =>
+  requestApi({
+    path: `/api/v1/products/${productId}/price`,
+    method: "PATCH",
+    schema: priceMutationResponseSchema,
+    body: priceMutationSchema.parse(request),
   });

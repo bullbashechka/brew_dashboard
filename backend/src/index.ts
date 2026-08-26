@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, type RouteHandler } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 import {
   apiErrorResponseSchema,
   healthResponseSchema,
@@ -17,6 +18,8 @@ import {
   onboardingRequestSchema,
   overviewResponseSchema,
   productsResponseSchema,
+  priceMutationSchema,
+  priceMutationResponseSchema,
   salesQuerySchema,
   salesResponseSchema,
   analyticsFilterQuerySchema,
@@ -25,6 +28,7 @@ import {
   sessionResponseSchema,
   tourMutationSchema,
   tourStateResponseSchema,
+  uuidSchema,
 } from "@brew-dashboard/contracts";
 
 import {
@@ -54,6 +58,7 @@ import {
 } from "./analytics/http.ts";
 import { tourStateHandler } from "./tour/http.ts";
 import { resetDemoHandler } from "./demo/http.ts";
+import { productPriceHandler } from "./products/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -289,6 +294,33 @@ const productsRoute = createRoute({
   },
 });
 
+const productPriceRoute = createRoute({
+  method: "patch",
+  path: "/products/{productId}/price",
+  request: {
+    params: z.object({ productId: uuidSchema }),
+    body: {
+      content: { "application/json": { schema: priceMutationSchema } },
+      description: "Update a tenant product's current selling price",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: priceMutationResponseSchema } },
+      description: "Current product price updated",
+    },
+    400: errorResponseDefinition("Product price validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    404: errorResponseDefinition("Product not found"),
+    409: errorResponseDefinition("Product or demo data changed"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
 const inventoryRoute = createRoute({
   method: "get",
   path: "/inventory",
@@ -361,6 +393,7 @@ app.openapi(
 for (const path of ["/overview", "/locations", "/sales", "/products", "/inventory"]) {
   app.use(path, requireAuthentication, requireCompletedOnboarding);
 }
+app.use("/products/:productId/price", requireAuthentication, requireCompletedOnboarding);
 
 app.openapi(
   overviewRoute,
@@ -374,6 +407,10 @@ app.openapi(salesRoute, salesHandler as unknown as RouteHandler<typeof salesRout
 app.openapi(
   productsRoute,
   productsHandler as unknown as RouteHandler<typeof productsRoute, AppEnvironment>,
+);
+app.openapi(
+  productPriceRoute,
+  productPriceHandler as unknown as RouteHandler<typeof productPriceRoute, AppEnvironment>,
 );
 app.openapi(
   inventoryRoute,
