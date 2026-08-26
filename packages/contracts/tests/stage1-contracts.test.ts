@@ -9,6 +9,7 @@ import {
   salesQuerySchema,
   apiErrorResponseSchema,
   feedbackMutationSchema,
+  inventoryMovementMutationResponseSchema,
   inventoryMovementMutationSchema,
   loginRequestSchema,
   onboardingRequestSchema,
@@ -157,6 +158,40 @@ describe("Stage 1 shared contracts", () => {
         type: "receipt",
         quantity: "1.250",
         idempotencyKey: UUID,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("keeps inventory movement responses typed and strict", () => {
+    expect(
+      inventoryMovementMutationResponseSchema.safeParse({
+        data: {
+          movement: {
+            movementId: UUID,
+            inventoryItemId: UUID,
+            inventoryItemName: "Beans",
+            locationId: UUID,
+            locationName: "Central",
+            type: "receipt",
+            quantity: "1.000",
+            occurredAt: "2026-08-25T10:00:00.000Z",
+          },
+          balance: {
+            inventoryItemId: UUID,
+            inventoryItemName: "Beans",
+            productId: null,
+            productName: null,
+            locationId: UUID,
+            locationName: "Central",
+            unit: "kg",
+            onHand: "2.000",
+            minThreshold: "1.000",
+            status: "in_stock",
+          },
+          demoDataRevision: 1,
+        },
+        meta: {},
+        requestId: UUID,
       }).success,
     ).toBe(true);
   });

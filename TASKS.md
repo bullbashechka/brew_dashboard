@@ -354,23 +354,23 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S10.1.** Реализовать Inventory list с единицами, balances по точкам, thresholds, статусами, location/status filters и recent movements.
-- [ ] **S10.2.** Создать атомарную database function для inventory movement и balance update.
-- [ ] **S10.3.** Реализовать `POST /inventory/movements` только для `receipt` и `writeoff` с положительным quantity.
-- [ ] **S10.4.** Для writeoff блокировать quantity больше текущего balance; проверить concurrency, чтобы остаток не становился отрицательным.
-- [ ] **S10.5.** Создать Receipt/Write off forms со shared validation, progress, duplicate-submit lock, toast и сохранением ввода при ошибке.
-- [ ] **S10.6.** После success точечно обновить Inventory, Overview и alerts badge/dropdown.
-- [ ] **S10.7.** Удалять stock alert из ответа сразу после устранения condition; не хранить persistent alert state.
-- [ ] **S10.8.** Записать `inventory_movement_created`; не добавлять edit/delete movement.
-- [ ] **S10.9.** Добавить integration tests receipt/writeoff, threshold transitions, negative-stock rejection, tenant isolation и atomic rollback.
-- [ ] **S10.10.** Добавить component tests forms/statuses и Playwright journey изменения balance/alert.
+- [x] **S10.1.** Реализовать Inventory list с единицами, balances по точкам, thresholds, статусами, location/status filters и recent movements.
+- [x] **S10.2.** Создать атомарную database function для inventory movement и balance update.
+- [x] **S10.3.** Реализовать `POST /inventory/movements` только для `receipt` и `writeoff` с положительным quantity.
+- [x] **S10.4.** Для writeoff блокировать quantity больше текущего balance; проверить concurrency, чтобы остаток не становился отрицательным.
+- [x] **S10.5.** Создать Receipt/Write off forms со shared validation, progress, duplicate-submit lock, toast и сохранением ввода при ошибке.
+- [x] **S10.6.** После success точечно обновить Inventory, Overview и alerts badge/dropdown.
+- [x] **S10.7.** Удалять stock alert из ответа сразу после устранения condition; не хранить persistent alert state.
+- [x] **S10.8.** Записать `inventory_movement_created`; не добавлять edit/delete movement.
+- [x] **S10.9.** Добавить integration tests receipt/writeoff, threshold transitions, negative-stock rejection, tenant isolation и atomic rollback.
+- [x] **S10.10.** Добавить component tests forms/statuses и Playwright journey изменения balance/alert.
 
 ### Критерии приёмки
 
-- [ ] `In stock`, `Low stock` и `Out of stock` точно следуют формулам PRD.
-- [ ] Успешный movement виден на Inventory и Overview без полного reload.
-- [ ] Параллельные списания не создают отрицательный balance.
-- [ ] Movements нельзя редактировать или удалять; восстановление возможно только через Reset.
+- [x] `In stock`, `Low stock` и `Out of stock` точно следуют формулам PRD.
+- [x] Успешный movement виден на Inventory и Overview без полного reload.
+- [x] Параллельные списания не создают отрицательный balance.
+- [x] Movements нельзя редактировать или удалять; восстановление возможно только через Reset.
 
 ---
 

@@ -2,11 +2,16 @@ import { queryOptions } from "@tanstack/react-query";
 import {
   locationsResponseSchema,
   overviewResponseSchema,
+  inventoryMovementMutationResponseSchema,
+  inventoryMovementMutationSchema,
+  inventoryResponseSchema,
   priceMutationResponseSchema,
   priceMutationSchema,
   productsResponseSchema,
   salesResponseSchema,
   type AnalyticsQuery,
+  type InventoryData,
+  type InventoryMovementMutation,
   type LocationsData,
   type PriceMutation,
 } from "@brew-dashboard/contracts";
@@ -15,6 +20,9 @@ import { requestApi } from "./client";
 export type AnalyticsPeriod = AnalyticsQuery["period"];
 export type AnalyticsFilters = { period: AnalyticsPeriod; locationId?: string | undefined };
 export type LocationSorting = Pick<LocationsData, "sortBy" | "sortDir">;
+export type InventoryFilters = AnalyticsFilters & {
+  status?: Exclude<InventoryData["status"], null> | undefined;
+};
 
 const queryString = (filters: AnalyticsFilters & Partial<LocationSorting>) => {
   const params = new URLSearchParams({ period: filters.period });
@@ -88,10 +96,36 @@ export const productsQuery = (networkId: string, filters: AnalyticsFilters) =>
       }),
   });
 
+export const inventoryInfiniteQuery = (networkId: string, filters: InventoryFilters) => ({
+  queryKey: ["tenant", networkId, "inventory", filters],
+  initialPageParam: undefined as string | undefined,
+  queryFn: ({ signal, pageParam }: { signal: AbortSignal; pageParam: string | undefined }) => {
+    const params = new URLSearchParams(queryString(filters));
+    params.set("pageSize", "20");
+    if (filters.status) params.set("status", filters.status);
+    if (pageParam) params.set("cursor", pageParam);
+    return requestApi({
+      path: `/api/v1/inventory?${params.toString()}`,
+      schema: inventoryResponseSchema,
+      signal,
+    });
+  },
+  getNextPageParam: (lastPage: { meta: { pagination: { nextCursor: string | null } } }) =>
+    lastPage.meta.pagination.nextCursor ?? undefined,
+});
+
 export const updateProductPrice = (productId: string, request: PriceMutation) =>
   requestApi({
     path: `/api/v1/products/${productId}/price`,
     method: "PATCH",
     schema: priceMutationResponseSchema,
     body: priceMutationSchema.parse(request),
+  });
+
+export const createInventoryMovement = (request: InventoryMovementMutation) =>
+  requestApi({
+    path: "/api/v1/inventory/movements",
+    method: "POST",
+    schema: inventoryMovementMutationResponseSchema,
+    body: inventoryMovementMutationSchema.parse(request),
   });

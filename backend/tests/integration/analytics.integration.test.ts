@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
   apiErrorResponseSchema,
+  inventoryMovementMutationResponseSchema,
   inventoryResponseSchema,
   locationsResponseSchema,
   overviewResponseSchema,
@@ -15,7 +16,8 @@ import { createAccount, deleteAccount } from "../../src/admin/accounts.ts";
 import { SESSION_COOKIE_NAME } from "../../src/auth/better-auth.ts";
 import { __test as authHttpTest } from "../../src/auth/http.ts";
 import { app } from "../../src/index.ts";
-import { withRequestDatabase } from "../../src/db/client.ts";
+import { setTenantContext, withRequestDatabase } from "../../src/db/client.ts";
+import { createInventoryMovement } from "../../src/inventory/service.ts";
 
 const ownerUrl = process.env.DATABASE_TEST_URL;
 const runtimeUrl = process.env.DATABASE_TEST_RUNTIME_URL;
@@ -296,6 +298,285 @@ describeIntegration("Stage 5 analytics API", () => {
     expect((ordersPlanJson as Array<{ Plan?: unknown }>)[0]?.Plan).toBeDefined();
     expect((movementsPlanJson as Array<{ Plan?: unknown }>)[0]?.Plan).toBeDefined();
   });
+
+  it("records tenant-scoped inventory movements once and recomputes stock alerts", async () => {
+    const first = await createOnboarded(
+      `stage10-a-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Ten A",
+    );
+    const second = await createOnboarded(
+      `stage10-b-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Ten B",
+    );
+    const initial = inventoryResponseSchema.parse(
+      await (await request("/api/v1/inventory?period=today", first.cookie)).json(),
+    );
+    const foreign = inventoryResponseSchema.parse(
+      await (await request("/api/v1/inventory?period=today", second.cookie)).json(),
+    );
+    const outOfStock = initial.data.balances.find((balance) => balance.status === "out_of_stock");
+    const foreignBalance = foreign.data.balances[0];
+    if (!outOfStock || !foreignBalance) throw new Error("Expected generated inventory balances");
+
+    const quantity = (Number(outOfStock.minThreshold) + 1).toFixed(3);
+    const mutation = {
+      inventoryItemId: outOfStock.inventoryItemId,
+      locationId: outOfStock.locationId,
+      type: "receipt" as const,
+      quantity,
+      expectedDemoDataRevision: initial.meta.demoDataRevision,
+      idempotencyKey: crypto.randomUUID(),
+    };
+    const receipt = await request("/api/v1/inventory/movements", first.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify(mutation),
+    });
+    expect(receipt.status).toBe(200);
+    const created = inventoryMovementMutationResponseSchema.parse(await receipt.json());
+    expect(created.data.movement.type).toBe("receipt");
+    expect(created.data.balance.status).toBe("in_stock");
+
+    const replay = await request("/api/v1/inventory/movements", first.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify(mutation),
+    });
+    expect(replay.status).toBe(200);
+    expect(
+      inventoryMovementMutationResponseSchema.parse(await replay.json()).data.movement.movementId,
+    ).toBe(created.data.movement.movementId);
+
+    const changedPayload = await request("/api/v1/inventory/movements", first.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({ ...mutation, quantity: "1.000" }),
+    });
+    expect(changedPayload.status).toBe(409);
+
+    const after = inventoryResponseSchema.parse(
+      await (await request("/api/v1/inventory?period=today", first.cookie)).json(),
+    );
+    const updated = after.data.balances.find(
+      (balance) =>
+        balance.inventoryItemId === outOfStock.inventoryItemId &&
+        balance.locationId === outOfStock.locationId,
+    );
+    expect(updated?.status).toBe("in_stock");
+    expect(
+      after.data.alerts.some(
+        (alert) =>
+          alert.entityId === outOfStock.inventoryItemId &&
+          alert.locationId === outOfStock.locationId,
+      ),
+    ).toBe(false);
+    expect(
+      after.data.movements.some(
+        (movement) => movement.movementId === created.data.movement.movementId,
+      ),
+    ).toBe(true);
+    const overviewAfter = overviewResponseSchema.parse(
+      await (await request("/api/v1/overview?period=today", first.cookie)).json(),
+    );
+    expect(
+      overviewAfter.data.alerts.some(
+        (alert) =>
+          alert.entityId === outOfStock.inventoryItemId &&
+          alert.locationId === outOfStock.locationId,
+      ),
+    ).toBe(false);
+
+    const events = await ownerClient.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM app.product_events
+       WHERE network_id = $1
+         AND type = 'inventory_movement_created'
+         AND metadata = $2::jsonb`,
+      [
+        first.account.networkId,
+        JSON.stringify({
+          inventoryItemId: outOfStock.inventoryItemId,
+          locationId: outOfStock.locationId,
+          type: "receipt",
+        }),
+      ],
+    );
+    expect(events.rows[0]?.count).toBe("1");
+
+    const tooLarge = await request("/api/v1/inventory/movements", first.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({
+        ...mutation,
+        type: "writeoff",
+        quantity: "99999999999.000",
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    });
+    expect(tooLarge.status).toBe(409);
+    expect(apiErrorResponseSchema.parse(await tooLarge.json()).error.code).toBe("CONFLICT");
+
+    const crossTenant = await request("/api/v1/inventory/movements", first.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({
+        ...mutation,
+        inventoryItemId: foreignBalance.inventoryItemId,
+        locationId: foreignBalance.locationId,
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    });
+    expect(crossTenant.status).toBe(404);
+  }, 60_000);
+
+  it("transitions stock alerts at exact thresholds and rejects stale inventory revisions", async () => {
+    const account = await createOnboarded(
+      `stage10-thresholds-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Ten Thresholds",
+    );
+    const initial = inventoryResponseSchema.parse(
+      await (await request("/api/v1/inventory?period=today", account.cookie)).json(),
+    );
+    const outOfStock = initial.data.balances.find((balance) => balance.status === "out_of_stock");
+    if (!outOfStock) throw new Error("Expected generated out-of-stock balance");
+    const movement = async (type: "receipt" | "writeoff", quantity: string) => {
+      const response = await request("/api/v1/inventory/movements", account.cookie, {
+        method: "POST",
+        headers: { origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify({
+          inventoryItemId: outOfStock.inventoryItemId,
+          locationId: outOfStock.locationId,
+          type,
+          quantity,
+          expectedDemoDataRevision: initial.meta.demoDataRevision,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      expect(response.status).toBe(200);
+      return inventoryMovementMutationResponseSchema.parse(await response.json());
+    };
+    const alerts = async () =>
+      inventoryResponseSchema.parse(
+        await (await request("/api/v1/inventory?period=today", account.cookie)).json(),
+      ).data.alerts;
+
+    expect((await movement("receipt", outOfStock.minThreshold)).data.balance.status).toBe(
+      "low_stock",
+    );
+    expect(
+      (await alerts()).some(
+        (alert) =>
+          alert.type === "LOW_STOCK" &&
+          alert.entityId === outOfStock.inventoryItemId &&
+          alert.locationId === outOfStock.locationId,
+      ),
+    ).toBe(true);
+    expect((await movement("receipt", "1.000")).data.balance.status).toBe("in_stock");
+    expect(
+      (await alerts()).some(
+        (alert) =>
+          alert.entityId === outOfStock.inventoryItemId &&
+          alert.locationId === outOfStock.locationId,
+      ),
+    ).toBe(false);
+    expect((await movement("writeoff", "1.000")).data.balance.status).toBe("low_stock");
+    expect((await movement("writeoff", outOfStock.minThreshold)).data.balance.status).toBe(
+      "out_of_stock",
+    );
+
+    const reset = await request("/api/v1/demo/reset", account.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    });
+    expect(reset.status).toBe(200);
+    const staleKey = crypto.randomUUID();
+    const stale = await request("/api/v1/inventory/movements", account.cookie, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({
+        inventoryItemId: outOfStock.inventoryItemId,
+        locationId: outOfStock.locationId,
+        type: "receipt",
+        quantity: "1.000",
+        expectedDemoDataRevision: initial.meta.demoDataRevision,
+        idempotencyKey: staleKey,
+      }),
+    });
+    expect(stale.status).toBe(409);
+    const staleKeyRows = await ownerClient.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM app.idempotency_keys
+       WHERE network_id = $1 AND key = $2`,
+      [account.account.networkId, staleKey],
+    );
+    expect(staleKeyRows.rows[0]?.count).toBe("0");
+  }, 60_000);
+
+  it("rolls back inventory state when a post-movement step fails", async () => {
+    const account = await createOnboarded(
+      `stage10-rollback-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Ten Rollback",
+    );
+    const initial = inventoryResponseSchema.parse(
+      await (await request("/api/v1/inventory?period=today", account.cookie)).json(),
+    );
+    const balance = initial.data.balances[0];
+    if (!balance) throw new Error("Expected generated inventory balance");
+    const key = crypto.randomUUID();
+    const snapshot = async () => {
+      const result = await ownerClient.query<{
+        onHand: string;
+        movementCount: string;
+        idempotencyCount: string;
+        eventCount: string;
+      }>(
+        `SELECT b.on_hand::text AS "onHand",
+                (SELECT count(*)::text
+                   FROM app.inventory_movements m
+                  WHERE m.network_id = $1
+                    AND m.location_id = $2
+                    AND m.inventory_item_id = $3) AS "movementCount",
+                (SELECT count(*)::text
+                   FROM app.idempotency_keys i
+                  WHERE i.network_id = $1 AND i.key = $4) AS "idempotencyCount",
+                (SELECT count(*)::text
+                   FROM app.product_events e
+                  WHERE e.network_id = $1 AND e.type = 'inventory_movement_created') AS "eventCount"
+           FROM app.inventory_balances b
+          WHERE b.network_id = $1 AND b.location_id = $2 AND b.inventory_item_id = $3`,
+        [account.account.networkId, balance.locationId, balance.inventoryItemId, key],
+      );
+      return result.rows[0];
+    };
+    const before = await snapshot();
+
+    await expect(
+      withRequestDatabase(runtimeUrl!, (db) =>
+        db.transaction(async (transaction) => {
+          await setTenantContext(transaction, account.account.networkId);
+          return createInventoryMovement(transaction, {
+            authUserId: account.account.authUserId,
+            networkId: account.account.networkId,
+            request: {
+              inventoryItemId: balance.inventoryItemId,
+              locationId: balance.locationId,
+              type: "receipt",
+              quantity: "1.000",
+              expectedDemoDataRevision: initial.meta.demoDataRevision,
+              idempotencyKey: key,
+            },
+            hooks: {
+              afterMovementApplied: () => {
+                throw new Error("injected inventory post-movement failure");
+              },
+            },
+          });
+        }),
+      ),
+    ).rejects.toThrow("injected inventory post-movement failure");
+    expect(await snapshot()).toEqual(before);
+  }, 60_000);
 
   it("updates only the current product price and records one safe tenant event", async () => {
     const first = await createOnboarded(

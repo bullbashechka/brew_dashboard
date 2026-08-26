@@ -230,6 +230,58 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
     await client.query("ROLLBACK");
   });
 
+  it("serializes concurrent write offs so stock cannot become negative", async () => {
+    const concurrentItem = "30000000-0000-0000-0000-000000000003";
+    const concurrentBalance = "40000000-0000-0000-0000-000000000003";
+    await client.query(
+      `INSERT INTO app.inventory_items (id, network_id, name, unit)
+       VALUES ($1, $2, 'Concurrent beans', 'kg')`,
+      [concurrentItem, networkA],
+    );
+    await client.query(
+      `INSERT INTO app.inventory_balances
+        (id, network_id, location_id, inventory_item_id, on_hand, min_threshold)
+       VALUES ($1, $2, $3, $4, 5.000, 1.000)`,
+      [concurrentBalance, networkA, locationA, concurrentItem],
+    );
+    const first = new Client({ connectionString: databaseUrl });
+    const second = new Client({ connectionString: databaseUrl });
+    await Promise.all([first.connect(), second.connect()]);
+    const apply = async (connection: Client, key: string) => {
+      await connection.query("BEGIN");
+      try {
+        await connection.query("SET LOCAL ROLE brew_runtime");
+        await connection.query("SELECT set_config('app.network_id', $1, true)", [networkA]);
+        await connection.query(
+          `SELECT * FROM app.apply_inventory_movement($1, $2, 'writeoff', 4.000, $3, $4)`,
+          [locationA, concurrentItem, key.slice(0, 64), key.slice(64)],
+        );
+        await connection.query("COMMIT");
+        return true;
+      } catch {
+        await connection.query("ROLLBACK");
+        return false;
+      }
+    };
+    try {
+      const [firstResult, secondResult] = await Promise.all([
+        apply(first, `${"e".repeat(64)}50000000-0000-0000-0000-000000000004`),
+        apply(second, `${"f".repeat(64)}50000000-0000-0000-0000-000000000005`),
+      ]);
+      expect([firstResult, secondResult].sort()).toEqual([false, true]);
+    } finally {
+      await Promise.all([first.end(), second.end()]);
+    }
+    const after = await client.query<{ on_hand: string; movement_count: string }>(
+      `SELECT b.on_hand::text AS on_hand,
+              (SELECT count(*)::text FROM app.inventory_movements m WHERE m.inventory_item_id = $1) AS movement_count
+         FROM app.inventory_balances b
+        WHERE b.id = $2`,
+      [concurrentItem, concurrentBalance],
+    );
+    expect(after.rows[0]).toEqual({ on_hand: "1.000", movement_count: "1" });
+  });
+
   it("rejects invalid values and duplicate per-network records", async () => {
     await expect(
       client.query(

@@ -685,6 +685,14 @@ export const inventoryMovementMutationSchema = z.strictObject({
   expectedDemoDataRevision: versionSchema.default(1),
   idempotencyKey: idempotencyKeySchema,
 });
+export const inventoryMovementMutationDataSchema = z.strictObject({
+  movement: inventoryMovementSchema,
+  balance: inventoryBalanceSchema,
+  demoDataRevision: versionSchema,
+});
+export const inventoryMovementMutationResponseSchema = createSuccessEnvelopeSchema(
+  inventoryMovementMutationDataSchema,
+);
 export const revenueGoalMutationSchema = z.strictObject({
   monthlyGoal: nonNegativeMoneySchema,
   expectedVersion: versionSchema.nullable(),
@@ -839,4 +847,9 @@ export type InventoryData = z.infer<typeof inventoryDataSchema>;
 export type PriceMutation = z.infer<typeof priceMutationSchema>;
 export type PriceMutationData = z.infer<typeof priceMutationDataSchema>;
 export type PriceMutationResponse = z.infer<typeof priceMutationResponseSchema>;
+export type InventoryMovementMutation = z.infer<typeof inventoryMovementMutationSchema>;
+export type InventoryMovementMutationData = z.infer<typeof inventoryMovementMutationDataSchema>;
+export type InventoryMovementMutationResponse = z.infer<
+  typeof inventoryMovementMutationResponseSchema
+>;
 export type ProductEventRequest = z.infer<typeof productEventRequestSchema>;

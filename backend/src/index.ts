@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   apiErrorResponseSchema,
   healthResponseSchema,
+  inventoryMovementMutationResponseSchema,
+  inventoryMovementMutationSchema,
   inventoryQuerySchema,
   inventoryResponseSchema,
   locationsQuerySchema,
@@ -59,6 +61,7 @@ import {
 import { tourStateHandler } from "./tour/http.ts";
 import { resetDemoHandler } from "./demo/http.ts";
 import { productPriceHandler } from "./products/http.ts";
+import { inventoryMovementHandler } from "./inventory/http.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -334,6 +337,32 @@ const inventoryRoute = createRoute({
   },
 });
 
+const inventoryMovementRoute = createRoute({
+  method: "post",
+  path: "/inventory/movements",
+  request: {
+    body: {
+      content: { "application/json": { schema: inventoryMovementMutationSchema } },
+      description: "Create a tenant inventory receipt or write off",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: inventoryMovementMutationResponseSchema } },
+      description: "Inventory balance updated",
+    },
+    400: errorResponseDefinition("Inventory movement validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Onboarding is incomplete or origin rejected"),
+    404: errorResponseDefinition("Inventory item or balance not found"),
+    409: errorResponseDefinition("Inventory balance or demo data changed"),
+    413: errorResponseDefinition("Request body too large"),
+    415: errorResponseDefinition("Unsupported media type"),
+    500: errorResponseDefinition("Internal server error"),
+  },
+});
+
 const validationHook = (result: { success: boolean }, context: Context<AppEnvironment>) => {
   if (result.success) return;
   if (context.req.path.endsWith("/auth/login")) return unauthenticatedResponse(context);
@@ -394,6 +423,7 @@ for (const path of ["/overview", "/locations", "/sales", "/products", "/inventor
   app.use(path, requireAuthentication, requireCompletedOnboarding);
 }
 app.use("/products/:productId/price", requireAuthentication, requireCompletedOnboarding);
+app.use("/inventory/movements", requireAuthentication, requireCompletedOnboarding);
 
 app.openapi(
   overviewRoute,
@@ -415,6 +445,13 @@ app.openapi(
 app.openapi(
   inventoryRoute,
   inventoryHandler as unknown as RouteHandler<typeof inventoryRoute, AppEnvironment>,
+);
+app.openapi(
+  inventoryMovementRoute,
+  inventoryMovementHandler as unknown as RouteHandler<
+    typeof inventoryMovementRoute,
+    AppEnvironment
+  >,
 );
 
 for (const path of [

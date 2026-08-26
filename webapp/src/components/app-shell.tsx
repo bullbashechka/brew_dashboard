@@ -59,6 +59,12 @@ export function AppShell() {
   );
   const { data: profile } = useQuery(sessionQueryOptions());
   const locale = localeFromProfile(profile);
+  const inventoryStatus =
+    search.status === "in_stock" ||
+    search.status === "low_stock" ||
+    search.status === "out_of_stock"
+      ? search.status
+      : undefined;
   const locations = useQuery({
     ...locationOptionsQuery(profile?.networkId ?? "pending"),
     enabled: Boolean(profile),
@@ -83,7 +89,11 @@ export function AppShell() {
     if (!missingFromOptions && !apiFellBack) return;
     void navigate({
       to: pathname,
-      search: { period: filters.period, locationId: undefined },
+      search: {
+        period: filters.period,
+        locationId: undefined,
+        ...(inventoryStatus ? { status: inventoryStatus } : {}),
+      },
       replace: true,
     });
     toast.message(translate(locale, "filters.allLocations"));
@@ -94,6 +104,7 @@ export function AppShell() {
     locale,
     locations.data,
     navigate,
+    inventoryStatus,
     pathname,
   ]);
 
@@ -142,6 +153,7 @@ export function AppShell() {
         period: next.period ?? filters.period,
         locationId: next.locationId === null ? undefined : (next.locationId ?? filters.locationId),
         ...locationsSearch,
+        ...(inventoryStatus ? { status: inventoryStatus } : {}),
       },
       replace: true,
     });
@@ -157,6 +169,9 @@ export function AppShell() {
             period: filters.period,
             locationId: filters.locationId,
             ...(item === "settings" ? { panel: undefined } : {}),
+            ...(item === "inventory" && section === "inventory" && inventoryStatus
+              ? { status: inventoryStatus }
+              : {}),
           }}
           onClick={() => setDrawerOpen(false)}
           data-tour={item === "locations" ? "navigation-locations" : undefined}

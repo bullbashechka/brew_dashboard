@@ -14,6 +14,7 @@ import {
   locationSortBySchema,
   periodSchema,
   sortDirectionSchema,
+  stockStatusSchema,
   type Profile,
 } from "@brew-dashboard/contracts";
 import { sessionQueryKey, sessionQueryOptions } from "@/api/session";
@@ -131,9 +132,13 @@ const salesRoute = createRoute({ getParentRoute: () => appRoute, path: "sales" }
 const productsRoute = createRoute({ getParentRoute: () => appRoute, path: "products" }).lazy(() =>
   import("./pages/products.lazy").then((module) => module.Route),
 );
-const inventoryRoute = createRoute({ getParentRoute: () => appRoute, path: "inventory" }).lazy(() =>
-  import("./pages/inventory.lazy").then((module) => module.Route),
-);
+const inventoryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "inventory",
+  validateSearch: (search: Record<string, unknown>) => ({
+    status: stockStatusSchema.safeParse(search.status).data ?? undefined,
+  }),
+}).lazy(() => import("./pages/inventory.lazy").then((module) => module.Route));
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "settings",
