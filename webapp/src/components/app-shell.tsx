@@ -375,9 +375,11 @@ export function AppShell() {
               <X className="size-4" />
             </button>
           </div>
-          <Button className="mt-3" type="button" onClick={() => setFeedbackOpen(true)}>
-            {translate(locale, "actions.feedback")}
-          </Button>
+          <div className="mt-3">
+            <Button type="button" onClick={() => setFeedbackOpen(true)}>
+              {translate(locale, "actions.feedback")}
+            </Button>
+          </div>
         </aside>
       )}
       <FeedbackDialog
@@ -418,22 +420,20 @@ function ShellActions({
       <Button
         data-tour="feedback"
         type="button"
-        variant="outline"
-        className="w-full justify-start"
+        variant="sidebar"
+        icon={MessageSquare}
         onClick={onFeedback}
       >
-        <MessageSquare className="mr-2 size-4" />
         {translate(locale, "actions.feedback")}
       </Button>
       <PendingButton
         type="button"
-        variant="outline"
-        className="w-full justify-start"
+        variant="sidebar"
+        icon={LogOut}
         onClick={onLogout}
         pending={pending}
         pendingLabel={translate(locale, "states.loading")}
       >
-        <LogOut className="mr-2 size-4" />
         {translate(locale, "actions.logout")}
       </PendingButton>
     </div>

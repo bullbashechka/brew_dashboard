@@ -1,37 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { Profile } from "@brew-dashboard/contracts";
-import type { ReactNode } from "react";
 
 import { completeOnboarding, login, saveOnboardingLanguage } from "@/api/first-run";
 import { sessionQueryKey } from "@/api/session";
 import { LanguageForm, LoginForm, OnboardingForm } from "@/components/first-run-forms";
+import { FirstRunPage } from "@/components/first-run-page";
 import { localeFromProfile, translate } from "@/lib/i18n";
-
-function FirstRunPage({
-  locale,
-  title,
-  description,
-  children,
-}: {
-  locale: ReturnType<typeof localeFromProfile>;
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-lg items-center px-5 py-10">
-      <section className="w-full rounded-2xl border border-stone-200 bg-[#fffaf2] p-6 shadow-sm sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-800">
-          {translate(locale, "public.firstRun")}
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-950">{title}</h1>
-        <p className="mt-3 text-stone-600">{description}</p>
-        <div className="mt-7">{children}</div>
-      </section>
-    </main>
-  );
-}
 
 const nextDestination = (profile: Profile) => {
   if (!profile.language) return { to: "/first-run/language" as const };

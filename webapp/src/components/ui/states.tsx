@@ -18,17 +18,33 @@ export function LoadingState({ locale }: { locale: AppLocale }) {
         {translate(locale, "states.loading")}
       </div>
       <div className="mt-5 grid gap-3" aria-hidden="true">
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
+        <Skeleton variant="textLong" />
+        <Skeleton variant="textShort" />
       </div>
     </div>
   );
 }
 
-export function Skeleton({ className = "" }: { className?: string }) {
+const skeletonVariants = {
+  textLong: "h-4 w-3/4",
+  textShort: "h-4 w-1/2",
+  pageTitle: "h-9 w-56 max-w-full",
+  pageTitleCompact: "h-9 w-40 max-w-full",
+  pageTitleNarrow: "h-9 w-36 max-w-full",
+  pageDescription: "h-5 w-96 max-w-full",
+  filterBar: "h-24 w-full",
+  metricCard: "h-36 w-full",
+  locationCard: "h-64 w-full",
+  chart: "h-80 w-full",
+  panel: "h-56 w-full",
+  productMatrix: "h-96 w-full",
+  productList: "h-72 w-full",
+} as const;
+
+export function Skeleton({ variant }: { variant: keyof typeof skeletonVariants }) {
   return (
     <div
-      className={`animate-pulse rounded bg-stone-200 motion-reduce:animate-none ${className}`}
+      className={`animate-pulse rounded bg-stone-200 motion-reduce:animate-none ${skeletonVariants[variant]}`}
       aria-hidden="true"
     />
   );

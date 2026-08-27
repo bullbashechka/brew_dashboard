@@ -7,6 +7,10 @@ build/
 coverage/
 .vite/
 .wrangler/
+.turbo/
+.cache/
+.eslintcache
+*.tsbuildinfo
 .scratch/
 playwright-report/
 test-results/
@@ -21,6 +25,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 bun-debug.log*
+lerna-debug.log*
+*.pid
+*.pid.lock
 
 # Environment files
 .env
