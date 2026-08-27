@@ -1,0 +1,1 @@
+CREATE INDEX "product_events_occurred_idx" ON "app"."product_events" USING btree ("occurred_at");

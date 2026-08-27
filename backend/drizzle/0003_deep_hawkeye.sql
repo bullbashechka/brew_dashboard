@@ -1,0 +1,1 @@
+ALTER TABLE "app"."demo_generations" ADD CONSTRAINT "demo_generations_network_date_unique" UNIQUE("network_id","generated_for_date");

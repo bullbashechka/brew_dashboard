@@ -1,0 +1,20 @@
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: postgres
+    ports:
+      - "127.0.0.1:54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+    volumes:
+      - brew-dashboard-postgres-test:/var/lib/postgresql/data
+
+volumes:
+  brew-dashboard-postgres-test:

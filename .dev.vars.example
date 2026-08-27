@@ -1,0 +1,5 @@
+# Cloudflare Worker local variables. Keep real values in an untracked .dev.vars file.
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:5173
+# Optional local-only Hyperdrive override; keep the real connection string out of git.
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=

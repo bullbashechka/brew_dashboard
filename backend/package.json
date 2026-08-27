@@ -1,0 +1,39 @@
+{
+  "name": "@brew-dashboard/backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "wrangler dev --config ../wrangler.jsonc",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:check": "drizzle-kit check --config drizzle.config.ts",
+    "db:migrate": "bun scripts/migrate.ts",
+    "db:provision-runtime": "bun scripts/provision-runtime-role.ts",
+    "db:smoke:hyperdrive": "bun scripts/run-hyperdrive-smoke.ts",
+    "admin:create-user": "bun scripts/admin-create-user.ts",
+    "admin:reset-password": "bun scripts/admin-reset-password.ts",
+    "admin:disable-user": "bun scripts/admin-disable-user.ts",
+    "admin:delete-user": "bun scripts/admin-delete-user.ts",
+    "admin:cleanup-events": "bun scripts/admin-cleanup-events.ts",
+    "lint": "eslint .",
+    "test:integration": "bun scripts/run-integration.ts",
+    "test:unit": "bun test tests/unit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@brew-dashboard/contracts": "workspace:*",
+    "@better-auth/drizzle-adapter": "^1.7.1",
+    "@hono/zod-openapi": "^1.0.0",
+    "better-auth": "^1.7.1",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.0.0",
+    "pg": "^8.16.3",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.5"
+  }
+}
