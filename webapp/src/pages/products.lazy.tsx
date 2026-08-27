@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLazyRoute, useRouterState } from "@tanstack/react-router";
+import { createLazyRoute } from "@tanstack/react-router";
 import type { ProductAnalytics, ProductsData, Profile } from "@brew-dashboard/contracts";
 import { Pencil } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -32,7 +32,6 @@ import {
   translate,
 } from "@/lib/i18n";
 
-const periods = ["today", "7d", "30d", "6m"] as const;
 const menuGroups = ["stars", "workhorses", "puzzles", "dogs"] as const;
 const groupColors = {
   stars: "#166534",
@@ -45,14 +44,10 @@ export const Route = createLazyRoute("/app/products")({ component: ProductsPage 
 
 function ProductsPage() {
   const queryClient = useQueryClient();
-  const search = useRouterState({
-    select: (state) => state.location.search as { period?: string; locationId?: string },
-  });
+  const search = Route.useSearch();
   const { data: profile } = useQuery(sessionQueryOptions());
   const filters: AnalyticsFilters = {
-    period: periods.includes(search.period as (typeof periods)[number])
-      ? (search.period as AnalyticsFilters["period"])
-      : "today",
+    period: search.period,
     ...(typeof search.locationId === "string" ? { locationId: search.locationId } : {}),
   };
   const analytics = useQuery({

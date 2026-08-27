@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLazyRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createLazyRoute, useNavigate } from "@tanstack/react-router";
 import type { InventoryData, Profile } from "@brew-dashboard/contracts";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -26,7 +26,6 @@ import {
   type TranslationKey,
 } from "@/lib/i18n";
 
-const periods = ["today", "7d", "30d", "6m"] as const;
 const statuses = ["in_stock", "low_stock", "out_of_stock"] as const;
 
 type Balance = InventoryData["balances"][number];
@@ -42,22 +41,15 @@ export const Route = createLazyRoute("/app/inventory")({ component: InventoryPag
 function InventoryPage() {
   const navigate = useNavigate({ from: "/app/inventory" });
   const queryClient = useQueryClient();
-  const search = useRouterState({
-    select: (state) =>
-      state.location.search as { period?: string; locationId?: string; status?: string },
-  });
+  const search = Route.useSearch();
   const { data: profile } = useQuery(sessionQueryOptions());
   const filters: AnalyticsFilters = {
-    period: periods.includes(search.period as (typeof periods)[number])
-      ? (search.period as AnalyticsFilters["period"])
-      : "today",
+    period: search.period,
     ...(typeof search.locationId === "string" ? { locationId: search.locationId } : {}),
   };
   const inventoryFilters: InventoryFilters = {
     ...filters,
-    ...(statuses.includes(search.status as (typeof statuses)[number])
-      ? { status: search.status as InventoryFilters["status"] }
-      : {}),
+    ...(search.status ? { status: search.status } : {}),
   };
   const analytics = useInfiniteQuery({
     ...inventoryInfiniteQuery(profile?.networkId ?? "pending", inventoryFilters),

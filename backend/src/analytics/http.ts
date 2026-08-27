@@ -14,6 +14,7 @@ import { ApiProblem } from "../http/errors.ts";
 import type { AppEnvironment } from "../http/types.ts";
 import {
   buildAnalyticsSnapshot,
+  buildSalesAnalyticsSnapshot,
   buildAnalyticsMeta,
   buildInventory,
   buildLocations,
@@ -304,7 +305,7 @@ export const salesHandler = async (context: Context<AppEnvironment>) => {
   const asOf = continuation ? new Date(continuation.asOf) : undefined;
   if (continuation && !Number.isFinite(asOf!.getTime()))
     throw new ApiProblem("VALIDATION_ERROR", 400, "Invalid pagination context");
-  const analytics = await buildAnalyticsSnapshot(
+  const analytics = await buildSalesAnalyticsSnapshot(
     context.get("database"),
     authOptions(context, request.period, request.locationId, asOf),
   );

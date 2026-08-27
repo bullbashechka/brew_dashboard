@@ -27,7 +27,7 @@ export type AppRouterContext = { queryClient: QueryClient };
 
 const rootRoute = createRootRouteWithContext<AppRouterContext>()({
   component: RootLayout,
-  pendingComponent: () => <LoadingState locale="en" />,
+  pendingComponent: RootPending,
   errorComponent: RootError,
   notFoundComponent: NotFoundPage,
 });
@@ -188,16 +188,24 @@ function RootLayout() {
   return <Outlet />;
 }
 
+function RootPending() {
+  const queryClient = useQueryClient();
+  const profile = queryClient.getQueryData<Profile | null>(sessionQueryKey);
+  return <LoadingState locale={localeFromProfile(profile)} />;
+}
+
 function RootError({ error }: { error: unknown }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const profile = queryClient.getQueryData<Profile | null>(sessionQueryKey);
+  const locale = localeFromProfile(profile);
 
   const retry = () => {
     queryClient.removeQueries({ queryKey: sessionQueryKey, exact: true });
     void router.invalidate({ forcePending: true });
   };
 
-  return <ErrorState locale="en" error={error} onRetry={retry} />;
+  return <ErrorState locale={locale} error={error} onRetry={retry} />;
 }
 
 function NotFoundPage() {

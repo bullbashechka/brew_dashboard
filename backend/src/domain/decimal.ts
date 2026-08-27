@@ -117,10 +117,6 @@ export function toPercentage(value: Decimal): string {
   return formatDecimal(value, 2);
 }
 
-export function sum(values: readonly Decimal[]): Decimal {
-  return values.reduce((total, value) => add(total, value), { integer: 0n, scale: 0 });
-}
-
 export function median(values: readonly Decimal[]): Decimal {
   if (values.length === 0) {
     throw new Error("Cannot calculate a median of an empty collection");

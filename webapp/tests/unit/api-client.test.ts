@@ -49,6 +49,23 @@ describe("requestApi", () => {
     });
   });
 
+  it("keeps a valid Retry-After value on a rate-limit error", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: { code: "RATE_LIMITED", message: "try later", fields: {} },
+            requestId: "123e4567-e89b-12d3-a456-426614174000",
+          }),
+          { status: 429, headers: { "retry-after": "2" } },
+        ),
+      ),
+    ) as unknown as typeof fetch;
+    await expect(
+      requestApi({ path: "/api/v1/health", schema: healthResponseSchema }),
+    ).rejects.toMatchObject({ status: 429, retryAfterSeconds: 2 });
+  });
+
   it("handles concurrent confirmed-session 401 responses once", async () => {
     let calls = 0;
     setSessionExpiredHandler(async () => {

@@ -1,12 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLazyRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createLazyRoute, useNavigate } from "@tanstack/react-router";
 import type { Profile } from "@brew-dashboard/contracts";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { overviewQuery } from "@/api/analytics";
-import { resetDemoData } from "@/api/demo";
 import { ApiClientError } from "@/api/client";
 import { logout, sessionQueryKey, sessionQueryOptions } from "@/api/session";
 import { saveRevenueGoal, saveSettingsLanguage } from "@/api/settings";
@@ -14,9 +13,10 @@ import { saveTourState } from "@/api/tour";
 import { FeedbackForm } from "@/components/feedback";
 import { ResetDemoDialog } from "@/components/reset-demo-dialog";
 import { Button } from "@/components/ui/button";
-import { FormError, PendingButton } from "@/components/ui/states";
+import { ErrorState, FormError, PendingButton, ProgressState } from "@/components/ui/states";
 import { localeFromProfile, translate } from "@/lib/i18n";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
+import { useResetDemoData } from "@/lib/reset-demo";
 
 export const Route = createLazyRoute("/app/settings")({ component: SettingsPage });
 
@@ -26,12 +26,20 @@ const normalizeGoal = (value: string) => {
   return `${whole}.${fraction.padEnd(2, "0")}`;
 };
 
+type GoalSnapshot = {
+  expectedVersion: number | null;
+  expectedDemoDataRevision: number;
+};
+
+type GoalMutationInput = {
+  monthlyGoal: string;
+  snapshot: GoalSnapshot;
+};
+
 function SettingsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate({ from: "/app/settings" });
-  const search = useRouterState({
-    select: (state) => state.location.search as { period?: string; locationId?: string },
-  });
+  const search = Route.useSearch();
   const { data: profile } = useQuery(sessionQueryOptions());
   const locale = localeFromProfile(profile);
   const overview = useQuery({
@@ -39,21 +47,12 @@ function SettingsPage() {
     enabled: Boolean(profile),
   });
   const [goal, setGoal] = useState("");
+  const [goalDirty, setGoalDirty] = useState(false);
+  const [goalSnapshot, setGoalSnapshot] = useState<GoalSnapshot | null>(null);
+  const [goalRefreshError, setGoalRefreshError] = useState<unknown>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const goalKey = useRef<string | null>(null);
-  const overwriteGoal = useRef(false);
-  const goalVersion = useRef<number | null>(null);
-  const resetKey = useRef<string | null>(null);
-  const initializedGoalVersion = useRef<number | null | undefined>(undefined);
   const currentGoal = overview.data?.data.goal ?? null;
-
-  useEffect(() => {
-    if (overview.isSuccess && initializedGoalVersion.current !== (currentGoal?.version ?? null)) {
-      initializedGoalVersion.current = currentGoal?.version ?? null;
-      goalVersion.current = currentGoal?.version ?? null;
-      setGoal(currentGoal?.target ?? "0.00");
-    }
-  }, [currentGoal, overview.isSuccess]);
 
   const language = useMutation({
     mutationFn: (nextLanguage: "en" | "ru") =>
@@ -90,44 +89,37 @@ function SettingsPage() {
   });
 
   const goalMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ monthlyGoal, snapshot }: GoalMutationInput) => {
       if (!profile) throw new Error("Profile is unavailable");
-      const monthlyGoal = normalizeGoal(goal);
-      if (!monthlyGoal) throw new Error("Revenue goal is invalid");
-      if (overwriteGoal.current) {
-        goalKey.current = null;
-        overwriteGoal.current = false;
-      }
       goalKey.current ??= crypto.randomUUID();
       return saveRevenueGoal({
         monthlyGoal,
-        expectedVersion: goalVersion.current,
-        expectedDemoDataRevision: profile.demoDataRevision,
+        expectedVersion: snapshot.expectedVersion,
+        expectedDemoDataRevision: snapshot.expectedDemoDataRevision,
         idempotencyKey: goalKey.current,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (response) => {
       goalKey.current = null;
+      setGoal(response.data.monthlyGoal ?? "0.00");
+      setGoalSnapshot({
+        expectedVersion: response.data.version,
+        expectedDemoDataRevision: response.data.demoDataRevision,
+      });
       if (profile) recordFeedbackMutation(profile.networkId);
       await queryClient.invalidateQueries({ queryKey: ["tenant", profile?.networkId, "overview"] });
+      setGoalDirty(false);
       toast.success(translate(locale, "settings.goalSaved"));
     },
   });
 
-  const reset = useMutation({
-    mutationFn: () => {
-      resetKey.current ??= crypto.randomUUID();
-      return resetDemoData(resetKey.current);
-    },
-    onSuccess: async (response) => {
-      queryClient.setQueryData<Profile | null>(sessionQueryKey, response.data.profile);
-      await queryClient.invalidateQueries({
-        queryKey: ["tenant", response.data.profile.networkId],
-      });
-      resetKey.current = null;
-      setResetOpen(false);
-      toast.success(translate(locale, "reset.complete"));
-    },
+  const reset = useResetDemoData(locale, () => {
+    goalKey.current = null;
+    goalMutation.reset();
+    setGoalDirty(false);
+    setGoalSnapshot(null);
+    setGoalRefreshError(null);
+    setResetOpen(false);
   });
 
   const logoutMutation = useMutation({
@@ -139,10 +131,47 @@ function SettingsPage() {
     },
   });
 
-  if (!profile) return null;
-  const normalizedGoal = normalizeGoal(goal);
+  const serverGoal = currentGoal?.target ?? "0.00";
+  const displayedGoal = goalDirty ? goal : serverGoal;
+  const normalizedGoal = normalizeGoal(displayedGoal);
   const goalConflict =
     goalMutation.error instanceof ApiClientError && goalMutation.error.code === "CONFLICT";
+  const goalRevision = overview.data?.meta.demoDataRevision;
+  const serverSnapshot: GoalSnapshot | null =
+    overview.isSuccess && goalRevision !== undefined
+      ? {
+          expectedVersion: currentGoal?.version ?? null,
+          expectedDemoDataRevision: goalRevision,
+        }
+      : null;
+  const goalUnavailable = !serverSnapshot;
+  const goalError = goalRefreshError ?? (overview.isError ? overview.error : null);
+
+  if (!profile) return null;
+
+  const refreshGoal = async (mode: "latest" | "overwrite") => {
+    setGoalRefreshError(null);
+    const latest = await overview.refetch();
+    if (!latest.isSuccess || !latest.data || latest.data.meta.demoDataRevision === undefined) {
+      setGoalRefreshError(latest.error ?? new Error("Unable to refresh revenue goal"));
+      return;
+    }
+    const latestGoal = latest.data.data.goal;
+    const snapshot: GoalSnapshot = {
+      expectedVersion: latestGoal?.version ?? null,
+      expectedDemoDataRevision: latest.data.meta.demoDataRevision,
+    };
+    setGoalSnapshot(snapshot);
+    goalKey.current = null;
+    goalMutation.reset();
+    if (mode === "latest") {
+      setGoal(latestGoal?.target ?? "0.00");
+      setGoalDirty(false);
+      return;
+    }
+    if (!normalizedGoal) return;
+    goalMutation.mutate({ monthlyGoal: normalizedGoal, snapshot });
+  };
 
   return (
     <section className="space-y-6" aria-labelledby="settings-title" data-testid="page-settings">
@@ -184,11 +213,22 @@ function SettingsPage() {
           </label>
           <FormError locale={locale} error={language.error} />
 
+          {overview.isPending && <ProgressState locale={locale} />}
+          {goalError && (
+            <ErrorState
+              locale={locale}
+              error={goalError}
+              onRetry={() => void refreshGoal("latest")}
+            />
+          )}
+
           <form
             className="max-w-sm space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
-              if (normalizedGoal && !goalConflict) goalMutation.mutate();
+              const snapshot = goalSnapshot ?? serverSnapshot;
+              if (normalizedGoal && snapshot && !goalConflict)
+                goalMutation.mutate({ monthlyGoal: normalizedGoal, snapshot });
             }}
           >
             <label className="grid gap-1 text-sm font-medium text-stone-700">
@@ -196,11 +236,14 @@ function SettingsPage() {
               <input
                 className="control"
                 inputMode="decimal"
-                value={goal}
-                disabled={goalMutation.isPending || overview.isPending}
+                value={displayedGoal}
+                disabled={goalMutation.isPending || goalUnavailable}
                 onChange={(event) => {
                   goalKey.current = null;
                   goalMutation.reset();
+                  setGoalRefreshError(null);
+                  setGoalSnapshot(serverSnapshot);
+                  setGoalDirty(true);
                   setGoal(event.target.value);
                 }}
                 aria-invalid={!normalizedGoal || undefined}
@@ -221,24 +264,15 @@ function SettingsPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      goalMutation.reset();
-                      void overview.refetch();
-                    }}
+                    onClick={() => void refreshGoal("latest")}
                   >
                     {translate(locale, "actions.useLatest")}
                   </Button>
                   <Button
                     type="button"
                     size="sm"
-                    disabled={!normalizedGoal}
-                    onClick={() => {
-                      void overview.refetch().then((latest) => {
-                        goalVersion.current = latest.data?.data.goal?.version ?? null;
-                        overwriteGoal.current = true;
-                        goalMutation.mutate();
-                      });
-                    }}
+                    disabled={!normalizedGoal || goalMutation.isPending}
+                    onClick={() => void refreshGoal("overwrite")}
                   >
                     {translate(locale, "actions.overwrite")}
                   </Button>
@@ -249,7 +283,7 @@ function SettingsPage() {
               type="submit"
               pending={goalMutation.isPending}
               pendingLabel={translate(locale, "settings.goalPending")}
-              disabled={!normalizedGoal || goalConflict}
+              disabled={!normalizedGoal || goalConflict || goalUnavailable}
             >
               {translate(locale, "settings.saveGoal")}
             </PendingButton>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { Bell, Coffee, LogOut, Menu, MessageSquare, X } from "lucide-react";
@@ -10,7 +10,7 @@ import type { z } from "zod";
 import { overviewResponseSchema, type Profile, type TourState } from "@brew-dashboard/contracts";
 import { logout, sessionQueryKey, sessionQueryOptions } from "@/api/session";
 import { saveTourState } from "@/api/tour";
-import { feedbackQuery, sendProductEvent } from "@/api/settings";
+import { feedbackQuery } from "@/api/settings";
 import { FeedbackDialog } from "@/components/feedback";
 import { GuidedTour } from "@/components/guided-tour";
 import { ErrorState, LoadingState, PendingButton } from "@/components/ui/states";
@@ -23,6 +23,7 @@ import {
   recordFeedbackSection,
 } from "@/lib/feedback-prompt";
 import { useQueryClient } from "@tanstack/react-query";
+import { productEventDispatcher } from "@/lib/product-events";
 
 const sections = ["overview", "locations", "sales", "products", "inventory", "settings"] as const;
 type Section = (typeof sections)[number];
@@ -51,16 +52,12 @@ export function AppShell() {
   const navigate = useNavigate({ from: "/app" });
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const search = useRouterState({
-    select: (state) => state.location.search as Record<string, unknown>,
-  });
+  const search = useSearch({ strict: false });
   const section = sectionFromPath(pathname);
   const isAnalytics = analyticsSections.has(section);
   const filters = useMemo<AnalyticsFilters>(
     () => ({
-      period: periods.includes(search.period as (typeof periods)[number])
-        ? (search.period as AnalyticsFilters["period"])
-        : "today",
+      period: search.period ?? "today",
       ...(typeof search.locationId === "string" ? { locationId: search.locationId } : {}),
     }),
     [search.locationId, search.period],
@@ -71,12 +68,7 @@ export function AppShell() {
     ...feedbackQuery(profile?.networkId ?? "pending"),
     enabled: Boolean(profile),
   });
-  const inventoryStatus =
-    search.status === "in_stock" ||
-    search.status === "low_stock" ||
-    search.status === "out_of_stock"
-      ? search.status
-      : undefined;
+  const inventoryStatus = search.status;
   const locations = useQuery({
     ...locationOptionsQuery(profile?.networkId ?? "pending"),
     enabled: Boolean(profile),
@@ -133,12 +125,12 @@ export function AppShell() {
     const updatePrompt = window.setTimeout(() => setPromptState(nextPromptState), 0);
     if (lastSectionEvent.current === section) return;
     lastSectionEvent.current = section;
-    void sendProductEvent({
+    productEventDispatcher.dispatch({
       eventId: crypto.randomUUID(),
       type: "section_viewed",
       route: section,
       metadata: { section },
-    }).catch(() => undefined);
+    });
     return () => window.clearTimeout(updatePrompt);
   }, [profile, section]);
 
@@ -185,18 +177,8 @@ export function AppShell() {
     const locationsSearch =
       section === "locations"
         ? {
-            sortBy:
-              search.sortBy === "revenue" ||
-              search.sortBy === "grossProfit" ||
-              search.sortBy === "orders" ||
-              search.sortBy === "averageCheck" ||
-              search.sortBy === "grossMargin" ||
-              search.sortBy === "activeAlerts" ||
-              search.sortBy === "name"
-                ? search.sortBy
-                : "revenue",
-            sortDir:
-              search.sortDir === "asc" || search.sortDir === "desc" ? search.sortDir : "desc",
+            sortBy: search.sortBy ?? "revenue",
+            sortDir: search.sortDir ?? "desc",
           }
         : {};
     void navigate({
@@ -213,12 +195,12 @@ export function AppShell() {
     const nextPeriod = next.period ?? filters.period;
     const nextLocationId =
       next.locationId === null ? null : (next.locationId ?? filters.locationId ?? null);
-    void sendProductEvent({
+    productEventDispatcher.dispatch({
       eventId: crypto.randomUUID(),
       type: "filter_changed",
       route: section,
       metadata: { filter, period: nextPeriod, locationId: nextLocationId },
-    }).catch(() => undefined);
+    });
   };
 
   const navigation = (compact = false) => (

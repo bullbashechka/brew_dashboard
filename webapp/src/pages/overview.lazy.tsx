@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import * as Dialog from "@radix-ui/react-dialog";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLazyRoute, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { createLazyRoute } from "@tanstack/react-router";
 import type { OverviewData, Profile } from "@brew-dashboard/contracts";
 import {
   AlertTriangle,
@@ -15,16 +14,14 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
-  X,
 } from "lucide-react";
-import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 
 import { type AnalyticsFilters, overviewQuery } from "@/api/analytics";
-import { resetDemoData } from "@/api/demo";
-import { sessionQueryKey, sessionQueryOptions } from "@/api/session";
+import { sessionQueryOptions } from "@/api/session";
 import { Button } from "@/components/ui/button";
-import { ErrorState, PendingButton, Skeleton } from "@/components/ui/states";
+import { ErrorState, Skeleton } from "@/components/ui/states";
+import { ResetDemoDialog } from "@/components/reset-demo-dialog";
 import {
   formatCurrency,
   formatDate,
@@ -34,8 +31,8 @@ import {
   translate,
   type TranslationKey,
 } from "@/lib/i18n";
+import { useResetDemoData } from "@/lib/reset-demo";
 
-const periods = ["today", "7d", "30d", "6m"] as const;
 type MetricName =
   "revenue" | "grossProfit" | "orders" | "averageCheck" | "grossMargin" | "activeAlerts";
 const metricNames: MetricName[] = [
@@ -56,16 +53,11 @@ const TrendChart = lazy(() =>
 );
 
 function OverviewPage() {
-  const queryClient = useQueryClient();
-  const search = useRouterState({
-    select: (state) => state.location.search as { period?: string; locationId?: string },
-  });
+  const search = Route.useSearch();
   const { data: profile } = useQuery(sessionQueryOptions());
   const locale = localeFromProfile(profile);
   const filters: AnalyticsFilters = {
-    period: periods.includes(search.period as (typeof periods)[number])
-      ? (search.period as AnalyticsFilters["period"])
-      : "today",
+    period: search.period,
     ...(typeof search.locationId === "string" ? { locationId: search.locationId } : {}),
   };
   const analytics = useQuery({
@@ -73,22 +65,7 @@ function OverviewPage() {
     enabled: Boolean(profile),
   });
   const [resetOpen, setResetOpen] = useState(false);
-  const resetKey = useRef<string | null>(null);
-  const reset = useMutation({
-    mutationFn: () => {
-      resetKey.current ??= crypto.randomUUID();
-      return resetDemoData(resetKey.current);
-    },
-    onSuccess: async (response) => {
-      queryClient.setQueryData<Profile | null>(sessionQueryKey, response.data.profile);
-      await queryClient.invalidateQueries({
-        queryKey: ["tenant", response.data.profile.networkId],
-      });
-      resetKey.current = null;
-      setResetOpen(false);
-      toast.success(translate(locale, "reset.complete"));
-    },
-  });
+  const reset = useResetDemoData(locale, () => setResetOpen(false));
 
   if (!profile || analytics.isPending) return <OverviewSkeleton />;
   if (analytics.isError)
@@ -448,75 +425,6 @@ function AlertsList({ data, profile }: { data: OverviewData; profile: Profile })
         <p className="mt-6 text-stone-600">{translate(locale, "alerts.none")}</p>
       )}
     </article>
-  );
-}
-
-function ResetDemoDialog({
-  open,
-  onOpenChange,
-  locale,
-  pending,
-  error,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  locale: ReturnType<typeof localeFromProfile>;
-  pending: boolean;
-  error: unknown;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-stone-950/35" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white p-6 shadow-xl focus:outline-none">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <Dialog.Title className="text-xl font-semibold text-stone-950">
-                {translate(locale, "reset.title")}
-              </Dialog.Title>
-              <Dialog.Description className="mt-2 text-stone-600">
-                {translate(locale, "reset.description")}
-              </Dialog.Description>
-            </div>
-            <Dialog.Close asChild disabled={pending}>
-              <button
-                type="button"
-                className="icon-button -mr-2 -mt-2"
-                aria-label={translate(locale, "actions.close")}
-              >
-                <X className="size-5" />
-              </button>
-            </Dialog.Close>
-          </div>
-          <ul className="mt-5 space-y-3 text-sm text-stone-700">
-            <li className="rounded-lg bg-amber-50 p-3">{translate(locale, "reset.resetItems")}</li>
-            <li className="rounded-lg bg-emerald-50 p-3">{translate(locale, "reset.keepItems")}</li>
-          </ul>
-          {Boolean(error) && (
-            <div className="mt-4">
-              <ErrorState locale={locale} error={error} />
-            </div>
-          )}
-          <div className="mt-6 flex flex-wrap justify-end gap-3">
-            <Dialog.Close asChild disabled={pending}>
-              <Button type="button" variant="outline">
-                {translate(locale, "actions.cancel")}
-              </Button>
-            </Dialog.Close>
-            <PendingButton
-              type="button"
-              pending={pending}
-              pendingLabel={translate(locale, "reset.pending")}
-              onClick={onConfirm}
-            >
-              {translate(locale, "reset.confirm")}
-            </PendingButton>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
   );
 }
 

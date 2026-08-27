@@ -21,41 +21,51 @@ const initialValues = (feedback: FeedbackResponseData | null | undefined) => ({
   desiredFeatures: feedback?.desiredFeatures ?? "",
 });
 
+type FeedbackFormValues = ReturnType<typeof initialValues>;
+type FeedbackMutationInput = {
+  values: FeedbackFormValues;
+  expectedVersion: number | null;
+};
+
 export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
   const locale = localeFromProfile(profile);
   const queryClient = useQueryClient();
   const feedback = useQuery(feedbackQuery(profile.networkId));
   const [values, setValues] = useState(() => initialValues(undefined));
+  const [dirty, setDirty] = useState(false);
   const key = useRef<string | null>(null);
   const version = useRef<number | null>(null);
-  const submittedVersion = useRef<number | null>(null);
+  const appliedVersion = useRef<number | null | undefined>(undefined);
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ values: nextValues, expectedVersion }: FeedbackMutationInput) => {
       key.current ??= crypto.randomUUID();
       return saveFeedback({
-        rating: Number(values.rating),
-        comment: values.comment,
-        desiredFeatures: values.desiredFeatures,
-        expectedVersion: version.current,
+        rating: Number(nextValues.rating),
+        comment: nextValues.comment,
+        desiredFeatures: nextValues.desiredFeatures,
+        expectedVersion,
         idempotencyKey: key.current,
       });
     },
     onSuccess: (response) => {
       if (!response.data) return;
-      submittedVersion.current = response.data.version;
+      appliedVersion.current = response.data.version;
       version.current = response.data.version;
       key.current = null;
+      setValues(initialValues(response.data));
+      setDirty(false);
       queryClient.setQueryData(feedbackQueryKey(profile.networkId), response);
       onSubmitted?.();
     },
   });
   const saved = feedback.data?.data;
   useEffect(() => {
-    if (feedback.isSuccess && saved?.version !== submittedVersion.current) {
+    if (feedback.isSuccess && !dirty && saved?.version !== appliedVersion.current) {
+      appliedVersion.current = saved?.version ?? null;
       version.current = saved?.version ?? null;
       setValues(initialValues(saved));
     }
-  }, [feedback.isSuccess, saved]);
+  }, [dirty, feedback.isSuccess, saved]);
 
   const invalid =
     !/^[1-5]$/u.test(values.rating) ||
@@ -64,19 +74,32 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
     values.desiredFeatures.length > 2000;
   const conflict = mutation.error instanceof ApiClientError && mutation.error.code === "CONFLICT";
 
-  const submit = (overwrite = false) => {
-    if (mutation.isPending || invalid || (conflict && !overwrite)) return;
-    if (overwrite) {
-      key.current = null;
-      mutation.reset();
+  const submit = (nextValues: FeedbackFormValues, expectedVersion: number | null) => {
+    if (mutation.isPending || invalid) return;
+    mutation.mutate({ values: nextValues, expectedVersion });
+  };
+
+  const refreshFeedback = async (mode: "latest" | "overwrite") => {
+    const draft = { ...values };
+    const latest = await feedback.refetch();
+    if (!latest.isSuccess) return;
+    const latestVersion = latest.data?.data?.version ?? null;
+    version.current = latestVersion;
+    appliedVersion.current = latestVersion;
+    key.current = null;
+    mutation.reset();
+    if (mode === "latest") {
+      setValues(initialValues(latest.data?.data));
+      setDirty(false);
+      return;
     }
-    mutation.mutate();
+    mutation.mutate({ values: draft, expectedVersion: latestVersion });
   };
 
   if (feedback.isPending) {
     return <p className="text-sm text-stone-600">{translate(locale, "states.loading")}</p>;
   }
-  if (feedback.isError) {
+  if (feedback.isError && !feedback.data) {
     return (
       <ErrorState locale={locale} error={feedback.error} onRetry={() => void feedback.refetch()} />
     );
@@ -87,7 +110,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
-        submit();
+        submit({ ...values }, version.current);
       }}
     >
       <label className="grid gap-1 text-sm font-medium text-stone-700">
@@ -99,6 +122,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
           onChange={(event) => {
             key.current = null;
             mutation.reset();
+            setDirty(true);
             setValues((current) => ({ ...current, rating: event.target.value }));
           }}
         >
@@ -120,6 +144,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
           onChange={(event) => {
             key.current = null;
             mutation.reset();
+            setDirty(true);
             setValues((current) => ({ ...current, desiredFeatures: event.target.value }));
           }}
           aria-invalid={values.desiredFeatures.length < 1 || undefined}
@@ -139,6 +164,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
           onChange={(event) => {
             key.current = null;
             mutation.reset();
+            setDirty(true);
             setValues((current) => ({ ...current, comment: event.target.value }));
           }}
         />
@@ -151,6 +177,13 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
           {translate(locale, "errors.validation")}
         </p>
       )}
+      {feedback.isRefetchError && (
+        <ErrorState
+          locale={locale}
+          error={feedback.error}
+          onRetry={() => void feedback.refetch()}
+        />
+      )}
       {conflict && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
           <p>{translate(locale, "feedback.conflict")}</p>
@@ -160,11 +193,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
               size="sm"
               variant="outline"
               disabled={mutation.isPending}
-              onClick={() => {
-                submittedVersion.current = null;
-                mutation.reset();
-                void feedback.refetch();
-              }}
+              onClick={() => void refreshFeedback("latest")}
             >
               {translate(locale, "actions.useLatest")}
             </Button>
@@ -172,12 +201,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
               type="button"
               size="sm"
               disabled={mutation.isPending || invalid}
-              onClick={() => {
-                void feedback.refetch().then((latest) => {
-                  version.current = latest.data?.data?.version ?? null;
-                  submit(true);
-                });
-              }}
+              onClick={() => void refreshFeedback("overwrite")}
             >
               {translate(locale, "actions.overwrite")}
             </Button>

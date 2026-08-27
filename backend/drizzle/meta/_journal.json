@@ -64,6 +64,13 @@
       "when": 1787750296491,
       "tag": "0008_serious_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787831794403,
+      "tag": "0009_kind_paladin",
+      "breakpoints": true
     }
   ]
 }

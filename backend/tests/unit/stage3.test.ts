@@ -11,6 +11,7 @@ import { __test as authHttpTest } from "../../src/auth/http.ts";
 import { isSupportedLogin, normalizeLogin, parsePassword } from "../../src/auth/login.ts";
 import { app } from "../../src/index.ts";
 import { __test as middlewareTest } from "../../src/http/middleware.ts";
+import { isLoopbackHostname } from "../../src/security/hosts.ts";
 
 describe("Stage 3 login and admin boundaries", () => {
   it("normalizes valid aliases and rejects unsupported characters", () => {
@@ -38,6 +39,25 @@ describe("Stage 3 login and admin boundaries", () => {
     expect(password.length).toBeGreaterThanOrEqual(12);
     expect(password.length).toBeLessThanOrEqual(128);
     expect(() => parsePassword("")).toThrow();
+  });
+
+  it("allows HTTPS exceptions only for loopback hosts", () => {
+    expect(isLoopbackHostname("localhost")).toBe(true);
+    expect(isLoopbackHostname("127.0.0.1")).toBe(true);
+    expect(isLoopbackHostname("[::1]")).toBe(true);
+    expect(isLoopbackHostname("203.0.113.10")).toBe(false);
+  });
+
+  it("keeps unexpected Better Auth responses as internal failures", () => {
+    expect(() =>
+      authHttpTest.classifyAuthResponse("login", new Response(null, { status: 503 })),
+    ).toThrow("Better Auth login returned unexpected HTTP 503");
+    expect(() =>
+      authHttpTest.classifyAuthResponse("get-session", new Response(null, { status: 502 })),
+    ).toThrow("Better Auth get-session returned unexpected HTTP 502");
+    expect(authHttpTest.classifyAuthResponse("login", new Response(null, { status: 401 }))).toEqual(
+      { kind: "unauthenticated" },
+    );
   });
 
   it("enforces JSON, origin and body boundaries for mutations", async () => {

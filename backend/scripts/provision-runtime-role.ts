@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import { isLoopbackHostname } from "../src/security/hosts.ts";
 
 const migrationUrl = process.env.DATABASE_MIGRATION_URL;
 const databaseUrl = migrationUrl ?? process.env.DATABASE_PUBLIC_URL;
@@ -11,7 +12,7 @@ if (!runtimePassword || runtimePassword.length < 24) {
   throw new Error("RUNTIME_DATABASE_PASSWORD must be at least 24 characters");
 }
 const hostname = new URL(databaseUrl).hostname;
-const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(hostname);
+const isLoopback = isLoopbackHostname(hostname);
 if (!isLoopback && process.env.ALLOW_PRODUCTION_MIGRATIONS !== "1") {
   throw new Error(
     "Non-local role provisioning requires ALLOW_PRODUCTION_MIGRATIONS=1; use a loopback DATABASE_MIGRATION_URL for local databases",

@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useQuery } from "@tanstack/react-query";
-import { createLazyRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createLazyRoute, useNavigate } from "@tanstack/react-router";
 import type { LocationsData, Profile } from "@brew-dashboard/contracts";
 import { ArrowDown, ArrowUp, Award, Circle, Minus, Trophy } from "lucide-react";
 
@@ -16,7 +16,6 @@ import {
   type TranslationKey,
 } from "@/lib/i18n";
 
-const periods = ["today", "7d", "30d", "6m"] as const;
 const sortOptions: Array<LocationsData["sortBy"]> = [
   "revenue",
   "grossProfit",
@@ -26,6 +25,7 @@ const sortOptions: Array<LocationsData["sortBy"]> = [
   "activeAlerts",
   "name",
 ];
+
 const metrics = [
   "revenue",
   "grossProfit",
@@ -39,28 +39,16 @@ export const Route = createLazyRoute("/app/locations")({ component: LocationsPag
 
 function LocationsPage() {
   const navigate = useNavigate({ from: "/app/locations" });
-  const search = useRouterState({
-    select: (state) =>
-      state.location.search as {
-        period?: string;
-        locationId?: string;
-        sortBy?: string;
-        sortDir?: string;
-      },
-  });
+  const search = Route.useSearch();
   const { data: profile } = useQuery(sessionQueryOptions());
   const locale = localeFromProfile(profile);
   const filters: AnalyticsFilters = {
-    period: periods.includes(search.period as (typeof periods)[number])
-      ? (search.period as AnalyticsFilters["period"])
-      : "today",
+    period: search.period,
     ...(typeof search.locationId === "string" ? { locationId: search.locationId } : {}),
   };
   const sorting: LocationSorting = {
-    sortBy: sortOptions.includes(search.sortBy as LocationsData["sortBy"])
-      ? (search.sortBy as LocationsData["sortBy"])
-      : "revenue",
-    sortDir: search.sortDir === "asc" ? "asc" : "desc",
+    sortBy: search.sortBy,
+    sortDir: search.sortDir,
   };
   const analytics = useQuery({
     ...locationsQuery(profile?.networkId ?? "pending", { ...filters, ...sorting }),

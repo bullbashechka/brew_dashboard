@@ -1,7 +1,5 @@
-import { and, eq } from "drizzle-orm";
-
-import { lockRateLimit, type RequestTransaction } from "../db/client.ts";
-import { authRateLimits } from "../db/schema.ts";
+import { type RequestTransaction } from "../db/client.ts";
+import { consumeFixedWindow } from "../db/rate-limit.ts";
 
 export const PRODUCT_EVENT_BURST_WINDOW_SECONDS = 60;
 export const PRODUCT_EVENT_BURST_MAX = 30;
@@ -31,46 +29,10 @@ const consumeWindow = async (
     nowMs: number;
   },
 ) => {
-  await lockRateLimit(transaction, input.key);
-  const rows = await transaction
-    .select()
-    .from(authRateLimits)
-    .where(eq(authRateLimits.key, input.key))
-    .for("update");
-  const existing = rows[0];
-  if (!existing) {
-    await transaction.insert(authRateLimits).values({
-      id: crypto.randomUUID(),
-      key: input.key,
-      count: 1,
-      lastRequest: input.nowMs,
-    });
-    return;
+  const result = await consumeFixedWindow(transaction, input);
+  if (!result.allowed) {
+    throw new ProductEventRateLimitError(result.retryAfter ?? input.windowSeconds, input.window);
   }
-
-  const windowMs = input.windowSeconds * 1000;
-  const elapsed = input.nowMs - existing.lastRequest;
-  if (elapsed >= windowMs) {
-    await transaction
-      .update(authRateLimits)
-      .set({ count: 1, lastRequest: input.nowMs })
-      .where(eq(authRateLimits.id, existing.id));
-    return;
-  }
-
-  if (existing.count >= input.max) {
-    throw new ProductEventRateLimitError(
-      Math.max(1, Math.ceil((windowMs - Math.max(0, elapsed)) / 1000)),
-      input.window,
-    );
-  }
-
-  // Keep lastRequest as the start of this fixed window. Updating it on every
-  // accepted event would turn the daily quota into an inactivity timeout.
-  await transaction
-    .update(authRateLimits)
-    .set({ count: existing.count + 1 })
-    .where(and(eq(authRateLimits.id, existing.id), eq(authRateLimits.key, input.key)));
 };
 
 export const consumeProductEventRateLimit = async (
@@ -94,5 +56,3 @@ export const consumeProductEventRateLimit = async (
     nowMs,
   });
 };
-
-export const __test = { keyFor, consumeWindow };

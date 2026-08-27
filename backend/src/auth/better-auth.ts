@@ -3,13 +3,7 @@ import { betterAuth } from "better-auth/minimal";
 import { username } from "better-auth/plugins";
 
 import type { DatabaseExecutor } from "../db/client.ts";
-import {
-  authAccounts,
-  authRateLimits,
-  authSessions,
-  authUsers,
-  authVerifications,
-} from "../db/schema.ts";
+import { authAccounts, authSessions, authUsers, authVerifications } from "../db/schema.ts";
 import { isSupportedLogin, normalizeLogin } from "./login.ts";
 
 export const AUTH_BASE_PATH = "/api/v1/internal-auth";
@@ -22,7 +16,6 @@ const authSchema = {
   session: authSessions,
   account: authAccounts,
   verification: authVerifications,
-  rateLimit: authRateLimits,
 };
 
 export type BetterAuthEnvironment = {
@@ -54,14 +47,7 @@ export const createBetterAuth = (db: DatabaseExecutor, environment: BetterAuthEn
       cookieCache: { enabled: false },
     },
     rateLimit: {
-      enabled: true,
-      storage: "database",
-      window: 10,
-      max: 100,
-      customRules: {
-        "/sign-in/username": { window: 900, max: 20 },
-        "/get-session": false,
-      },
+      enabled: false,
     },
     advanced: {
       cookiePrefix: "brew_dashboard",

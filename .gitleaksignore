@@ -1,0 +1,4 @@
+# Historical integration-test fixture values are synthetic, non-production credentials.
+8f2525923a9f82a94881f464e6be5b6aa0472246:backend/tests/integration/retention.integration.test.ts:generic-api-key:21
+c21d75b964e09e3c97e526a8182fd8d2f0126f73:backend/tests/integration/auth.integration.test.ts:generic-api-key:343
+c21d75b964e09e3c97e526a8182fd8d2f0126f73:backend/tests/integration/auth.integration.test.ts:generic-api-key:350

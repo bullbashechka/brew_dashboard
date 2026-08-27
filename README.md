@@ -128,10 +128,12 @@ persisted.
 `bun run audit` fails on high/critical dependency advisories and source secret findings. The build
 gate separately scans the complete generated Worker artifact after removing preview-only local vars. The current
 dependency graph reports one documented moderate development-tool advisory (`esbuild`,
-`GHSA-67mh-4wv8-2f99`); it is retained for the pinned Drizzle/Vite toolchain and must be reviewed
-again before production release. If `gitleaks` is unavailable locally, the audit command uses a
-redacted tracked-file fallback; the Husky pre-commit hook remains fail-closed and requires
-`gitleaks`.
+`GHSA-67mh-4wv8-2f99`) through `drizzle-kit`'s `@esbuild-kit/esm-loader` chain; it is not part of
+the production Worker artifact and is retained without an unsupported transitive override. Review
+it again whenever the Drizzle toolchain changes and before production release. `gitleaks` is required
+for `bun run audit` and the Husky pre-commit hook; the release gate fails closed when it is unavailable.
+`.gitleaksignore` contains only reviewed fingerprints for historical synthetic test credentials; new
+findings still fail the scan.
 
 ## Authentication and account administration (Stage 3)
 

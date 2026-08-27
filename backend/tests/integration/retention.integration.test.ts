@@ -18,7 +18,7 @@ describeIntegration("product event retention cleanup", () => {
     account = await withRequestDatabase(ownerUrl!, (db) =>
       createAccount(db, {
         login: `stage12-retention-${crypto.randomUUID().slice(0, 8)}`,
-        password: "Stage12-retention-A1",
+        password: `test-${crypto.randomUUID()}`,
         accountKind: "e2e",
       }),
     );

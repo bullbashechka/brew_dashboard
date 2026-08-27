@@ -24,9 +24,10 @@ import {
   createBetterAuth,
   type BetterAuthEnvironment,
 } from "./better-auth.ts";
-import { LoginRateLimitError, consumeLoginPairRateLimit } from "./rate-limit.ts";
+import { LoginRateLimitError, consumeLoginRateLimit } from "./rate-limit.ts";
 import { normalizeLogin } from "./login.ts";
 import { localDateKey } from "../domain/periods.ts";
+import { isLoopbackHostname } from "../security/hosts.ts";
 
 type SessionPayload = {
   session: {
@@ -58,10 +59,7 @@ const getAuthEnvironment = (context: Context<AppEnvironment>): BetterAuthEnviron
     throw new Error("Better Auth server configuration is unavailable");
   }
   const parsed = new URL(baseUrl);
-  if (
-    parsed.protocol !== "https:" &&
-    !["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)
-  ) {
+  if (parsed.protocol !== "https:" && !isLoopbackHostname(parsed.hostname)) {
     throw new Error("Better Auth URL must use HTTPS outside local development");
   }
   return { secret, baseUrl: parsed.origin };
@@ -123,12 +121,32 @@ const clearSessionCookie = (context: Context<AppEnvironment>) => {
   );
 };
 
-const readJson = async (response: Response): Promise<unknown> => {
+const readJson = async (
+  response: Response,
+): Promise<{ ok: true; value: unknown } | { ok: false }> => {
   try {
-    return await response.json();
+    return { ok: true, value: await response.json() };
   } catch {
-    return null;
+    return { ok: false };
   }
+};
+
+const unexpectedAuthResponse = (operation: string, response: Response): never => {
+  throw new Error(`Better Auth ${operation} returned unexpected HTTP ${response.status}`);
+};
+
+const retryAfterFromAuthResponse = (response: Response) => {
+  const retryAfter = Number(response.headers.get("retry-after"));
+  return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 900;
+};
+
+const classifyAuthResponse = (operation: "login" | "get-session", response: Response) => {
+  if (operation === "login" && response.status === 429) {
+    return { kind: "rate-limited" as const, retryAfter: retryAfterFromAuthResponse(response) };
+  }
+  if (response.status === 401) return { kind: "unauthenticated" as const };
+  if (!response.ok) unexpectedAuthResponse(operation, response);
+  return { kind: "success" as const };
 };
 
 const isSessionPayload = (value: unknown): value is SessionPayload => {
@@ -254,7 +272,7 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
   try {
     result = await withRequestDatabase(getConnectionString(context), (db) =>
       db.transaction(async (transaction) => {
-        await consumeLoginPairRateLimit(transaction, ipAddress, credentials.login);
+        await consumeLoginRateLimit(transaction, ipAddress, credentials.login);
         await lockLogin(transaction, credentials.login);
         const auth = createBetterAuth(transaction, environment);
         const response = await auth.handler(
@@ -264,14 +282,13 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
           }),
         );
 
-        if (response.status === 429) {
-          const retryAfter = Number(response.headers.get("retry-after") ?? 900);
-          return { kind: "rate-limited" as const, retryAfter };
-        }
-        const payload = await readJson(response);
-        if (!response.ok || !isLoginPayload(payload)) {
-          return { kind: "invalid" as const };
-        }
+        const responseKind = classifyAuthResponse("login", response);
+        if (responseKind.kind === "rate-limited") return responseKind;
+        if (responseKind.kind === "unauthenticated") return { kind: "invalid" as const };
+        const body = await readJson(response);
+        if (!body.ok) throw unexpectedAuthResponse("login", response);
+        if (!isLoginPayload(body.value)) throw unexpectedAuthResponse("login", response);
+        const payload = body.value;
 
         await lockAuthUser(transaction, payload.user.id);
         const profile = await loadActiveProfile(transaction, payload.user.id);
@@ -339,12 +356,22 @@ export const requireAuthentication = async (
       const response = await auth.handler(
         internalRequest(context, environment, "/get-session", "GET"),
       );
-      const payload = await readJson(response);
-      if (!response.ok || !isSessionPayload(payload)) {
+      const responseKind = classifyAuthResponse("get-session", response);
+      if (responseKind.kind === "unauthenticated") {
         appendSetCookies(context, response.headers);
         clearSessionCookie(context);
         return unauthenticatedResponse(context);
       }
+      const body = await readJson(response);
+      if (!body.ok) throw unexpectedAuthResponse("get-session", response);
+      const payloadValue = body.value;
+      if (payloadValue === null) {
+        appendSetCookies(context, response.headers);
+        clearSessionCookie(context);
+        return unauthenticatedResponse(context);
+      }
+      if (!isSessionPayload(payloadValue)) throw unexpectedAuthResponse("get-session", response);
+      const payload = payloadValue;
 
       await lockAuthUser(transaction, payload.user.id);
       const authoritativeSession = await transaction
@@ -413,7 +440,8 @@ export const logoutHandler = async (context: Context<AppEnvironment>) => {
       const sessionResponse = await auth.handler(
         internalRequest(context, environment, "/get-session", "GET"),
       );
-      const payload = await readJson(sessionResponse);
+      const sessionBody = await readJson(sessionResponse);
+      const payload = sessionBody.ok ? sessionBody.value : null;
       if (isSessionPayload(payload)) await lockAuthUser(transaction, payload.user.id);
 
       const signOutResponse = await auth.handler(
@@ -451,6 +479,7 @@ export const meHandler = (context: Context<AppEnvironment>) =>
 
 export const __test = {
   clearSessionCookie,
+  classifyAuthResponse,
   getSetCookieValues,
   isLoginPayload,
   isSessionPayload,

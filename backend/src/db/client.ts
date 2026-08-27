@@ -26,16 +26,6 @@ export const setTenantContext = async (transaction: RequestTransaction, networkI
   await transaction.execute(sql`select set_config('app.network_id', ${networkId}, true)`);
 };
 
-export const withTenantTransaction = async <T>(
-  db: RequestDatabase,
-  networkId: string,
-  callback: (transaction: RequestTransaction) => Promise<T>,
-): Promise<T> =>
-  db.transaction(async (transaction) => {
-    await setTenantContext(transaction, networkId);
-    return callback(transaction);
-  });
-
 const advisoryLock = async (transaction: RequestTransaction, key: string) => {
   await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 };

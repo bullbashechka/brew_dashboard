@@ -110,12 +110,6 @@ export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 export const fieldErrorsSchema = z.record(z.string(), z.array(z.string()));
 export const apiMetaSchema = z.record(z.string(), z.unknown());
 
-export type ApiSuccess<TData, TMeta = Record<string, unknown>> = {
-  data: TData;
-  meta: TMeta;
-  requestId: string;
-};
-
 export function createSuccessEnvelopeSchema<
   TData extends z.ZodType,
   TMeta extends z.ZodType = typeof apiMetaSchema,
@@ -825,40 +819,18 @@ export const serverProductEventRequestSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const storedProductEventSchema = z.strictObject({
-  eventId: uuidSchema,
-  userId: uuidSchema,
-  networkId: uuidSchema,
-  type: productEventTypeSchema,
-  route: sectionSchema.nullable(),
-  metadata: z.record(z.string(), z.unknown()),
-  occurredAt: utcTimestampSchema,
-});
 export const productEventResponseSchema = createSuccessEnvelopeSchema(
   z.strictObject({ eventId: uuidSchema }),
 );
 
-export type HealthData = z.infer<typeof healthDataSchema>;
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
-export type ApiError = z.infer<typeof apiErrorSchema>;
-export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type DemoCounts = z.infer<typeof demoCountsSchema>;
 export type DemoGeneration = z.infer<typeof demoGenerationSchema>;
-export type OnboardingLanguageData = z.infer<typeof onboardingLanguageDataSchema>;
-export type OnboardingCompleteData = z.infer<typeof onboardingCompleteDataSchema>;
-export type ResetResultData = z.infer<typeof resetResultDataSchema>;
-export type SessionResponse = z.infer<typeof sessionResponseSchema>;
-export type LogoutResponse = z.infer<typeof logoutResponseSchema>;
 export type OnboardingRequest = z.infer<typeof onboardingRequestSchema>;
 export type TourState = z.infer<typeof tourStateSchema>;
-export type TourStateData = z.infer<typeof tourStateDataSchema>;
-export type TourStateResponse = z.infer<typeof tourStateResponseSchema>;
-export type CurrencyCode = z.infer<typeof currencyCodeSchema>;
-export type InventoryUnit = z.infer<typeof inventoryBalanceSchema>["unit"];
 export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>;
-export type FinancialKpis = z.infer<typeof financialKpisSchema>;
 export type OverviewData = z.infer<typeof overviewDataSchema>;
 export type LocationsData = z.infer<typeof locationsDataSchema>;
 export type SalesData = z.infer<typeof salesDataSchema>;
@@ -866,19 +838,10 @@ export type ProductsData = z.infer<typeof productsDataSchema>;
 export type ProductAnalytics = z.infer<typeof productAnalyticsSchema>;
 export type InventoryData = z.infer<typeof inventoryDataSchema>;
 export type PriceMutation = z.infer<typeof priceMutationSchema>;
-export type PriceMutationData = z.infer<typeof priceMutationDataSchema>;
-export type PriceMutationResponse = z.infer<typeof priceMutationResponseSchema>;
 export type InventoryMovementMutation = z.infer<typeof inventoryMovementMutationSchema>;
-export type InventoryMovementMutationData = z.infer<typeof inventoryMovementMutationDataSchema>;
-export type InventoryMovementMutationResponse = z.infer<
-  typeof inventoryMovementMutationResponseSchema
->;
 export type RevenueGoalMutation = z.infer<typeof revenueGoalMutationSchema>;
-export type RevenueGoalMutationData = z.infer<typeof revenueGoalMutationDataSchema>;
-export type RevenueGoalMutationResponse = z.infer<typeof revenueGoalMutationResponseSchema>;
 export type FeedbackMutation = z.infer<typeof feedbackMutationSchema>;
 export type FeedbackResponseData = z.infer<typeof feedbackResponseDataSchema>;
-export type FeedbackResponse = z.infer<typeof feedbackResponseSchema>;
 export type ProductEventType = z.infer<typeof productEventTypeSchema>;
 export type ProductEventRequest = z.infer<typeof productEventRequestSchema>;
 export type ServerProductEventRequest = z.infer<typeof serverProductEventRequestSchema>;

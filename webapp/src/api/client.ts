@@ -1,8 +1,4 @@
-import {
-  apiErrorResponseSchema,
-  type ApiErrorCode,
-  type ApiSuccess,
-} from "@brew-dashboard/contracts";
+import { apiErrorResponseSchema, type ApiErrorCode } from "@brew-dashboard/contracts";
 import type { z } from "zod";
 
 export class ApiClientError extends Error {
@@ -12,6 +8,7 @@ export class ApiClientError extends Error {
     readonly code?: ApiErrorCode,
     readonly fields: Record<string, string[]> = {},
     readonly requestId?: string,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiClientError";
@@ -50,6 +47,12 @@ const responseBody = async (response: Response): Promise<unknown> => {
   }
 };
 
+const parseRetryAfter = (value: string | null) => {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+};
+
 export async function requestApi<TSchema extends z.ZodType>(
   options: RequestOptions<TSchema>,
 ): Promise<z.output<TSchema>> {
@@ -72,6 +75,7 @@ export async function requestApi<TSchema extends z.ZodType>(
       parsed.success ? parsed.data.error.code : undefined,
       parsed.success ? parsed.data.error.fields : {},
       parsed.success ? parsed.data.requestId : (response.headers.get("x-request-id") ?? undefined),
+      parseRetryAfter(response.headers.get("retry-after")),
     );
     if (response.status === 401 && (options.unauthorized ?? "session") === "session") {
       await notifySessionExpired();
@@ -90,5 +94,3 @@ export async function requestApi<TSchema extends z.ZodType>(
   }
   return parsed.data;
 }
-
-export type ApiEnvelope<T> = ApiSuccess<T>;

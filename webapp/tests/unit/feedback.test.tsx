@@ -99,4 +99,100 @@ describe("feedback form", () => {
       },
     });
   });
+
+  it("refreshes the version before overwriting a feedback conflict", async () => {
+    const requests: Array<{ path: string; body?: Record<string, unknown> }> = [];
+    let getCount = 0;
+    let putCount = 0;
+    globalThis.fetch = mock((path: string, init?: RequestInit) => {
+      const body = init?.body
+        ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+        : undefined;
+      requests.push({ path, ...(body ? { body } : {}) });
+      if (init?.method !== "PUT") {
+        getCount += 1;
+        const version = getCount === 1 ? 1 : 2;
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                rating: 3,
+                comment: version === 1 ? "Existing note" : "Newer note",
+                desiredFeatures: version === 1 ? "Existing feature" : "Newer feature",
+                version,
+                submittedAt: "2026-08-25T10:00:00.000Z",
+                updatedAt: "2026-08-25T10:00:00.000Z",
+              },
+              meta: {},
+              requestId,
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+
+      putCount += 1;
+      if (putCount === 1) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: { code: "CONFLICT", message: "conflict", fields: {} },
+              requestId,
+            }),
+            { status: 409 },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: {
+              rating: 3,
+              comment: "Draft note",
+              desiredFeatures: "Draft feature",
+              version: 3,
+              submittedAt: "2026-08-25T10:00:00.000Z",
+              updatedAt: "2026-08-27T10:00:00.000Z",
+            },
+            meta: {},
+            requestId,
+          }),
+          { status: 200 },
+        ),
+      );
+    }) as unknown as typeof fetch;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackForm profile={profile} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByDisplayValue("Existing feature");
+    await user.clear(screen.getByLabelText("What should we add for you to adopt this product?"));
+    await user.type(
+      screen.getByLabelText("What should we add for you to adopt this product?"),
+      "Draft feature",
+    );
+    await user.clear(screen.getByLabelText("Anything else?"));
+    await user.type(screen.getByLabelText("Anything else?"), "Draft note");
+    await user.click(screen.getByRole("button", { name: "Save feedback" }));
+
+    await screen.findByText(
+      "Feedback changed in another tab. Reload it or overwrite with your answers.",
+    );
+    await user.click(screen.getByRole("button", { name: "Overwrite with my price" }));
+
+    await waitFor(() => expect(putCount).toBe(2));
+    expect(requests[3]).toMatchObject({
+      path: "/api/v1/feedback",
+      body: {
+        rating: 3,
+        comment: "Draft note",
+        desiredFeatures: "Draft feature",
+        expectedVersion: 2,
+      },
+    });
+  });
 });

@@ -183,11 +183,6 @@ export function localDateKey(date: Date, timeZone: string): string {
     .join("-");
 }
 
-export function localHourKey(date: Date, timeZone: string): string {
-  const value = parts(date, timeZone);
-  return `${localDateKey(date, timeZone)}T${String(value.hour).padStart(2, "0")}`;
-}
-
 export function localCalendarParts(date: Date, timeZone: string): LocalParts {
   return parts(date, timeZone);
 }

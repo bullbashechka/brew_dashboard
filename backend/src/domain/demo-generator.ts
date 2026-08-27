@@ -193,13 +193,6 @@ const CATEGORY_NAMES = ["Coffee", "Food", "Cold drinks"] as const;
 const WEIGHTED_PRODUCTS = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11];
 const CURRENT_DAY_WEIGHTED_PRODUCTS = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5];
 
-export const isDemoDataStale = (
-  generatedForDate: string | null,
-  timeZone: string | null,
-  now: Date,
-): boolean =>
-  Boolean(generatedForDate && timeZone) && generatedForDate !== localDateKey(now, timeZone!);
-
 const formatMoney = (cents: number): string => {
   const normalized = Math.max(0, Math.round(cents));
   return `${Math.floor(normalized / 100)}.${String(normalized % 100).padStart(2, "0")}`;

@@ -418,9 +418,10 @@ const buildSnapshot = async (
   timeZone: string,
   asOf: Date,
   period: AnalyticsPeriod,
+  scope: "full" | "sales" = "full",
 ): Promise<Snapshot> => {
   const window = resolvePeriodWindow(asOf, timeZone, period);
-  const monthStart = monthStartUtc(asOf, timeZone);
+  const monthStart = scope === "full" ? monthStartUtc(asOf, timeZone) : window.comparisonStart;
   const lowerBound =
     monthStart.getTime() < window.comparisonStart.getTime() ? monthStart : window.comparisonStart;
   const network = await rows<Row>(
@@ -514,74 +515,84 @@ const buildSnapshot = async (
       });
     }
   }
-  const inventoryItems = (
-    await rows<Row>(
-      transaction,
-      sql`SELECT i.id::text AS id, i.name, i.product_id::text AS "productId",
+  const inventoryItems =
+    scope === "sales"
+      ? []
+      : (
+          await rows<Row>(
+            transaction,
+            sql`SELECT i.id::text AS id, i.name, i.product_id::text AS "productId",
                p.name AS "productName", i.unit
         FROM app.inventory_items i
         LEFT JOIN app.products p
           ON p.network_id = i.network_id AND p.id = i.product_id
         WHERE i.network_id = ${networkId}
         ORDER BY i.name, i.id`,
-    )
-  ).map((row) => ({
-    id: stringValue(row.id),
-    name: stringValue(row.name),
-    productId: row.productId == null ? null : stringValue(row.productId),
-    productName: row.productName == null ? null : stringValue(row.productName),
-    unit: stringValue(row.unit) as InventoryItemRow["unit"],
-  }));
-  const balances = (
-    await rows<Row>(
-      transaction,
-      sql`SELECT id::text AS id, inventory_item_id::text AS "inventoryItemId",
+          )
+        ).map((row) => ({
+          id: stringValue(row.id),
+          name: stringValue(row.name),
+          productId: row.productId == null ? null : stringValue(row.productId),
+          productName: row.productName == null ? null : stringValue(row.productName),
+          unit: stringValue(row.unit) as InventoryItemRow["unit"],
+        }));
+  const balances =
+    scope === "sales"
+      ? []
+      : (
+          await rows<Row>(
+            transaction,
+            sql`SELECT id::text AS id, inventory_item_id::text AS "inventoryItemId",
                location_id::text AS "locationId", on_hand::text AS "onHand",
                min_threshold::text AS "minThreshold"
         FROM app.inventory_balances WHERE network_id = ${networkId}
         ORDER BY location_id, inventory_item_id`,
-    )
-  ).map((row) => ({
-    id: stringValue(row.id),
-    inventoryItemId: stringValue(row.inventoryItemId),
-    locationId: stringValue(row.locationId),
-    onHand: stringValue(row.onHand),
-    minThreshold: stringValue(row.minThreshold),
-  }));
-  const movements = (
-    await rows<Row>(
-      transaction,
-      sql`SELECT id::text AS id, inventory_item_id::text AS "inventoryItemId",
+          )
+        ).map((row) => ({
+          id: stringValue(row.id),
+          inventoryItemId: stringValue(row.inventoryItemId),
+          locationId: stringValue(row.locationId),
+          onHand: stringValue(row.onHand),
+          minThreshold: stringValue(row.minThreshold),
+        }));
+  const movements =
+    scope === "sales"
+      ? []
+      : (
+          await rows<Row>(
+            transaction,
+            sql`SELECT id::text AS id, inventory_item_id::text AS "inventoryItemId",
                location_id::text AS "locationId", type, quantity::text AS quantity,
                occurred_at AS "occurredAt"
         FROM app.inventory_movements WHERE network_id = ${networkId}
           AND occurred_at >= ${window.comparisonStart}
           AND occurred_at < ${asOf}
         ORDER BY occurred_at DESC, id DESC`,
-    )
-  ).map((row) => ({
-    id: stringValue(row.id),
-    inventoryItemId: stringValue(row.inventoryItemId),
-    locationId: stringValue(row.locationId),
-    type: stringValue(row.type) as MovementRow["type"],
-    quantity: stringValue(row.quantity),
-    occurredAt: dateValue(row.occurredAt),
-  }));
-  const currentMonth = localDateKey(asOf, timeZone).slice(0, 7) + "-01";
+          )
+        ).map((row) => ({
+          id: stringValue(row.id),
+          inventoryItemId: stringValue(row.inventoryItemId),
+          locationId: stringValue(row.locationId),
+          type: stringValue(row.type) as MovementRow["type"],
+          quantity: stringValue(row.quantity),
+          occurredAt: dateValue(row.occurredAt),
+        }));
   const target =
-    (
-      await rows<Row>(
-        transaction,
-        sql`SELECT month::text AS month, amount::text AS amount, version
+    scope === "sales"
+      ? null
+      : ((
+          await rows<Row>(
+            transaction,
+            sql`SELECT month::text AS month, amount::text AS amount, version
         FROM app.revenue_targets
-        WHERE network_id = ${networkId} AND month = ${currentMonth}::date
+        WHERE network_id = ${networkId} AND month = ${localDateKey(asOf, timeZone).slice(0, 7) + "-01"}::date
         LIMIT 1`,
-      )
-    ).map((row) => ({
-      month: stringValue(row.month).slice(0, 7),
-      amount: stringValue(row.amount),
-      version: numberValue(row.version),
-    }))[0] ?? null;
+          )
+        ).map((row) => ({
+          month: stringValue(row.month).slice(0, 7),
+          amount: stringValue(row.amount),
+          version: numberValue(row.version),
+        }))[0] ?? null);
   return {
     networkId,
     timeZone,
@@ -600,6 +611,7 @@ const buildSnapshot = async (
 export const createAnalyticsContext = async (
   transaction: RequestTransaction,
   options: AnalyticsOptions,
+  scope: "full" | "sales" = "full",
 ): Promise<AnalyticsContext> => {
   const asOf = options.asOf ?? new Date();
   const snapshot = await buildSnapshot(
@@ -608,6 +620,7 @@ export const createAnalyticsContext = async (
     options.timeZone,
     asOf,
     options.period,
+    scope,
   );
   const parsedLocation = options.locationId?.trim();
   const locationId =
@@ -1251,5 +1264,10 @@ export const buildAnalyticsSnapshot = async (
   transaction: RequestTransaction,
   options: AnalyticsOptions,
 ) => createAnalyticsContext(transaction, options);
+
+export const buildSalesAnalyticsSnapshot = async (
+  transaction: RequestTransaction,
+  options: AnalyticsOptions,
+) => createAnalyticsContext(transaction, options, "sales");
 
 export const paginationDefaults = { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE };

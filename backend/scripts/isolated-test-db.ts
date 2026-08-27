@@ -1,8 +1,8 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
+import { isLoopbackHostname } from "../src/security/hosts.ts";
 
-const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 const backendDirectory = fileURLToPath(new URL("../", import.meta.url));
 
 export type IsolatedTestDatabase = {
@@ -14,7 +14,7 @@ export type IsolatedTestDatabase = {
 
 const assertLoopback = (adminUrl: string) => {
   const parsed = new URL(adminUrl);
-  if (!loopbackHosts.has(parsed.hostname)) {
+  if (!isLoopbackHostname(parsed.hostname)) {
     throw new Error(
       "DATABASE_TEST_ADMIN_URL must point to localhost or an equivalent loopback host",
     );

@@ -109,12 +109,16 @@ export const authVerifications = auth.table(
   (table) => [index("auth_verifications_identifier_idx").on(table.identifier)],
 );
 
-export const authRateLimits = auth.table("rate_limits", {
-  id: text("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  count: integer("count").notNull(),
-  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
-});
+export const authRateLimits = auth.table(
+  "rate_limits",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    count: integer("count").notNull(),
+    lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+  },
+  (table) => [index("auth_rate_limits_last_request_idx").on(table.lastRequest)],
+);
 
 export const accountStatus = app.enum("account_status", ["active", "disabled"]);
 export const accountKind = app.enum("account_kind", ["demo", "e2e"]);
@@ -616,31 +620,3 @@ export const idempotencyKeys = app
     ],
   )
   .enableRLS();
-
-export const appTables = {
-  networks,
-  appUsers,
-  locations,
-  categories,
-  products,
-  orders,
-  orderItems,
-  inventoryItems,
-  inventoryBalances,
-  inventoryMovements,
-  revenueTargets,
-  feedbackResponses,
-  productEvents,
-  demoGenerations,
-  idempotencyKeys,
-};
-
-export const authTables = {
-  authUsers,
-  authSessions,
-  authAccounts,
-  authVerifications,
-  authRateLimits,
-};
-
-export const schema = { ...authTables, ...appTables };

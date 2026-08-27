@@ -100,5 +100,3 @@ export const completeIdempotency = async (
     })
     .where(eq(idempotencyKeys.id, input.id));
 };
-
-export const __test = { canonicalize, encodeCanonical };

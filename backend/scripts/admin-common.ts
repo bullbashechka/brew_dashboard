@@ -2,11 +2,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 
 import { parseLogin } from "../src/auth/login.ts";
+import { isLoopbackHostname } from "../src/security/hosts.ts";
 import * as schema from "../src/db/schema.ts";
 import type { RequestDatabase } from "../src/db/client.ts";
 import type { AccountKind } from "../src/admin/accounts.ts";
-
-const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 
 export const readAdminDatabaseUrl = () => {
   const databaseUrl = process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_PUBLIC_URL;
@@ -17,7 +16,7 @@ export const readAdminDatabaseUrl = () => {
 
 export const requireProductionAdmin = (databaseUrl: string, confirmation?: string) => {
   const hostname = new URL(databaseUrl).hostname;
-  if (loopbackHosts.has(hostname)) return;
+  if (isLoopbackHostname(hostname)) return;
   if (process.env.ALLOW_PRODUCTION_ADMIN !== "1" || confirmation !== "production") {
     throw new Error(
       "Non-local admin commands require ALLOW_PRODUCTION_ADMIN=1 and --confirm-production production",

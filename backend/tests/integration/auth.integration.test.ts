@@ -318,6 +318,20 @@ describeIntegration("Stage 3 authentication and account administration", () => {
     const rateLimited = responses.filter((response) => response.status === 429);
     expect(rateLimited).toHaveLength(1);
     expect(Number(rateLimited[0]?.headers.get("retry-after"))).toBeGreaterThan(0);
+
+    const aliasesFromOneIp = await Promise.all(
+      Array.from({ length: 21 }, (_, index) =>
+        request("/api/v1/auth/login", {
+          method: "POST",
+          body: {
+            login: `stage3-alias-${index}-${crypto.randomUUID().slice(0, 8)}`,
+            password: "wrong-password-123",
+          },
+          ip: "198.51.100.43",
+        }),
+      ),
+    );
+    expect(aliasesFromOneIp.filter((response) => response.status === 429)).toHaveLength(1);
   });
 
   it("serializes the fifteen-active-demo cap while excluding e2e accounts", async () => {
@@ -328,7 +342,7 @@ describeIntegration("Stage 3 authentication and account administration", () => {
       const filler = await withRequestDatabase(ownerUrl!, (db) =>
         createAccount(db, {
           login: `stage3-demo-${crypto.randomUUID().slice(0, 8)}`,
-          password: `Stage3-demo-${index}A1`,
+          password: `test-${index}-${crypto.randomUUID()}`,
           accountKind: "demo",
         }),
       );
