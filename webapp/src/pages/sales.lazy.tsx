@@ -124,7 +124,7 @@ function SalesFrame({
           {translate(locale, "sales.title")}
         </h1>
         <p className="text-stone-600">{translate(locale, "sales.description")}</p>
-        {updatedAt && <p className="text-sm text-stone-500">{formatDate(updatedAt, profile)}</p>}
+        {updatedAt && <p className="text-sm text-stone-600">{formatDate(updatedAt, profile)}</p>}
       </div>
       {children}
     </section>
@@ -173,7 +173,7 @@ function SalesMetricCard({
       <p className="mt-3 flex items-center gap-1.5 text-sm text-stone-600" aria-label={label}>
         {change !== null && <Icon className="size-4" aria-hidden="true" />}
         <span>{change === null ? label : formatPercent(Math.abs(Number(change)), profile)}</span>
-        <span className="text-stone-500">{translate(locale, "comparison.versusPrevious")}</span>
+        <span className="text-stone-600">{translate(locale, "comparison.versusPrevious")}</span>
       </p>
     </article>
   );
@@ -286,7 +286,7 @@ function Heatmap({ data, profile }: { data: SalesData; profile: Profile }) {
         <span className="block text-lg font-semibold text-stone-950">
           {translate(locale, "sales.heatmap")}
         </span>
-        <span className="block text-sm text-stone-500">
+        <span className="block text-sm text-stone-600">
           {translate(locale, "sales.heatmapHint")}
         </span>
       </figcaption>
@@ -299,7 +299,7 @@ function Heatmap({ data, profile }: { data: SalesData; profile: Profile }) {
                 <th
                   key={hour}
                   scope="col"
-                  className="min-w-7 p-1 text-center font-medium text-stone-500"
+                  className="min-w-7 p-1 text-center font-medium text-stone-600"
                 >
                   {hour}
                 </th>

@@ -112,7 +112,7 @@ function ProductsPage() {
       ) : (
         <>
           {analytics.isFetching && (
-            <p className="text-sm text-stone-500" role="status">
+            <p className="text-sm text-stone-600" role="status">
               {translate(locale, "products.refreshing")}
             </p>
           )}
@@ -159,7 +159,7 @@ function ProductsFrame({
           {translate(locale, "products.title")}
         </h1>
         <p className="text-stone-600">{translate(locale, "products.description")}</p>
-        {updatedAt && <p className="text-sm text-stone-500">{formatDate(updatedAt, profile)}</p>}
+        {updatedAt && <p className="text-sm text-stone-600">{formatDate(updatedAt, profile)}</p>}
       </div>
       {children}
     </section>
@@ -305,7 +305,7 @@ function MenuGroupCard({
             </li>
           ))
         ) : (
-          <li className="text-stone-500">{translate(locale, "states.empty")}</li>
+          <li className="text-stone-600">{translate(locale, "states.empty")}</li>
         )}
       </ul>
     </article>
@@ -369,14 +369,14 @@ function ProductCategories({
                       <td className="py-4 pr-3">
                         {formatCurrency(product.revenue, profile)}
                         <br />
-                        <span className="text-xs text-stone-500">
+                        <span className="text-xs text-stone-600">
                           {formatPercent(product.revenueShare, profile)}
                         </span>
                       </td>
                       <td className="py-4 pr-3">
                         {formatCurrency(product.grossProfit, profile)}
                         <br />
-                        <span className="text-xs text-stone-500">
+                        <span className="text-xs text-stone-600">
                           {formatPercent(product.grossMargin, profile)}
                         </span>
                       </td>
@@ -470,7 +470,7 @@ function Balances({ product, profile }: { product: ProductAnalytics; profile: Pr
       ))}
     </ul>
   ) : (
-    <span className="text-sm text-stone-500">{translate(locale, "products.noBalances")}</span>
+    <span className="text-sm text-stone-600">{translate(locale, "products.noBalances")}</span>
   );
 }
 

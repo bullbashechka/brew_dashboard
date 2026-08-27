@@ -4,7 +4,6 @@ import {
   localCalendarParts,
   localDateKey,
   localDateTimeToUtc,
-  localWeekdayAndHour,
   resolvePeriodWindow,
   type LocalParts,
 } from "./periods.ts";
@@ -425,7 +424,7 @@ export const generateDemoData = async (input: DemoGeneratorInput): Promise<Gener
                 ]!
               : globalOrderIndex < PRODUCT_BLUEPRINTS.length && itemIndex === 0
                 ? globalOrderIndex
-                : WEIGHTED_PRODUCTS[Math.floor(random() * WEIGHTED_PRODUCTS.length)]!;
+                : WEIGHTED_PRODUCTS[(globalOrderIndex + itemIndex) % WEIGHTED_PRODUCTS.length]!;
         const blueprint = PRODUCT_BLUEPRINTS[productIndex]!;
         const quantity = isCurrentSeedOrder
           ? productIndex <= 5
@@ -614,6 +613,24 @@ export const verifyDemoData = (data: GeneratedDemoData): void => {
     itemsByOrder.set(item.orderId, items);
   }
 
+  // Local-time validation is intentionally part of the generator contract, but
+  // Intl.DateTimeFormat is comparatively expensive.  Compute each order's
+  // local calendar parts once and reuse them for the coverage checks below.
+  const localPartsByOrderId = new Map(
+    data.orders.map((order) => [order.id, localCalendarParts(order.orderedAt, data.timeZone)]),
+  );
+  const localDateByOrderId = new Map(
+    data.orders.map((order) => {
+      const value = localPartsByOrderId.get(order.id)!;
+      return [
+        order.id,
+        [value.year, value.month, value.day]
+          .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, "0"))
+          .join("-"),
+      ];
+    }),
+  );
+
   const unitsByProduct = new Map<string, number>();
   for (const item of data.orderItems) {
     const order = ordersById.get(item.orderId);
@@ -714,10 +731,10 @@ export const verifyDemoData = (data: GeneratedDemoData): void => {
 
   const yesterdayDate = dateKeyOffset(data.generatedForDate, -1);
   const yesterdayOrders = data.orders.filter(
-    (order) => localDateKey(order.orderedAt, data.timeZone) === yesterdayDate,
+    (order) => localDateByOrderId.get(order.id) === yesterdayDate,
   );
   const todayOrders = data.orders.filter(
-    (order) => localDateKey(order.orderedAt, data.timeZone) === data.generatedForDate,
+    (order) => localDateByOrderId.get(order.id) === data.generatedForDate,
   );
   if (yesterdayOrders.length === 0 || todayOrders.length === 0) {
     throw new DemoGeneratorVerificationError("Today and Yesterday coverage is required");
@@ -725,9 +742,9 @@ export const verifyDemoData = (data: GeneratedDemoData): void => {
   if (
     !data.orders.some(
       (order) =>
-        localDateKey(order.orderedAt, data.timeZone) === yesterdayDate &&
-        localCalendarParts(order.orderedAt, data.timeZone).hour >= 8 &&
-        localCalendarParts(order.orderedAt, data.timeZone).hour < 11,
+        localDateByOrderId.get(order.id) === yesterdayDate &&
+        localPartsByOrderId.get(order.id)!.hour >= 8 &&
+        localPartsByOrderId.get(order.id)!.hour < 11,
     )
   ) {
     throw new DemoGeneratorVerificationError("Morning peak coverage is required");
@@ -735,14 +752,20 @@ export const verifyDemoData = (data: GeneratedDemoData): void => {
   if (
     !data.orders.some(
       (order) =>
-        localDateKey(order.orderedAt, data.timeZone) === yesterdayDate &&
-        localCalendarParts(order.orderedAt, data.timeZone).hour >= 12 &&
-        localCalendarParts(order.orderedAt, data.timeZone).hour < 16,
+        localDateByOrderId.get(order.id) === yesterdayDate &&
+        localPartsByOrderId.get(order.id)!.hour >= 12 &&
+        localPartsByOrderId.get(order.id)!.hour < 16,
     )
   ) {
     throw new DemoGeneratorVerificationError("Daytime peak coverage is required");
   }
 
-  const weekdays = data.orders.map((order) => localWeekdayAndHour(order.orderedAt, data.timeZone));
+  const weekdays = data.orders.map((order) => {
+    const value = localPartsByOrderId.get(order.id)!;
+    return {
+      weekday: new Date(Date.UTC(value.year, value.month - 1, value.day)).getUTCDay(),
+      hour: value.hour,
+    };
+  });
   if (weekdays.length === 0) throw new DemoGeneratorVerificationError("Order data is required");
 };

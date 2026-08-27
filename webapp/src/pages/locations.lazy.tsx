@@ -263,7 +263,7 @@ function MetricCell({
   const locale = localeFromProfile(profile);
   return (
     <div>
-      <dt className="text-xs font-medium text-stone-500">
+      <dt className="text-xs font-medium text-stone-600">
         {translate(locale, `metrics.${name}` as TranslationKey)}
       </dt>
       <dd className="mt-1">

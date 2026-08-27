@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, setDefaultTimeout } from "bun:test";
 
 import {
   DEMO_GENERATOR_VERSION,
@@ -12,6 +12,9 @@ import { localDateTimeToUtc } from "../../src/domain/periods.ts";
 import worker from "../../src/index.ts";
 
 const networkId = "11111111-1111-4111-8111-111111111111";
+
+// Deterministic fixture generation is CPU-heavy under parallel Bun workers.
+setDefaultTimeout(60_000);
 
 const inputFor = (
   count: number,
@@ -45,7 +48,7 @@ describe("Stage 4 deterministic demo generator", () => {
     expect(first.orderItems.every((item) => /^\d+\.\d{2}$/.test(item.unitPriceAtSale))).toBe(true);
     expect(first.orderItems.every((item) => /^\d+\.\d{2}$/.test(item.unitCostAtSale))).toBe(true);
     expect(first.orderItems.every((item) => /^\d+\.\d{3}$/.test(item.quantity))).toBe(true);
-  });
+  }, 60_000);
 
   it("covers one, two and five locations without future events", async () => {
     for (const count of [1, 2, 5]) {
@@ -58,7 +61,7 @@ describe("Stage 4 deterministic demo generator", () => {
       );
       expect(() => verifyDemoData(data)).not.toThrow();
     }
-  });
+  }, 60_000);
 
   it("keeps all menu groups on today despite extra generated sales", async () => {
     const anchor = new Date("2026-08-25T04:30:00.000Z");
@@ -71,7 +74,7 @@ describe("Stage 4 deterministic demo generator", () => {
       );
       expect(() => verifyDemoData(data)).not.toThrow();
     }
-  });
+  }, 60_000);
 
   it("handles DST gap/fold, leap day and month-end anchors", async () => {
     expect(
@@ -115,7 +118,7 @@ describe("Stage 4 deterministic demo generator", () => {
       expect(data.orders.length).toBeGreaterThan(0);
       expect(() => verifyDemoData(data)).not.toThrow();
     }
-  });
+  }, 60_000);
 
   it("rejects an unknown pinned version before producing data", async () => {
     await expect(generateDemoData(inputFor(1, { version: "v999" }))).rejects.toThrow(

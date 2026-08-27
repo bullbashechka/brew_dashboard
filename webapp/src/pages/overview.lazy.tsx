@@ -17,17 +17,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { type AnalyticsFilters, overviewQuery } from "@/api/analytics";
@@ -58,6 +48,12 @@ const metricNames: MetricName[] = [
 ];
 
 export const Route = createLazyRoute("/app/overview")({ component: OverviewPage });
+
+const TrendChart = lazy(() =>
+  import("@/components/overview-trend-chart").then((module) => ({
+    default: module.OverviewTrendChart,
+  })),
+);
 
 function OverviewPage() {
   const queryClient = useQueryClient();
@@ -111,7 +107,7 @@ function OverviewPage() {
           {translate(locale, "overview.title")}
         </h1>
         <p className="text-stone-600">{translate(locale, "overview.description")}</p>
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-stone-600">
           {translate(locale, "overview.updatedAt", {
             value: formatDate(analytics.data.meta.asOf, profile),
           })}
@@ -151,7 +147,9 @@ function OverviewPage() {
         ))}
       </div>
 
-      <TrendChart data={analytics.data.data} profile={profile} />
+      <Suspense fallback={<TrendChartFallback locale={locale} />}>
+        <TrendChart data={analytics.data.data} profile={profile} />
+      </Suspense>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <GoalCard data={analytics.data.data} profile={profile} />
@@ -239,103 +237,22 @@ function Comparison({ change, profile }: { change: string | number | null; profi
     <p className={`mt-3 flex items-center gap-1.5 text-sm ${color}`} aria-label={label}>
       <Icon className="size-4" aria-hidden="true" />
       <span>{state === "na" ? label : magnitude}</span>
-      <span className="text-stone-500">{translate(locale, "comparison.versusPrevious")}</span>
+      <span className="text-stone-600">{translate(locale, "comparison.versusPrevious")}</span>
     </p>
   );
 }
 
-function TrendChart({ data, profile }: { data: OverviewData; profile: Profile }) {
-  const locale = localeFromProfile(profile);
-  const formatBucket = (bucket: string) => {
-    if (data.period === "today") return `${bucket.slice(11, 13)}:00`;
-    return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    }).format(new Date(`${bucket.slice(0, 10)}T12:00:00.000Z`));
-  };
-  const labels = {
-    revenue: translate(locale, "metrics.revenue"),
-    grossProfit: translate(locale, "metrics.grossProfit"),
-    comparisonRevenue: `${translate(locale, "metrics.revenue")} · ${translate(locale, "overview.previousPeriod")}`,
-    comparisonGrossProfit: `${translate(locale, "metrics.grossProfit")} · ${translate(locale, "overview.previousPeriod")}`,
-  };
+function TrendChartFallback({ locale }: { locale: ReturnType<typeof localeFromProfile> }) {
   return (
     <figure
       className="min-w-0 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
       aria-labelledby="trend-title"
+      aria-busy="true"
     >
-      <figcaption
-        id="trend-title"
-        className="mb-4 flex flex-wrap items-center justify-between gap-2"
-      >
-        <span className="text-lg font-semibold text-stone-950">
-          {translate(locale, "overview.trend")}
-        </span>
-        <span className="text-sm text-stone-500">
-          {translate(locale, "comparison.versusPrevious")}
-        </span>
+      <figcaption id="trend-title" className="text-lg font-semibold text-stone-950">
+        {translate(locale, "overview.trend")}
       </figcaption>
-      {data.trend.length ? (
-        <div className="h-80 min-w-0" aria-label={translate(locale, "overview.trend")}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" />
-              <XAxis
-                dataKey="bucket"
-                tickFormatter={formatBucket}
-                minTickGap={28}
-                tick={{ fontSize: 12 }}
-              />
-              <YAxis
-                tickFormatter={(value) => formatNumber(value, profile)}
-                width={54}
-                tick={{ fontSize: 12 }}
-              />
-              <Tooltip
-                labelFormatter={(label) => formatBucket(String(label ?? ""))}
-                formatter={(value, name) => [
-                  formatCurrency(String(value ?? 0), profile),
-                  labels[String(name) as keyof typeof labels] ?? String(name),
-                ]}
-              />
-              <Legend
-                formatter={(value) => labels[String(value) as keyof typeof labels] ?? String(value)}
-              />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="var(--chart-one)"
-                strokeWidth={2.5}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="grossProfit"
-                stroke="var(--chart-two)"
-                strokeWidth={2.5}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="comparisonRevenue"
-                stroke="var(--chart-one)"
-                strokeDasharray="5 5"
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="comparisonGrossProfit"
-                stroke="var(--chart-two)"
-                strokeDasharray="5 5"
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      ) : (
-        <p className="py-12 text-center text-stone-600">{translate(locale, "states.empty")}</p>
-      )}
+      <Skeleton className="mt-4 h-80 w-full" />
     </figure>
   );
 }
@@ -357,7 +274,7 @@ function GoalCard({ data, profile }: { data: OverviewData; profile: Profile }) {
           {translate(locale, "overview.monthlyGoal")}
         </h2>
       </div>
-      <p className="mt-1 text-sm text-stone-500">{translate(locale, "overview.networkWide")}</p>
+      <p className="mt-1 text-sm text-stone-600">{translate(locale, "overview.networkWide")}</p>
       {!goal ? (
         <p className="mt-8 text-stone-600">{translate(locale, "overview.goalNotSet")}</p>
       ) : (
@@ -409,7 +326,7 @@ function LocationComparison({ data, profile }: { data: OverviewData; profile: Pr
                   }}
                 />
               </div>
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-xs text-stone-600">
                 {formatNumber(location.orders, profile)} · {translate(locale, "metrics.orders")} ·{" "}
                 {formatNumber(location.activeAlerts, profile)} ·{" "}
                 {translate(locale, "metrics.activeAlerts")}
@@ -448,7 +365,7 @@ function ProductList({
             <li key={product.productId} className="flex items-center justify-between gap-3 text-sm">
               <span className="min-w-0">
                 <span className="block truncate font-medium text-stone-800">{product.name}</span>
-                <span className="block truncate text-stone-500">{product.categoryName}</span>
+                <span className="block truncate text-stone-600">{product.categoryName}</span>
               </span>
               <span className="shrink-0 text-stone-700">
                 {formatCurrency(product.revenue, profile)}

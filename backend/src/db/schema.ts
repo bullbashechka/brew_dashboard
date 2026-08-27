@@ -562,6 +562,9 @@ export const productEvents = app
         name: "product_events_network_user_fk",
       }).onDelete("cascade"),
       index("product_events_network_occurred_idx").on(table.networkId, table.occurredAt),
+      // Retention is global (not tenant-specific), so cleanup can use the
+      // occurred-at predicate without scanning every tenant partition.
+      index("product_events_occurred_idx").on(table.occurredAt),
       tenantPolicy("product_events"),
     ],
   )

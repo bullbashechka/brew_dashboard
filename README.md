@@ -16,9 +16,18 @@ bun install --frozen-lockfile
 bun run lint
 bun run typecheck
 bun run test
-bun run test:integration
+bun run test:integration:docker
 bun run test:e2e
+bun run test:e2e:system:docker
 bun run build
+bun run audit
+```
+
+The complete Stage 12 release gate is available as one command and stops at the first failed
+validation:
+
+```bash
+bun run validate:stage12
 ```
 
 Run the local single-origin Worker and SPA with:
@@ -65,6 +74,64 @@ intentional full reset of this disposable test database is needed.
 The repository intentionally contains only the active `webapp`, `backend` and
 `packages/contracts` workspaces. Product screens and business API flows are introduced by later
 stages in `TASKS.md`; Stage 3 adds server-only Better Auth sessions and account administration.
+
+## System testing and hardening (Stage 12)
+
+The root gates cover contracts, unit/component tests, isolated PostgreSQL integration tests, the
+browser journeys, full Worker-artifact secret checks and dependency/source secret auditing:
+
+```bash
+bun run lint
+bun run typecheck
+bun run test
+bun run test:integration:docker
+bun run test:e2e
+bun run test:e2e:system:docker
+bun run build
+bun run audit
+```
+
+Playwright runs the mocked browser journeys in both Desktop Chrome and Pixel 5 projects. The
+system mode additionally runs a critical journey through the local Worker and isolated PostgreSQL
+for separate primary, secondary and performance e2e fixtures per viewport:
+
+```bash
+DATABASE_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:54329/postgres' \
+  bun run test:e2e:system
+```
+
+It creates a disposable database, applies migrations, provisions only explicit
+`account_kind = 'e2e'` accounts, passes the runtime connection through the local Hyperdrive
+override, and removes those accounts/database on exit. The runner is fail-closed when
+`E2E_ACCOUNT_KIND` is missing or differs from `e2e` and never enumerates demo accounts. Chromium
+must be installed locally (`bunx playwright install chromium`); the command never deploys a Worker
+or connects to Railway.
+
+Product-event retention is implemented by `admin:cleanup-events`. It reports aggregate counts and
+the physical relation size observed before the run in dry-run mode by default. Execution commits
+each batch independently, deletes at most 500 rows per batch and 10,000 rows per run;
+`hasMore` indicates when the command should be run again. Deletion requires `--execute`, and remote
+execution additionally requires the existing production admin confirmation:
+
+```bash
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:cleanup-events -- --days 90
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:cleanup-events -- --days 90 --max-rows 10000 --execute
+```
+
+Application observability logs keep matched route patterns and fixed `unmatched` cardinality for
+unknown paths; unmatched non-5xx requests are sampled at 1%, while all 5xx and matched signals are
+retained. Cloudflare invocation logs are disabled so only the structured application records are
+persisted.
+
+`bun run audit` fails on high/critical dependency advisories and source secret findings. The build
+gate separately scans the complete generated Worker artifact after removing preview-only local vars. The current
+dependency graph reports one documented moderate development-tool advisory (`esbuild`,
+`GHSA-67mh-4wv8-2f99`); it is retained for the pinned Drizzle/Vite toolchain and must be reviewed
+again before production release. If `gitleaks` is unavailable locally, the audit command uses a
+redacted tracked-file fallback; the Husky pre-commit hook remains fail-closed and requires
+`gitleaks`.
 
 ## Authentication and account administration (Stage 3)
 

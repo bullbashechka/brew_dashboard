@@ -15,6 +15,7 @@
     "admin:reset-password": "bun scripts/admin-reset-password.ts",
     "admin:disable-user": "bun scripts/admin-disable-user.ts",
     "admin:delete-user": "bun scripts/admin-delete-user.ts",
+    "admin:cleanup-events": "bun scripts/admin-cleanup-events.ts",
     "lint": "eslint .",
     "test:integration": "bun scripts/run-integration.ts",
     "test:unit": "bun test tests/unit",

@@ -18,6 +18,8 @@ export type LocalParts = {
 };
 
 const localFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const LOCAL_DATE_TIME_CACHE_LIMIT = 16_384;
+const localDateTimeCache = new Map<string, number | null>();
 
 const getFormatter = (timeZone: string): Intl.DateTimeFormat => {
   const cached = localFormatterCache.get(timeZone);
@@ -99,8 +101,20 @@ const sameLocalParts = (left: LocalParts, right: LocalParts): boolean =>
  * ambiguous fold resolves to the earliest UTC occurrence.
  */
 export const localDateTimeToUtc = (value: LocalParts, timeZone: string): Date | null => {
+  const cacheKey = `${timeZone}|${value.year}-${value.month}-${value.day}T${value.hour}:${value.minute}:${value.second}.${value.millisecond}`;
+  if (localDateTimeCache.has(cacheKey)) {
+    const cached = localDateTimeCache.get(cacheKey)!;
+    return cached === null ? null : new Date(cached);
+  }
+
   const candidate = fromLocal(value, timeZone);
-  return sameLocalParts(parts(candidate, timeZone), value) ? candidate : null;
+  const result = sameLocalParts(parts(candidate, timeZone), value) ? candidate : null;
+  localDateTimeCache.set(cacheKey, result?.getTime() ?? null);
+  if (localDateTimeCache.size > LOCAL_DATE_TIME_CACHE_LIMIT) {
+    const oldest = localDateTimeCache.keys().next().value;
+    if (oldest) localDateTimeCache.delete(oldest);
+  }
+  return result;
 };
 
 const calendarDate = (value: LocalParts, months: number, days: number): LocalParts => {

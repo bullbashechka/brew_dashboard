@@ -19,8 +19,13 @@ export type AuthenticatedRequest = {
 export type WorkerVariables = {
   requestId: string;
   requestStartedAt: number;
+  requestErrorLogged?: boolean;
   database: RequestTransaction;
   auth: AuthenticatedRequest;
+  safeAccount?: {
+    userId: string;
+    networkId: string;
+  };
 };
 
 export type AppEnvironment = {

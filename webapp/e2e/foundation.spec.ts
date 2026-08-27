@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const profile = {
   userId: "123e4567-e89b-12d3-a456-426614174000",
@@ -80,7 +80,7 @@ test("renders the compact guarded shell without horizontal page overflow", async
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
-  for (const width of [320, 768, 1280]) {
+  for (const width of [320, 767, 768, 1279, 1280]) {
     await page.setViewportSize({ width, height: 720 });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

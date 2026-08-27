@@ -17,6 +17,9 @@ import {
 } from "@brew-dashboard/contracts";
 import { requestApi } from "./client";
 
+export const ANALYTICS_STALE_TIME = 30_000;
+export const ANALYTICS_GC_TIME = 5 * 60_000;
+
 export type AnalyticsPeriod = AnalyticsQuery["period"];
 export type AnalyticsFilters = { period: AnalyticsPeriod; locationId?: string | undefined };
 export type LocationSorting = Pick<LocationsData, "sortBy" | "sortDir">;
@@ -44,6 +47,7 @@ export const locationOptionsQuery = (networkId: string) =>
     select: (response) =>
       response.data.locations.map(({ locationId, name }) => ({ locationId, name })),
     staleTime: 30 * 60_000,
+    gcTime: ANALYTICS_GC_TIME,
   });
 
 export const overviewQuery = (networkId: string, filters: AnalyticsFilters) =>
@@ -55,6 +59,8 @@ export const overviewQuery = (networkId: string, filters: AnalyticsFilters) =>
         schema: overviewResponseSchema,
         signal,
       }),
+    staleTime: ANALYTICS_STALE_TIME,
+    gcTime: ANALYTICS_GC_TIME,
   });
 
 export const locationsQuery = (networkId: string, filters: AnalyticsFilters & LocationSorting) =>
@@ -66,6 +72,8 @@ export const locationsQuery = (networkId: string, filters: AnalyticsFilters & Lo
         schema: locationsResponseSchema,
         signal,
       }),
+    staleTime: ANALYTICS_STALE_TIME,
+    gcTime: ANALYTICS_GC_TIME,
   });
 
 export const salesInfiniteQuery = (networkId: string, filters: AnalyticsFilters) => ({
@@ -83,6 +91,8 @@ export const salesInfiniteQuery = (networkId: string, filters: AnalyticsFilters)
   },
   getNextPageParam: (lastPage: { meta: { pagination: { nextCursor: string | null } } }) =>
     lastPage.meta.pagination.nextCursor ?? undefined,
+  staleTime: ANALYTICS_STALE_TIME,
+  gcTime: ANALYTICS_GC_TIME,
 });
 
 export const productsQuery = (networkId: string, filters: AnalyticsFilters) =>
@@ -94,6 +104,8 @@ export const productsQuery = (networkId: string, filters: AnalyticsFilters) =>
         schema: productsResponseSchema,
         signal,
       }),
+    staleTime: ANALYTICS_STALE_TIME,
+    gcTime: ANALYTICS_GC_TIME,
   });
 
 export const inventoryInfiniteQuery = (networkId: string, filters: InventoryFilters) => ({
@@ -112,6 +124,8 @@ export const inventoryInfiniteQuery = (networkId: string, filters: InventoryFilt
   },
   getNextPageParam: (lastPage: { meta: { pagination: { nextCursor: string | null } } }) =>
     lastPage.meta.pagination.nextCursor ?? undefined,
+  staleTime: ANALYTICS_STALE_TIME,
+  gcTime: ANALYTICS_GC_TIME,
 });
 
 export const updateProductPrice = (productId: string, request: PriceMutation) =>

@@ -206,7 +206,7 @@ function SettingsPage() {
                 aria-invalid={!normalizedGoal || undefined}
               />
             </label>
-            <p className="text-xs text-stone-500">{translate(locale, "settings.goalHint")}</p>
+            <p className="text-xs text-stone-600">{translate(locale, "settings.goalHint")}</p>
             {!normalizedGoal && (
               <p role="alert" className="text-sm text-red-800">
                 {translate(locale, "errors.validation")}
@@ -344,7 +344,7 @@ function SettingsCard({
 function ReadOnlyValue({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-stone-500">{label}</dt>
+      <dt className="text-stone-600">{label}</dt>
       <dd className="mt-1 font-medium text-stone-950">{value ?? "—"}</dd>
     </div>
   );

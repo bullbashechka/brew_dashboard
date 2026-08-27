@@ -124,7 +124,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
           }}
           aria-invalid={values.desiredFeatures.length < 1 || undefined}
         />
-        <span className="text-xs font-normal text-stone-500">
+        <span className="text-xs font-normal text-stone-600">
           {translate(locale, "feedback.requiredHint")}
         </span>
       </label>
@@ -142,7 +142,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
             setValues((current) => ({ ...current, comment: event.target.value }));
           }}
         />
-        <span className="text-xs font-normal text-stone-500">
+        <span className="text-xs font-normal text-stone-600">
           {translate(locale, "feedback.optionalHint")}
         </span>
       </label>

@@ -414,22 +414,22 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S12.1.** Свести unit suite: формулы, periods/timezones, matrix, stock/alerts, schemas, generator и event whitelist.
-- [ ] **S12.2.** Свести integration suite: admin creation, auth/session expiry, onboarding, mutations, feedback, reset, envelope и два tenants.
-- [ ] **S12.3.** Добавить safety guard runner: destructive test/cleanup немедленно прекращается, если account не `e2e`, и никогда не перечисляет demo accounts.
-- [ ] **S12.4.** Свести component suite: first run, filters, все dialogs/forms, loading/empty/error states, mobile navigation и accessible errors.
-- [ ] **S12.5.** Завершить восемь обязательных Playwright journeys из PRD на desktop и mobile viewport.
-- [ ] **S12.6.** Проверить keyboard navigation, labels/errors, focus, dialog focus trap, WCAG AA contrast основного текста/controls и reduced motion.
-- [ ] **S12.7.** Проверить responsive ranges 320–767, 768–1279 и 1280+ px; устранить page-level horizontal scroll и нечитаемые charts/tables.
-- [ ] **S12.8.** Измерить performance budgets: первый полезный экран до 3 секунд, filter reaction до 1 секунды после API response, mutation до 2 секунд без network failure.
-- [ ] **S12.9.** Проверить route code splitting, KPI-first loading, TanStack Query cache/invalidation и pagination recent orders.
-- [ ] **S12.10.** Добавить security headers: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy` и frame protection; проверить HTTPS и Origin enforcement.
-- [ ] **S12.11.** Провести security review tenant scope, body limits, generic auth errors, secret exposure и отсутствия credentials/feedback в логах.
-- [ ] **S12.12.** Настроить Cloudflare Workers Observability: structured JSON logs с requestId, route, method, status, durationMs и safe account identifiers.
-- [ ] **S12.13.** Добавить наблюдение за 5xx, login failures, onboarding/reset failures и API latency; stack оставлять только в server logs.
-- [ ] **S12.14.** Показывать пользователю localized safe error и request ID для обращения за помощью.
-- [ ] **S12.15.** Выполнить `bun audit`, разобрать findings и не ослаблять security controls ради прохождения тестов.
-- [ ] **S12.16.** Определить и реализовать retention/cleanup policy для `product_events` до production rollout; проверить storage budget и admin analytics history.
+- [x] **S12.1.** Свести unit suite: формулы, periods/timezones, matrix, stock/alerts, schemas, generator и event whitelist.
+- [x] **S12.2.** Свести integration suite: admin creation, auth/session expiry, onboarding, mutations, feedback, reset, envelope и два tenants.
+- [x] **S12.3.** Добавить safety guard runner: destructive test/cleanup немедленно прекращается, если account не `e2e`, и никогда не перечисляет demo accounts.
+- [x] **S12.4.** Свести component suite: first run, filters, все dialogs/forms, loading/empty/error states, mobile navigation и accessible errors.
+- [x] **S12.5.** Завершить восемь обязательных Playwright journeys из PRD на desktop и mobile viewport.
+- [x] **S12.6.** Проверить keyboard navigation, labels/errors, focus, dialog focus trap, WCAG AA contrast основного текста/controls и reduced motion.
+- [x] **S12.7.** Проверить responsive ranges 320–767, 768–1279 и 1280+ px; устранить page-level horizontal scroll и нечитаемые charts/tables.
+- [x] **S12.8.** Измерить performance budgets: первый полезный экран до 3 секунд, filter reaction до 1 секунды после API response, mutation до 2 секунд без network failure.
+- [x] **S12.9.** Проверить route code splitting, KPI-first loading, TanStack Query cache/invalidation и pagination recent orders.
+- [x] **S12.10.** Добавить security headers: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy` и frame protection; проверить HTTPS и Origin enforcement.
+- [x] **S12.11.** Провести security review tenant scope, body limits, generic auth errors, secret exposure и отсутствия credentials/feedback в логах.
+- [x] **S12.12.** Настроить Cloudflare Workers Observability: structured JSON logs с requestId, route, method, status, durationMs и safe account identifiers.
+- [x] **S12.13.** Добавить наблюдение за 5xx, login failures, onboarding/reset failures и API latency; stack оставлять только в server logs.
+- [x] **S12.14.** Показывать пользователю localized safe error и request ID для обращения за помощью.
+- [x] **S12.15.** Выполнить `bun audit`, разобрать findings и не ослаблять security controls ради прохождения тестов.
+- [x] **S12.16.** Определить и реализовать retention/cleanup policy для `product_events` до production rollout; проверить storage budget и admin analytics history.
 
 ### Критерии приёмки
 
@@ -438,6 +438,11 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [ ] Все восемь E2E journeys проходят на поддерживаемых desktop/mobile состояниях.
 - [ ] Performance budgets либо подтверждены измерениями, либо явно зафиксирован блокирующий gap до release.
 - [ ] В логах и telemetry нет secrets, tokens, cookies, feedback contents и произвольных form texts.
+
+> Статус локальной проверки 27.08.2026: unit/component, lint, typecheck, build, schema check и audit
+> проходят. Integration gate заблокирован отсутствующим Docker daemon, а Playwright journeys —
+> отсутствующим Chromium executable; после устранения этих условий нужно повторно выполнить
+> `bun run validate:stage12`, включая system-E2E Docker wrapper и полный Worker-artifact secret scan.
 
 ---
 

@@ -192,7 +192,7 @@ function InventoryPage() {
         </label>
       </section>
       {analytics.isFetching && (
-        <p className="text-sm text-stone-500" role="status">
+        <p className="text-sm text-stone-600" role="status">
           {translate(locale, "states.loading")}
         </p>
       )}
@@ -254,7 +254,7 @@ function InventoryFrame({
         </h1>
         <p className="text-stone-600">{translate(locale, "inventory.description")}</p>
         {updatedAt && (
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-stone-600">
             {translate(locale, "inventory.updatedAt", { value: formatDate(updatedAt, profile) })}
           </p>
         )}
@@ -315,7 +315,7 @@ function Balances({
               >
                 <td className="px-4 py-3 font-medium text-stone-950">
                   {balance.inventoryItemName}
-                  <span className="ml-2 text-stone-500">{balance.unit}</span>
+                  <span className="ml-2 text-stone-600">{balance.unit}</span>
                 </td>
                 <td className="px-4 py-3 text-stone-700">{balance.locationName}</td>
                 <td className="px-4 py-3 text-stone-700">

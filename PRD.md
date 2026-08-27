@@ -572,6 +572,17 @@ Browser-facing `POST /events` принимает только `section_viewed` �
 
 Все business tables используют UUID, `created_at`/`updated_at` по необходимости и обязательный `network_id`. Soft delete отсутствует.
 
+`product_events` хранятся 90 дней по `occurred_at`. До production rollout retention выполняется
+защищённой admin-командой пакетно, по умолчанию в dry-run режиме; каждая batch коммитится
+отдельной транзакцией, а один запуск удаляет не более 10 000 строк (по 500 строк в batch).
+Каждая batch также ограничена `lock_timeout = 5s` и `statement_timeout = 30s`, чтобы зависшая
+операция не удерживала транзакцию неограниченно.
+Удаление требует явного `--execute`, а для удалённой базы — `ALLOW_PRODUCTION_ADMIN=1` и
+`--confirm-production production`; при оставшихся кандидатах отчёт возвращает `hasMore=true` для
+повторного запуска. Отчёт содержит только cutoff, количества строк, `hasMore` и агрегированный
+physical relation size до запуска (`relationBytesBefore`), без event IDs, route или metadata.
+Фоновый Cron для этой политики не используется.
+
 ### 13.3. Ограничения
 
 - внешние ключи запрещают orphan records;
@@ -751,6 +762,10 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 
 - structured JSON logs;
 - `requestId`, route, method, status, durationMs и safe account identifiers;
+- matched route patterns only; unknown non-5xx paths use `unmatched` and 1% sampling, а 5xx и
+  matched signals сохраняются полностью;
+- Cloudflare invocation logs отключены, чтобы persisted telemetry состояла только из этих
+  application records;
 - stack доступен только в server logs;
 - отслеживаются 5xx, login failures, onboarding/reset failures и API latency;
 - пользовательская ошибка показывает безопасное сообщение и request ID;

@@ -53,7 +53,14 @@ import {
   errorResponse,
   unauthenticatedResponse,
 } from "./http/errors.ts";
-import { mutationSecurityMiddleware, requestIdMiddleware } from "./http/middleware.ts";
+import {
+  mutationSecurityMiddleware,
+  observabilityMiddleware,
+  requestIdMiddleware,
+  securityHeadersMiddleware,
+  signalsFor,
+  observableRoute,
+} from "./http/middleware.ts";
 import type { AppEnvironment } from "./http/types.ts";
 import { OperationConflictError } from "./domain/idempotency.ts";
 import { onboardingCompleteHandler, onboardingLanguageHandler } from "./onboarding/http.ts";
@@ -502,6 +509,8 @@ export const app = new OpenAPIHono<AppEnvironment>({ defaultHook: validationHook
 );
 
 app.use("*", requestIdMiddleware);
+app.use("*", securityHeadersMiddleware);
+app.use("*", observabilityMiddleware);
 app.use("*", mutationSecurityMiddleware);
 
 app.openapi(healthRoute, (context) =>
@@ -633,18 +642,25 @@ app.onError((error, context) => {
   }
 
   const requestId = ensureRequestId(context);
-  console.error(
-    JSON.stringify({
-      errorName: error instanceof Error ? error.name : "UnknownError",
-      message: "Unhandled request error",
-      method: context.req.method,
-      path: context.req.path,
-      requestId,
-      durationMs: context.get("requestStartedAt")
-        ? Date.now() - context.get("requestStartedAt")
-        : 0,
-    }),
-  );
+  const requestPath = context.req.path;
+  const route = observableRoute(context);
+  const account = context.get("safeAccount");
+  const signals = signalsFor(requestPath, 500);
+  context.set("requestErrorLogged", true);
+  console.error({
+    event: "http_request_failed.v1",
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    message: "Unhandled request error",
+    method: context.req.method,
+    route,
+    status: 500,
+    requestId,
+    signal: signals[0],
+    signals,
+    ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+    durationMs: context.get("requestStartedAt") ? Date.now() - context.get("requestStartedAt") : 0,
+    ...(account ? { userId: account.userId, networkId: account.networkId } : {}),
+  });
   return errorResponse(context, "INTERNAL_ERROR", 500, "Internal server error");
 });
 

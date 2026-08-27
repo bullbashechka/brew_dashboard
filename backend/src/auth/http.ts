@@ -316,6 +316,10 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
     return unauthenticatedResponse(context);
   }
 
+  context.set("safeAccount", {
+    userId: result.profile.userId,
+    networkId: result.profile.networkId,
+  });
   appendSetCookies(context, result.response.headers);
   return context.json({
     data: { authenticated: true as const, profile: result.profile },
@@ -369,6 +373,10 @@ export const requireAuthentication = async (
         networkId: profile.networkId,
         profile: profile.profile,
         sessionId: payload.session.id,
+      });
+      context.set("safeAccount", {
+        userId: profile.profile.userId,
+        networkId: profile.networkId,
       });
       appendSetCookies(context, response.headers);
       await next();

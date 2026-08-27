@@ -5,6 +5,7 @@ import {
   parseExpiry,
   requireExactConfirmation,
 } from "../../scripts/admin-common.ts";
+import { assertE2eAccountKind } from "../../scripts/test-safety.ts";
 import { generatePassword } from "../../src/admin/accounts.ts";
 import { __test as authHttpTest } from "../../src/auth/http.ts";
 import { isSupportedLogin, normalizeLogin, parsePassword } from "../../src/auth/login.ts";
@@ -27,6 +28,9 @@ describe("Stage 3 login and admin boundaries", () => {
     expect(() => parseAccountKind("production")).toThrow();
     expect(parseExpiry("2030-01-01T00:00:00Z")).toBeInstanceOf(Date);
     expect(() => parseExpiry("2030-01-01T00:00:00")).toThrow();
+    expect(() => assertE2eAccountKind("demo")).toThrow();
+    expect(() => assertE2eAccountKind(undefined)).toThrow();
+    expect(() => assertE2eAccountKind("e2e")).not.toThrow();
   });
 
   it("generates a password within the shared credential bounds", () => {
@@ -113,6 +117,85 @@ describe("Stage 3 login and admin boundaries", () => {
     const outsideBody = (await outsideApi.json()) as { requestId: string };
     expect(outsideApi.status).toBe(404);
     expect(outsideApi.headers.get("x-request-id")).toBe(outsideBody.requestId);
+  });
+
+  it("applies the required security headers to every API response", async () => {
+    const response = await app.request("http://localhost/api/v1/health");
+    for (const [name, value] of Object.entries(middlewareTest.SECURITY_HEADERS)) {
+      expect(response.headers.get(name)).toBe(value);
+    }
+    expect(middlewareTest.signalFor("/api/v1/auth/login", 401)).toBe("login_failure");
+    expect(middlewareTest.signalFor("/api/v1/onboarding/complete", 409)).toBe("onboarding_failure");
+    expect(middlewareTest.signalFor("/api/v1/demo/reset", 500)).toBe("server_error");
+    expect(middlewareTest.signalsFor("/api/v1/demo/reset", 500)).toEqual([
+      "server_error",
+      "reset_failure",
+    ]);
+    expect(middlewareTest.signalsFor("/api/v1/auth/login", 500)).toEqual([
+      "server_error",
+      "login_failure",
+    ]);
+    expect(middlewareTest.normalizeRoutePattern("/api/v1/products/:productId/price")).toBe(
+      "/api/v1/products/:productId/price",
+    );
+    expect(middlewareTest.normalizeRoutePattern("/api/v1/*")).toBe("unmatched");
+    expect(
+      middlewareTest.shouldLogRequest("unmatched", 404, "00000000-0000-0000-0000-000000000000"),
+    ).toBe(true);
+    expect(
+      middlewareTest.shouldLogRequest("unmatched", 404, "ffffffff-ffff-ffff-ffff-ffffffffffff"),
+    ).toBe(false);
+    expect(
+      middlewareTest.shouldLogRequest("unmatched", 500, "ffffffff-ffff-ffff-ffff-ffffffffffff"),
+    ).toBe(true);
+  });
+
+  it("emits structured telemetry without request contents or secrets", async () => {
+    const records: unknown[] = [];
+    const originalLog = console.log;
+    console.log = ((record: unknown) => records.push(record)) as typeof console.log;
+    try {
+      await app.request("http://localhost/api/v1/health");
+    } finally {
+      console.log = originalLog;
+    }
+    const record = records.find((value): value is Record<string, unknown> =>
+      Boolean(value && typeof value === "object" && "event" in value),
+    );
+    expect(record).toMatchObject({
+      event: "http_request_completed.v1",
+      route: "/api/v1/health",
+      method: "GET",
+      status: 200,
+      signal: "request",
+    });
+    expect(record).not.toHaveProperty("body");
+    expect(JSON.stringify(record)).not.toContain("password");
+    expect(JSON.stringify(record)).not.toContain("feedback");
+  });
+
+  it("normalizes handled 5xx routes and emits one failure record", async () => {
+    const records: unknown[] = [];
+    const originalError = console.error;
+    console.error = ((record: unknown) => records.push(record)) as typeof console.error;
+    try {
+      const response = await app.request("http://localhost/api/v1/products/customer-secret/price");
+      expect(response.status).toBe(500);
+    } finally {
+      console.error = originalError;
+    }
+
+    const failureRecords = records.filter((value): value is Record<string, unknown> =>
+      Boolean(value && typeof value === "object" && "event" in value),
+    );
+    expect(failureRecords).toHaveLength(1);
+    expect(failureRecords[0]).toMatchObject({
+      event: "http_request_failed.v1",
+      route: "/api/v1/products/:productId/price",
+      status: 500,
+      signal: "server_error",
+    });
+    expect(JSON.stringify(failureRecords[0])).not.toContain("customer-secret");
   });
 });
 

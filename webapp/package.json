@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && XDG_CONFIG_HOME=../.scratch/wrangler-config WRANGLER_WRITE_LOGS=false vite build",
+    "build": "tsc --noEmit && XDG_CONFIG_HOME=../.scratch/wrangler-config WRANGLER_WRITE_LOGS=false vite build && node ../scripts/build-artifact-security.mjs sanitize",
     "dev": "XDG_CONFIG_HOME=../.scratch/wrangler-config WRANGLER_WRITE_LOGS=false vite",
     "lint": "eslint .",
     "test": "bun test --preload ./tests/setup.ts tests/unit",
@@ -29,6 +29,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@cloudflare/vite-plugin": "^1.0.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.0.0",

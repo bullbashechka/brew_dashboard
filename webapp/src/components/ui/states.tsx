@@ -68,16 +68,19 @@ export function FormError({ locale, error }: { locale: AppLocale; error?: unknow
   if (!error) return null;
   const apiError = error instanceof ApiClientError ? error : undefined;
   return (
-    <p role="alert" className="text-sm text-red-800">
-      {translate(locale, errorTranslationKey(apiError?.code))}
-    </p>
+    <div role="alert" className="space-y-1 text-sm text-red-800">
+      <p>{translate(locale, errorTranslationKey(apiError?.code))}</p>
+      {apiError?.requestId && (
+        <p>{translate(locale, "errors.requestId", { requestId: apiError.requestId })}</p>
+      )}
+    </div>
   );
 }
 
 export function EmptyState({ locale, children }: { locale: AppLocale; children?: ReactNode }) {
   return (
     <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center text-stone-700">
-      <Inbox className="mx-auto mb-3 size-6 text-stone-500" aria-hidden="true" />
+      <Inbox className="mx-auto mb-3 size-6 text-stone-600" aria-hidden="true" />
       <p>{children ?? translate(locale, "states.empty")}</p>
     </div>
   );

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import type { Profile } from "@brew-dashboard/contracts";
 
+import {
+  ANALYTICS_GC_TIME,
+  ANALYTICS_STALE_TIME,
+  inventoryInfiniteQuery,
+  salesInfiniteQuery,
+} from "../../src/api/analytics";
 import { formatCurrency, formatPercent } from "../../src/lib/i18n";
 
 const profile: Profile = {
@@ -34,5 +40,17 @@ describe("analytics formatting", () => {
     expect(formatPercent(null, { ...profile, language: "ru", effectiveLanguage: "ru" })).toBe(
       "Н/Д",
     );
+  });
+
+  it("keeps analytics reads cacheable and paginates recent orders", () => {
+    const sales = salesInfiniteQuery("network", { period: "7d" });
+    const inventory = inventoryInfiniteQuery("network", { period: "today" });
+    expect(sales.staleTime).toBe(ANALYTICS_STALE_TIME);
+    expect(sales.gcTime).toBe(ANALYTICS_GC_TIME);
+    expect(sales.initialPageParam).toBeUndefined();
+    expect(inventory.staleTime).toBe(ANALYTICS_STALE_TIME);
+    expect(inventory.gcTime).toBe(ANALYTICS_GC_TIME);
+    expect(sales.getNextPageParam({ meta: { pagination: { nextCursor: "next" } } })).toBe("next");
+    expect(sales.getNextPageParam({ meta: { pagination: { nextCursor: null } } })).toBeUndefined();
   });
 });

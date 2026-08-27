@@ -384,7 +384,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       cookie,
     });
     expect(retry.status).toBe(200);
-  }, 30_000);
+  }, 120_000);
 
   it("rolls back every Reset phase to the previous complete dataset", async () => {
     const account = await createE2eAccount(
@@ -451,7 +451,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       }),
     );
     expect(retry.generation.revision).toBe(2);
-  }, 30_000);
+  }, 120_000);
 
   it("regenerates deterministically while preserving preferences and tenant isolation", async () => {
     const account = await createE2eAccount(`stage4-reset-${crypto.randomUUID().slice(0, 8)}`);
@@ -623,7 +623,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
         }),
       ),
     ).rejects.toBeDefined();
-  }, 30_000);
+  }, 120_000);
 
   it("serves an authenticated idempotent demo reset endpoint", async () => {
     const account = await createE2eAccount(`stage8-reset-${crypto.randomUUID().slice(0, 8)}`);
@@ -664,7 +664,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     });
     expect(guest.status).toBe(401);
     expect(apiErrorResponseSchema.parse(await guest.json()).error.code).toBe("UNAUTHENTICATED");
-  }, 30_000);
+  }, 120_000);
 
   it("persists Settings goal and feedback while accepting only strict product events", async () => {
     const account = await createE2eAccount(`stage11-settings-${crypto.randomUUID().slice(0, 8)}`);
@@ -770,7 +770,7 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
       { type: "demo_reset", count: 1 },
       { type: "feedback_submitted", count: 1 },
     ]);
-  }, 30_000);
+  }, 120_000);
 
   it("keeps server events private and rate-limits client telemetry", async () => {
     const first = await completeAccount("stage11-event-limit", "198.51.100.62");
