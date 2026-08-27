@@ -213,6 +213,8 @@ bun run --cwd backend db:provision-runtime
 The password is used only by this server-side command and must not be placed in `.dev.vars`, the
 Worker bundle, source control, shell history, process arguments, or logs. The cache-disabled
 Hyperdrive configuration must use a connection string for `brew_runtime`, not the migration owner.
+`brew_runtime` is default-deny: each table receives only the privileges required by the Worker, and
+future tables receive no runtime privileges until a migration grants them explicitly.
 After Cloudflare authentication, inspect the existing configuration with
 `bun run --cwd webapp wrangler hyperdrive list` and `bun run --cwd webapp wrangler hyperdrive get <id>`;
 create it through the authenticated Cloudflare dashboard or a short-lived local session that does

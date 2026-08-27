@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import type { LocationsData, Profile } from "@brew-dashboard/contracts";
-import { ArrowDown, ArrowUp, Award, Circle, Minus, Trophy } from "lucide-react";
+import { Award, Circle, Trophy } from "lucide-react";
 
 import { type AnalyticsFilters, type LocationSorting, locationsQuery } from "@/api/analytics";
+import { MetricComparison } from "@/components/metric-comparison";
 import { sessionQueryOptions } from "@/api/session";
-import { ErrorState, Skeleton } from "@/components/ui/states";
+import { CachedSnapshotWarning, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
+  formatDate,
   formatNumber,
   formatPercent,
   localeFromProfile,
@@ -49,8 +51,8 @@ export function LocationsPage({
     enabled: Boolean(profile),
   });
 
-  if (!profile || analytics.isPending) return <LocationsSkeleton />;
-  if (analytics.isError)
+  if (!profile || analytics.isPending) return <LocationsSkeleton locale={locale} />;
+  if (analytics.isLoadingError || !analytics.data)
     return (
       <section className="space-y-6" aria-labelledby="locations-title" data-testid="page-locations">
         <div className="space-y-2">
@@ -75,7 +77,17 @@ export function LocationsPage({
           {translate(locale, "locations.title")}
         </h1>
         <p className="text-stone-600">{translate(locale, "locations.description")}</p>
+        <p className="text-sm text-stone-600">{formatDate(analytics.data.meta.asOf, profile)}</p>
       </div>
+
+      {analytics.isRefetchError && (
+        <CachedSnapshotWarning
+          profile={profile}
+          error={analytics.error}
+          asOf={analytics.data.meta.asOf}
+          onRetry={() => void analytics.refetch()}
+        />
+      )}
 
       <section
         className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-end"
@@ -268,29 +280,25 @@ function MetricValue({
           ? translate(locale, "comparison.notAvailable")
           : formatCurrency(metricValue, profile);
   if (name === "activeAlerts") return <span className="font-semibold text-stone-950">{value}</span>;
-  const change = metric.changePercent as string | number | null;
-  const numericChange = change === null ? null : Number(change);
-  const state =
-    numericChange === null ? "na" : numericChange > 0 ? "up" : numericChange < 0 ? "down" : "flat";
-  const Icon = state === "up" ? ArrowUp : state === "down" ? ArrowDown : Minus;
-  const color =
-    state === "up" ? "text-emerald-700" : state === "down" ? "text-red-700" : "text-stone-600";
   return (
     <span>
       <span className="block font-semibold text-stone-950">{value}</span>
-      <span className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
-        <Icon className="size-3.5" aria-hidden="true" />
-        {numericChange === null
-          ? translate(locale, "comparison.notAvailable")
-          : formatPercent(Math.abs(numericChange), profile)}
-      </span>
+      <MetricComparison
+        change={metric.changePercent as string | number | null}
+        profile={profile}
+        variant="compact"
+      />
     </span>
   );
 }
 
-function LocationsSkeleton() {
+function LocationsSkeleton({ locale }: { locale: ReturnType<typeof localeFromProfile> }) {
   return (
-    <section className="space-y-6" aria-busy="true" aria-label="Loading locations">
+    <section
+      className="space-y-6"
+      aria-busy="true"
+      aria-label={`${translate(locale, "states.loading")} ${translate(locale, "navigation.locations")}`}
+    >
       <div className="space-y-3">
         <Skeleton variant="pageTitle" />
         <Skeleton variant="pageDescription" />

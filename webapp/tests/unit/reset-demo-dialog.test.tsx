@@ -48,4 +48,24 @@ describe("reset demo dialog", () => {
       true,
     );
   });
+
+  it("keeps cancellation available while a stale snapshot blocks confirmation", () => {
+    render(
+      <ResetDemoDialog
+        open
+        onOpenChange={() => undefined}
+        locale="en"
+        pending={false}
+        disabled
+        error={null}
+        onConfirm={() => undefined}
+      />,
+    );
+    expect(
+      (screen.getByRole("button", { name: "Reset demo data" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
 });

@@ -20,7 +20,7 @@ import { sessionQueryOptions } from "@/api/session";
 import { PriceDialog } from "@/components/product-price-dialog";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
+import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
   formatDate,
@@ -79,7 +79,7 @@ export function ProductsPage({ filters }: { filters: AnalyticsFilters }) {
   };
 
   if (!profile || analytics.isPending) return <ProductsSkeleton />;
-  if (analytics.isError)
+  if (analytics.isLoadingError || !analytics.data)
     return (
       <ProductsFrame profile={profile}>
         <ErrorState
@@ -91,8 +91,17 @@ export function ProductsPage({ filters }: { filters: AnalyticsFilters }) {
     );
   const editingProduct =
     analytics.data.data.products.find((product) => product.productId === editingProductId) ?? null;
+  const mutationDisabled = analytics.isRefetchError;
   return (
     <ProductsFrame profile={profile} updatedAt={analytics.data.meta.asOf}>
+      {analytics.isRefetchError && (
+        <CachedSnapshotWarning
+          profile={profile}
+          error={analytics.error}
+          asOf={analytics.data.meta.asOf}
+          onRetry={() => void analytics.refetch()}
+        />
+      )}
       {!analytics.data.data.products.length ? (
         <EmptyState locale={locale} />
       ) : (
@@ -107,6 +116,7 @@ export function ProductsPage({ filters }: { filters: AnalyticsFilters }) {
             data={analytics.data.data}
             profile={profile}
             onEdit={openProductEditor}
+            disabled={mutationDisabled}
           />
         </>
       )}
@@ -117,6 +127,7 @@ export function ProductsPage({ filters }: { filters: AnalyticsFilters }) {
         demoDataRevision={analytics.data.meta.demoDataRevision}
         open={editingProductId !== null}
         pending={edit.isPending}
+        disabled={mutationDisabled}
         error={edit.error}
         onOpenChange={(open) => {
           if (!open) closeProductEditor();
@@ -302,10 +313,12 @@ function ProductCategories({
   data,
   profile,
   onEdit,
+  disabled,
 }: {
   data: ProductsData;
   profile: Profile;
   onEdit: (id: string) => void;
+  disabled: boolean;
 }) {
   const locale = localeFromProfile(profile);
   return (
@@ -328,6 +341,7 @@ function ProductCategories({
                   product={product}
                   profile={profile}
                   onEdit={onEdit}
+                  disabled={disabled}
                 />
               ))}
             </div>
@@ -370,7 +384,12 @@ function ProductCategories({
                         <Balances product={product} profile={profile} />
                       </td>
                       <td className="py-4 text-right">
-                        <EditButton product={product} profile={profile} onEdit={onEdit} />
+                        <EditButton
+                          product={product}
+                          profile={profile}
+                          onEdit={onEdit}
+                          disabled={disabled}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -388,16 +407,18 @@ function ProductCard({
   product,
   profile,
   onEdit,
+  disabled,
 }: {
   product: ProductAnalytics;
   profile: Profile;
   onEdit: (id: string) => void;
+  disabled: boolean;
 }) {
   return (
     <article className="rounded-lg border border-stone-200 p-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-stone-950">{product.name}</h3>
-        <EditButton product={product} profile={profile} onEdit={onEdit} />
+        <EditButton product={product} profile={profile} onEdit={onEdit} disabled={disabled} />
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <PriceDetails product={product} profile={profile} />
@@ -464,10 +485,12 @@ function EditButton({
   product,
   profile,
   onEdit,
+  disabled,
 }: {
   product: ProductAnalytics;
   profile: Profile;
   onEdit: (id: string) => void;
+  disabled: boolean;
 }) {
   const locale = localeFromProfile(profile);
   return (
@@ -476,6 +499,7 @@ function EditButton({
       variant="outline"
       size="sm"
       icon={Pencil}
+      disabled={disabled}
       onClick={() => onEdit(product.productId)}
     >
       {translate(locale, "actions.editPrice")}

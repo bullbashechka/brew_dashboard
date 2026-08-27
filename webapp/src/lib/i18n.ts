@@ -302,6 +302,8 @@ const en = {
   states: {
     loading: "Loading…",
     unavailable: "This section is temporarily unavailable.",
+    cachedSnapshot: "Refresh failed. Showing data from {value}.",
+    paginationUnavailable: "Could not load more results. Your current results are still available.",
     empty: "Nothing to show yet.",
     foundation: "This workspace is ready for its product screen.",
     feedbackLater: "Feedback collection will be available here soon.",
@@ -628,6 +630,8 @@ const ru: typeof en = {
   states: {
     loading: "Загрузка…",
     unavailable: "Этот раздел временно недоступен.",
+    cachedSnapshot: "Не удалось обновить данные. Показаны данные на {value}.",
+    paginationUnavailable: "Не удалось загрузить больше результатов. Текущие результаты сохранены.",
     empty: "Пока нечего показать.",
     foundation: "Основа экрана готова для продуктового раздела.",
     feedbackLater: "Сбор обратной связи появится здесь позже.",

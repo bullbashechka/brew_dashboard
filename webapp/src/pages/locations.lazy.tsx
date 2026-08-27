@@ -4,8 +4,6 @@ import { createLazyRoute, useNavigate } from "@tanstack/react-router";
 import type { AnalyticsFilters, LocationSorting } from "@/api/analytics";
 import { LocationsPage } from "@/components/locations-page";
 
-export { LocationsPerformanceBadge } from "@/components/locations-page";
-
 export const Route = createLazyRoute("/app/locations")({
   component: LocationsRoute,
 });

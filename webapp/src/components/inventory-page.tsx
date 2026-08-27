@@ -15,7 +15,7 @@ import { sessionQueryOptions } from "@/api/session";
 import { InventoryMovementDialog } from "@/components/inventory-movement-dialog";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
+import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatDate,
   formatNumber,
@@ -116,8 +116,8 @@ export function InventoryPage({
       }
     },
   });
-  if (!profile || analytics.isPending) return <InventorySkeleton />;
-  if (analytics.isError || !analytics.data)
+  if (!profile || analytics.isPending) return <InventorySkeleton locale={locale} />;
+  if (analytics.isLoadingError || !analytics.data)
     return (
       <InventoryFrame profile={profile}>
         <ErrorState
@@ -137,7 +137,9 @@ export function InventoryPage({
     );
   const balances = first.data.balances;
   const movements = analytics.data.pages.flatMap((page) => page.data.movements);
+  const mutationDisabled = analytics.isRefetchError;
   const openMovement = (balance: Balance, type: MovementTarget["type"]) =>
+    !mutationDisabled &&
     setTarget({
       balance,
       type,
@@ -173,6 +175,14 @@ export function InventoryPage({
           </select>
         </label>
       </section>
+      {analytics.isRefetchError && (
+        <CachedSnapshotWarning
+          profile={profile}
+          error={analytics.error}
+          asOf={first.meta.asOf}
+          onRetry={() => void analytics.refetch()}
+        />
+      )}
       {analytics.isFetching && (
         <p className="text-sm text-stone-600" role="status">
           {translate(locale, "states.loading")}
@@ -181,13 +191,19 @@ export function InventoryPage({
       {!balances.length ? (
         <EmptyState locale={locale}>{translate(locale, "inventory.noBalances")}</EmptyState>
       ) : (
-        <Balances balances={balances} profile={profile} onOpen={openMovement} />
+        <Balances
+          balances={balances}
+          profile={profile}
+          onOpen={openMovement}
+          disabled={mutationDisabled}
+        />
       )}
       <RecentMovements
         movements={movements}
         profile={profile}
         hasNext={analytics.hasNextPage}
         pending={analytics.isFetchingNextPage}
+        error={analytics.isFetchNextPageError ? analytics.error : null}
         onLoadMore={() => void analytics.fetchNextPage()}
       />
       <InventoryMovementDialog
@@ -202,6 +218,7 @@ export function InventoryPage({
         demoDataRevision={target?.demoDataRevision ?? first.meta.demoDataRevision}
         open={target !== null}
         pending={movement.isPending}
+        disabled={mutationDisabled}
         error={movement.error}
         conflictState={target?.conflictState}
         onOpenChange={(open) => {
@@ -212,7 +229,7 @@ export function InventoryPage({
         }}
         onSave={(request) => movement.mutate(request)}
         onClearError={() => movement.reset()}
-        onRefreshConflict={() => void refreshConflictTarget()}
+        onRefreshConflict={() => !mutationDisabled && void refreshConflictTarget()}
       />
     </InventoryFrame>
   );
@@ -250,10 +267,12 @@ function Balances({
   balances,
   profile,
   onOpen,
+  disabled,
 }: {
   balances: Balance[];
   profile: Profile;
   onOpen: (balance: Balance, type: MovementTarget["type"]) => void;
+  disabled: boolean;
 }) {
   const locale = localeFromProfile(profile);
   return (
@@ -268,6 +287,7 @@ function Balances({
             balance={balance}
             profile={profile}
             onOpen={onOpen}
+            disabled={disabled}
           />
         ))}
       </div>
@@ -310,7 +330,12 @@ function Balances({
                   <StatusBadge status={balance.status} profile={profile} />
                 </td>
                 <td className="px-4 py-3">
-                  <BalanceActions balance={balance} profile={profile} onOpen={onOpen} />
+                  <BalanceActions
+                    balance={balance}
+                    profile={profile}
+                    onOpen={onOpen}
+                    disabled={disabled}
+                  />
                 </td>
               </tr>
             ))}
@@ -325,10 +350,12 @@ function BalanceCard({
   balance,
   profile,
   onOpen,
+  disabled,
 }: {
   balance: Balance;
   profile: Profile;
   onOpen: (balance: Balance, type: MovementTarget["type"]) => void;
+  disabled: boolean;
 }) {
   const locale = localeFromProfile(profile);
   return (
@@ -357,7 +384,7 @@ function BalanceCard({
         </div>
       </dl>
       <div className="mt-5">
-        <BalanceActions balance={balance} profile={profile} onOpen={onOpen} />
+        <BalanceActions balance={balance} profile={profile} onOpen={onOpen} disabled={disabled} />
       </div>
     </article>
   );
@@ -367,10 +394,12 @@ function BalanceActions({
   balance,
   profile,
   onOpen,
+  disabled,
 }: {
   balance: Balance;
   profile: Profile;
   onOpen: (balance: Balance, type: MovementTarget["type"]) => void;
+  disabled: boolean;
 }) {
   const locale = localeFromProfile(profile);
   const open = (type: MovementTarget["type"]) => onOpen(balance, type);
@@ -381,6 +410,7 @@ function BalanceActions({
         size="sm"
         variant="outline"
         icon={ArrowUp}
+        disabled={disabled}
         onClick={() => open("receipt")}
       >
         {translate(locale, "inventory.receipt")}
@@ -389,7 +419,7 @@ function BalanceActions({
         type="button"
         size="sm"
         icon={ArrowDown}
-        disabled={balance.status === "out_of_stock"}
+        disabled={disabled || balance.status === "out_of_stock"}
         onClick={() => open("writeoff")}
       >
         {translate(locale, "inventory.writeoff")}
@@ -403,12 +433,14 @@ function RecentMovements({
   profile,
   hasNext,
   pending,
+  error,
   onLoadMore,
 }: {
   movements: InventoryData["movements"];
   profile: Profile;
   hasNext: boolean;
   pending: boolean;
+  error: unknown;
   onLoadMore: () => void;
 }) {
   const locale = localeFromProfile(profile);
@@ -457,6 +489,11 @@ function RecentMovements({
                   ? translate(locale, "states.loading")
                   : translate(locale, "actions.loadMore")}
               </Button>
+              {Boolean(error) && (
+                <div className="mt-3">
+                  <ErrorState locale={locale} error={error} onRetry={onLoadMore} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -484,9 +521,12 @@ function StatusBadge({ status, profile }: { status: Balance["status"]; profile: 
 const statusKey = (status: Balance["status"]): TranslationKey =>
   `inventory.${status === "in_stock" ? "inStock" : status === "low_stock" ? "lowStock" : "outOfStock"}`;
 
-function InventorySkeleton() {
+function InventorySkeleton({ locale }: { locale: ReturnType<typeof localeFromProfile> }) {
   return (
-    <section className="space-y-6" aria-label="Inventory loading">
+    <section
+      className="space-y-6"
+      aria-label={`${translate(locale, "states.loading")} ${translate(locale, "navigation.inventory")}`}
+    >
       <div className="space-y-3">
         <Skeleton variant="pageTitleCompact" />
         <Skeleton variant="pageDescription" />

@@ -180,4 +180,31 @@ describe("price dialog", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(cleared).toBe(1);
   });
+
+  it("preserves the draft but blocks saving during an analytics outage", async () => {
+    const user = userEvent.setup();
+    const saves: unknown[] = [];
+    render(
+      <PriceDialog
+        product={product}
+        profile={profile}
+        demoDataRevision={1}
+        open
+        pending={false}
+        disabled
+        error={null}
+        onOpenChange={() => undefined}
+        onSave={(_, request) => saves.push(request)}
+        onClearError={() => undefined}
+      />,
+    );
+    const input = screen.getByLabelText("Selling price") as HTMLInputElement;
+    expect(input.value).toBe("6.50");
+    expect((screen.getByRole("button", { name: "Save price" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    await user.click(screen.getByRole("button", { name: "Save price" }));
+    expect(saves).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+  });
 });

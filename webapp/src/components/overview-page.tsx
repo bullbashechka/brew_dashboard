@@ -2,10 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { OverviewData, Profile } from "@brew-dashboard/contracts";
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   CircleAlert,
-  Minus,
   PackageCheck,
   PackageX,
   RefreshCw,
@@ -16,9 +13,10 @@ import {
 import { lazy, Suspense, useState } from "react";
 
 import { type AnalyticsFilters, overviewQuery } from "@/api/analytics";
+import { MetricComparison } from "@/components/metric-comparison";
 import { sessionQueryOptions } from "@/api/session";
 import { Button } from "@/components/ui/button";
-import { ErrorState, Skeleton } from "@/components/ui/states";
+import { CachedSnapshotWarning, ErrorState, Skeleton } from "@/components/ui/states";
 import { ResetDemoDialog } from "@/components/reset-demo-dialog";
 import {
   formatCurrency,
@@ -58,8 +56,8 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
   const [resetOpen, setResetOpen] = useState(false);
   const reset = useResetDemoData(locale, () => setResetOpen(false));
 
-  if (!profile || analytics.isPending) return <OverviewSkeleton />;
-  if (analytics.isError)
+  if (!profile || analytics.isPending) return <OverviewSkeleton locale={locale} />;
+  if (analytics.isLoadingError || !analytics.data)
     return (
       <OverviewError
         locale={locale}
@@ -98,10 +96,23 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
               </p>
             </div>
           </div>
-          <Button type="button" onClick={() => setResetOpen(true)}>
+          <Button
+            type="button"
+            disabled={analytics.isRefetchError}
+            onClick={() => setResetOpen(true)}
+          >
             {translate(locale, "reset.open")}
           </Button>
         </section>
+      )}
+
+      {analytics.isRefetchError && (
+        <CachedSnapshotWarning
+          profile={profile}
+          error={analytics.error}
+          asOf={analytics.data.meta.asOf}
+          onRetry={() => void analytics.refetch()}
+        />
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -146,6 +157,7 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
         locale={locale}
         pending={reset.isPending}
         error={reset.error}
+        disabled={analytics.isRefetchError}
         onConfirm={() => reset.mutate()}
       />
     </section>
@@ -178,35 +190,12 @@ export function OverviewMetricCard({
       </p>
       <p className="mt-2 text-2xl font-semibold tracking-tight text-stone-950">{value}</p>
       {name !== "activeAlerts" && (
-        <Comparison change={metric.changePercent as string | number | null} profile={profile} />
+        <MetricComparison
+          change={metric.changePercent as string | number | null}
+          profile={profile}
+        />
       )}
     </article>
-  );
-}
-
-function Comparison({ change, profile }: { change: string | number | null; profile: Profile }) {
-  const locale = localeFromProfile(profile);
-  const numericChange = change === null ? null : Number(change);
-  const magnitude = numericChange === null ? null : formatPercent(Math.abs(numericChange), profile);
-  const state =
-    numericChange === null ? "na" : numericChange > 0 ? "up" : numericChange < 0 ? "down" : "flat";
-  const Icon = state === "up" ? ArrowUp : state === "down" ? ArrowDown : Minus;
-  const label =
-    state === "na"
-      ? translate(locale, "comparison.notAvailable")
-      : state === "up"
-        ? translate(locale, "comparison.increase", { value: magnitude! })
-        : state === "down"
-          ? translate(locale, "comparison.decrease", { value: magnitude! })
-          : translate(locale, "comparison.unchanged");
-  const color =
-    state === "up" ? "text-emerald-700" : state === "down" ? "text-red-700" : "text-stone-600";
-  return (
-    <p className={`mt-3 flex items-center gap-1.5 text-sm ${color}`} aria-label={label}>
-      <Icon className="size-4" aria-hidden="true" />
-      <span>{state === "na" ? label : magnitude}</span>
-      <span className="text-stone-600">{translate(locale, "comparison.versusPrevious")}</span>
-    </p>
   );
 }
 
@@ -425,9 +414,13 @@ function AlertsList({ data, profile }: { data: OverviewData; profile: Profile })
   );
 }
 
-function OverviewSkeleton() {
+function OverviewSkeleton({ locale }: { locale: ReturnType<typeof localeFromProfile> }) {
   return (
-    <section className="space-y-6" aria-busy="true" aria-label="Loading overview">
+    <section
+      className="space-y-6"
+      aria-busy="true"
+      aria-label={`${translate(locale, "states.loading")} ${translate(locale, "navigation.overview")}`}
+    >
       <div className="space-y-3">
         <Skeleton variant="pageTitle" />
         <Skeleton variant="pageDescription" />

@@ -39,10 +39,6 @@ export const signalsFor = (path: string, status: number): RequestSignal[] => {
   return signals.length ? signals : ["request"];
 };
 
-export const signalFor = (path: string, status: number): RequestSignal => {
-  return signalsFor(path, status)[0]!;
-};
-
 export const normalizeRoutePattern = (matchedRoute: string | undefined): string => {
   if (!matchedRoute || matchedRoute.endsWith("*")) return UNMATCHED_ROUTE;
   return matchedRoute;
@@ -65,11 +61,8 @@ const isJsonContentType = (value: string | undefined) => {
 const expectedOrigin = (context: Context<AppEnvironment>) => {
   const configured = context.env?.BETTER_AUTH_URL;
   if (configured) {
-    try {
-      return new URL(configured).origin;
-    } catch {
-      return null;
-    }
+    if (!URL.canParse(configured)) throw new Error("Configured authentication URL is invalid");
+    return new URL(configured).origin;
   }
   return new URL(context.req.url).origin;
 };
@@ -153,7 +146,6 @@ export const __test = {
   expectedOrigin,
   SECURITY_HEADERS,
   signalsFor,
-  signalFor,
   UNMATCHED_ROUTE,
   UNMATCHED_ROUTE_SAMPLE_RATE,
   normalizeRoutePattern,

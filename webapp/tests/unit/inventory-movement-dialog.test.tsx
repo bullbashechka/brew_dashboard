@@ -144,4 +144,32 @@ describe("inventory movement dialog", () => {
     expect(saves[1]).toMatchObject({ quantity: "1.500", expectedDemoDataRevision: 2 });
     expect(saves[1]?.idempotencyKey).not.toBe(saves[0]?.idempotencyKey);
   });
+
+  it("blocks an outage-time movement while retaining the entered quantity", async () => {
+    const user = userEvent.setup();
+    const saves: unknown[] = [];
+    render(
+      <InventoryMovementDialog
+        balance={balance}
+        type="receipt"
+        profile={profile}
+        demoDataRevision={1}
+        open
+        pending={false}
+        disabled
+        error={null}
+        onOpenChange={() => undefined}
+        onSave={(request) => saves.push(request)}
+        onClearError={() => undefined}
+      />,
+    );
+    const input = screen.getByLabelText("Quantity") as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Record receipt" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Record receipt" }));
+    expect(saves).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+  });
 });

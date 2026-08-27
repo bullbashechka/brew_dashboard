@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
+import type { Profile } from "@brew-dashboard/contracts";
 import { AlertCircle, Inbox, LoaderCircle } from "lucide-react";
 import { Button, type ButtonProps } from "./button";
-import { errorTranslationKey, translate, type AppLocale } from "@/lib/i18n";
+import {
+  errorTranslationKey,
+  formatDate,
+  localeFromProfile,
+  translate,
+  type AppLocale,
+} from "@/lib/i18n";
 import { ApiClientError } from "@/api/client";
 
 export function LoadingState({ locale }: { locale: AppLocale }) {
@@ -128,6 +135,42 @@ export function ErrorState({
               {translate(locale, "actions.retry")}
             </Button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CachedSnapshotWarning({
+  profile,
+  error,
+  asOf,
+  onRetry,
+}: {
+  profile: Profile;
+  error: unknown;
+  asOf: string;
+  onRetry: () => void;
+}) {
+  const locale = localeFromProfile(profile);
+  const apiError = error instanceof ApiClientError ? error : undefined;
+  return (
+    <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+      <div className="flex gap-3">
+        <AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+        <div className="space-y-3">
+          <p>{translate(locale, "states.cachedSnapshot", { value: formatDate(asOf, profile) })}</p>
+          <p className="text-sm text-amber-900">
+            {translate(locale, errorTranslationKey(apiError?.code))}
+          </p>
+          {apiError?.requestId && (
+            <p className="text-sm text-amber-900">
+              {translate(locale, "errors.requestId", { requestId: apiError.requestId })}
+            </p>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+            {translate(locale, "actions.retry")}
+          </Button>
         </div>
       </div>
     </div>

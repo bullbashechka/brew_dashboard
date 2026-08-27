@@ -15,5 +15,3 @@ export const SYSTEM_E2E_FIXTURES = {
     performance: { login: "stage12-system-mobile-p", password: "Stage12-System-P2" },
   },
 } as const;
-
-export type SystemE2eFixture = (typeof SYSTEM_E2E_FIXTURES)[keyof typeof SYSTEM_E2E_FIXTURES];

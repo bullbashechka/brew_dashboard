@@ -139,13 +139,9 @@ const inventoryRoute = createRoute({
     status: stockStatusSchema.safeParse(search.status).data ?? undefined,
   }),
 }).lazy(() => import("./pages/inventory.lazy").then((module) => module.Route));
-const settingsRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: "settings",
-  validateSearch: (search: Record<string, unknown>) => ({
-    panel: search.panel === "feedback" ? "feedback" : undefined,
-  }),
-}).lazy(() => import("./pages/settings.lazy").then((module) => module.Route));
+const settingsRoute = createRoute({ getParentRoute: () => appRoute, path: "settings" }).lazy(() =>
+  import("./pages/settings.lazy").then((module) => module.Route),
+);
 
 const routeTree = rootRoute.addChildren([
   indexRoute,

@@ -9,17 +9,51 @@ type TransactionCallback = Parameters<RequestDatabase["transaction"]>[0];
 export type RequestTransaction = Parameters<TransactionCallback>[0];
 export type DatabaseExecutor = RequestDatabase | RequestTransaction;
 
+type RequestClientLifecycle = {
+  connect: () => Promise<unknown>;
+  end: () => Promise<void>;
+};
+
+export class DatabaseConnectionCloseError extends Error {
+  constructor() {
+    super("Database connection could not be closed");
+    this.name = "DatabaseConnectionCloseError";
+  }
+}
+
+const withClientLifecycle = async <T>(
+  client: RequestClientLifecycle,
+  callback: () => Promise<T>,
+): Promise<T> => {
+  let primaryFailed = false;
+  let primaryError: unknown;
+  let result: T | undefined;
+  try {
+    await client.connect();
+    result = await callback();
+  } catch (error) {
+    primaryFailed = true;
+    primaryError = error;
+  }
+  try {
+    await client.end();
+  } catch (error) {
+    console.error({
+      event: "database_connection_close_failed.v1",
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    if (!primaryFailed) throw new DatabaseConnectionCloseError();
+  }
+  if (primaryFailed) throw primaryError;
+  return result as T;
+};
+
 export const withRequestDatabase = async <T>(
   connectionString: string,
   callback: (db: RequestDatabase) => Promise<T>,
 ): Promise<T> => {
   const client = new Client({ connectionString });
-  try {
-    await client.connect();
-    return await callback(drizzle(client, { schema }));
-  } finally {
-    await client.end().catch(() => undefined);
-  }
+  return withClientLifecycle(client, () => callback(drizzle(client, { schema })));
 };
 
 export const setTenantContext = async (transaction: RequestTransaction, networkId: string) => {
@@ -47,3 +81,5 @@ export const lockRateLimit = (transaction: RequestTransaction, key: string) =>
 
 export const lockActiveDemoLimit = (transaction: RequestTransaction) =>
   advisoryLock(transaction, "brew-dashboard:active-demo-limit");
+
+export const __test = { withClientLifecycle };

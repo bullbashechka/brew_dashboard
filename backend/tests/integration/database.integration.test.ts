@@ -98,6 +98,98 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
     }
   });
 
+  it("uses explicit runtime grants and denies future table privileges by default", async () => {
+    const granted = [
+      ["auth.users", "SELECT"],
+      ["auth.accounts", "SELECT"],
+      ["auth.sessions", "SELECT, INSERT, UPDATE, DELETE"],
+      ["auth.rate_limits", "SELECT, INSERT, UPDATE, DELETE"],
+      ["app.app_users", "SELECT, UPDATE"],
+      ["app.networks", "SELECT, UPDATE"],
+      ["app.locations", "SELECT, INSERT"],
+      ["app.categories", "SELECT, INSERT, DELETE"],
+      ["app.orders", "SELECT, INSERT, DELETE"],
+      ["app.order_items", "SELECT, INSERT, DELETE"],
+      ["app.inventory_items", "SELECT, INSERT, DELETE"],
+      ["app.products", "SELECT, INSERT, UPDATE, DELETE"],
+      ["app.revenue_targets", "SELECT, INSERT, UPDATE, DELETE"],
+      ["app.idempotency_keys", "SELECT, INSERT, UPDATE, DELETE"],
+      ["app.feedback_responses", "SELECT, INSERT, UPDATE"],
+      ["app.demo_generations", "SELECT, INSERT"],
+      ["app.product_events", "SELECT, INSERT"],
+      ["app.inventory_balances", "SELECT"],
+      ["app.inventory_movements", "SELECT"],
+    ] as const;
+    for (const [table, privileges] of granted) {
+      const result = await client.query<{ granted: boolean }>(
+        "SELECT has_table_privilege('brew_runtime', $1, $2) AS granted",
+        [table, privileges],
+      );
+      expect(result.rows[0]?.granted).toBe(true);
+    }
+
+    for (const [table, privilege] of [
+      ["auth.verifications", "SELECT"],
+      ["app.inventory_balances", "INSERT"],
+      ["app.inventory_movements", "DELETE"],
+      ["app.locations", "UPDATE"],
+      ["app.feedback_responses", "DELETE"],
+    ] as const) {
+      const result = await client.query<{ granted: boolean }>(
+        "SELECT has_table_privilege('brew_runtime', $1, $2) AS granted",
+        [table, privilege],
+      );
+      expect(result.rows[0]?.granted).toBe(false);
+    }
+
+    const excessive = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM pg_class relation
+         JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+         WHERE namespace.nspname IN ('app', 'auth')
+           AND relation.relkind IN ('r', 'p')
+           AND (
+             has_table_privilege('brew_runtime', relation.oid, 'TRUNCATE')
+             OR has_table_privilege('brew_runtime', relation.oid, 'REFERENCES')
+             OR has_table_privilege('brew_runtime', relation.oid, 'TRIGGER')
+           )
+       ) AS exists`,
+    );
+    expect(excessive.rows[0]?.exists).toBe(false);
+
+    const sequencePrivileges = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM pg_class relation
+         JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+         WHERE namespace.nspname IN ('app', 'auth')
+           AND relation.relkind = 'S'
+           AND (
+             has_table_privilege('brew_runtime', relation.oid, 'SELECT')
+             OR has_table_privilege('brew_runtime', relation.oid, 'UPDATE')
+             OR has_sequence_privilege('brew_runtime', relation.oid, 'USAGE')
+           )
+       ) AS exists`,
+    );
+    expect(sequencePrivileges.rows[0]?.exists).toBe(false);
+
+    try {
+      await client.query("CREATE TABLE app.runtime_grant_probe_app (id uuid PRIMARY KEY)");
+      await client.query("CREATE TABLE auth.runtime_grant_probe_auth (id text PRIMARY KEY)");
+      for (const table of ["app.runtime_grant_probe_app", "auth.runtime_grant_probe_auth"]) {
+        const result = await client.query<{ granted: boolean }>(
+          "SELECT has_table_privilege('brew_runtime', $1, 'SELECT, INSERT, UPDATE, DELETE') AS granted",
+          [table],
+        );
+        expect(result.rows[0]?.granted).toBe(false);
+      }
+    } finally {
+      await client.query("DROP TABLE IF EXISTS app.runtime_grant_probe_app");
+      await client.query("DROP TABLE IF EXISTS auth.runtime_grant_probe_auth");
+    }
+  });
+
   it("creates the Better Auth account identity required by the pinned adapter", async () => {
     const issuer = await client.query<{ attnotnull: boolean }>(
       `SELECT attnotnull

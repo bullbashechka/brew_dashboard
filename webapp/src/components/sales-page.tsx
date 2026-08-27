@@ -1,6 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Profile, SalesData } from "@brew-dashboard/contracts";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   CartesianGrid,
@@ -14,9 +13,10 @@ import {
 } from "recharts";
 
 import { salesInfiniteQuery, type AnalyticsFilters } from "@/api/analytics";
+import { MetricComparison } from "@/components/metric-comparison";
 import { sessionQueryOptions } from "@/api/session";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
+import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
   formatDate,
@@ -45,7 +45,7 @@ export function SalesPage({ filters }: { filters: AnalyticsFilters }) {
   const locale = localeFromProfile(profile);
 
   if (!profile || analytics.isPending) return <SalesSkeleton />;
-  if (analytics.isError || !analytics.data)
+  if (analytics.isLoadingError || !analytics.data)
     return (
       <SalesFrame profile={profile}>
         <ErrorState
@@ -66,6 +66,14 @@ export function SalesPage({ filters }: { filters: AnalyticsFilters }) {
   const orders = analytics.data.pages.flatMap((page) => page.data.recentOrders);
   return (
     <SalesFrame profile={profile} updatedAt={first.meta.asOf}>
+      {analytics.isRefetchError && (
+        <CachedSnapshotWarning
+          profile={profile}
+          error={analytics.error}
+          asOf={first.meta.asOf}
+          onRetry={() => void analytics.refetch()}
+        />
+      )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {metricNames.map((name) => (
           <SalesMetricCard
@@ -87,6 +95,7 @@ export function SalesPage({ filters }: { filters: AnalyticsFilters }) {
         profile={profile}
         hasNext={analytics.hasNextPage}
         pending={analytics.isFetchingNextPage}
+        error={analytics.isFetchNextPageError ? analytics.error : null}
         onLoadMore={() => void analytics.fetchNextPage()}
       />
     </SalesFrame>
@@ -136,31 +145,13 @@ function SalesMetricCard({
       : metric.value === null
         ? translate(locale, "comparison.notAvailable")
         : formatCurrency(metric.value, profile);
-  const change = metric.changePercent;
-  const label =
-    change === null
-      ? translate(locale, "comparison.notAvailable")
-      : Number(change) > 0
-        ? translate(locale, "comparison.increase", {
-            value: formatPercent(Math.abs(Number(change)), profile),
-          })
-        : Number(change) < 0
-          ? translate(locale, "comparison.decrease", {
-              value: formatPercent(Math.abs(Number(change)), profile),
-            })
-          : translate(locale, "comparison.unchanged");
-  const Icon = change !== null && Number(change) > 0 ? ChevronUp : ChevronDown;
   return (
     <article className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <p className="text-sm font-medium text-stone-600">
         {translate(locale, `metrics.${name}` as TranslationKey)}
       </p>
       <p className="mt-2 text-2xl font-semibold tracking-tight text-stone-950">{value}</p>
-      <p className="mt-3 flex items-center gap-1.5 text-sm text-stone-600" aria-label={label}>
-        {change !== null && <Icon className="size-4" aria-hidden="true" />}
-        <span>{change === null ? label : formatPercent(Math.abs(Number(change)), profile)}</span>
-        <span className="text-stone-600">{translate(locale, "comparison.versusPrevious")}</span>
-      </p>
+      <MetricComparison change={metric.changePercent} profile={profile} />
     </article>
   );
 }
@@ -416,12 +407,14 @@ function RecentOrders({
   profile,
   hasNext,
   pending,
+  error,
   onLoadMore,
 }: {
   orders: SalesData["recentOrders"];
   profile: Profile;
   hasNext: boolean;
   pending: boolean;
+  error: unknown;
   onLoadMore: () => void;
 }) {
   const locale = localeFromProfile(profile);
@@ -483,6 +476,11 @@ function RecentOrders({
           <Button type="button" variant="outline" onClick={onLoadMore} disabled={pending}>
             {pending ? translate(locale, "states.loading") : translate(locale, "actions.loadMore")}
           </Button>
+          {Boolean(error) && (
+            <div className="mt-3">
+              <ErrorState locale={locale} error={error} onRetry={onLoadMore} />
+            </div>
+          )}
         </div>
       )}
     </section>

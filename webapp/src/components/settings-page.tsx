@@ -11,7 +11,13 @@ import { saveTourState } from "@/api/tour";
 import { FeedbackForm } from "@/components/feedback";
 import { ResetDemoDialog } from "@/components/reset-demo-dialog";
 import { Button } from "@/components/ui/button";
-import { ErrorState, FormError, PendingButton, ProgressState } from "@/components/ui/states";
+import {
+  CachedSnapshotWarning,
+  ErrorState,
+  FormError,
+  PendingButton,
+  ProgressState,
+} from "@/components/ui/states";
 import { localeFromProfile, translate } from "@/lib/i18n";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { useResetDemoData } from "@/lib/reset-demo";
@@ -129,14 +135,15 @@ export function SettingsPage({
     goalMutation.error instanceof ApiClientError && goalMutation.error.code === "CONFLICT";
   const goalRevision = overview.data?.meta.demoDataRevision;
   const serverSnapshot: GoalSnapshot | null =
-    overview.isSuccess && goalRevision !== undefined
+    overview.data && goalRevision !== undefined
       ? {
           expectedVersion: currentGoal?.version ?? null,
           expectedDemoDataRevision: goalRevision,
         }
       : null;
-  const goalUnavailable = !serverSnapshot;
-  const goalError = goalRefreshError ?? (overview.isError ? overview.error : null);
+  const mutationDisabled = overview.isLoadingError || overview.isRefetchError;
+  const goalUnavailable = !serverSnapshot || mutationDisabled;
+  const goalError = goalRefreshError ?? (overview.isLoadingError ? overview.error : null);
 
   if (!profile) return null;
 
@@ -205,6 +212,14 @@ export function SettingsPage({
           <FormError locale={locale} error={language.error} />
 
           {overview.isPending && <ProgressState locale={locale} />}
+          {overview.isRefetchError && overview.data && (
+            <CachedSnapshotWarning
+              profile={profile}
+              error={overview.error}
+              asOf={overview.data.meta.asOf}
+              onRetry={() => void overview.refetch()}
+            />
+          )}
           {goalError && (
             <ErrorState
               locale={locale}
@@ -255,6 +270,7 @@ export function SettingsPage({
                     type="button"
                     size="sm"
                     variant="outline"
+                    disabled={mutationDisabled}
                     onClick={() => void refreshGoal("latest")}
                   >
                     {translate(locale, "actions.useLatest")}
@@ -262,7 +278,7 @@ export function SettingsPage({
                   <Button
                     type="button"
                     size="sm"
-                    disabled={!normalizedGoal || goalMutation.isPending}
+                    disabled={mutationDisabled || !normalizedGoal || goalMutation.isPending}
                     onClick={() => void refreshGoal("overwrite")}
                   >
                     {translate(locale, "actions.overwrite")}
@@ -313,7 +329,7 @@ export function SettingsPage({
       <SettingsCard title={translate(locale, "settings.demoTitle")}>
         <p className="text-sm text-stone-600">{translate(locale, "settings.demoDescription")}</p>
         <div className="mt-4">
-          <Button type="button" onClick={() => setResetOpen(true)}>
+          <Button type="button" disabled={mutationDisabled} onClick={() => setResetOpen(true)}>
             {translate(locale, "reset.open")}
           </Button>
         </div>
@@ -341,6 +357,7 @@ export function SettingsPage({
         }}
         locale={locale}
         pending={reset.isPending}
+        disabled={mutationDisabled}
         error={reset.error}
         onConfirm={() => reset.mutate()}
       />

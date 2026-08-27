@@ -418,7 +418,7 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [x] **S12.2.** Свести integration suite: admin creation, auth/session expiry, onboarding, mutations, feedback, reset, envelope и два tenants.
 - [x] **S12.3.** Добавить safety guard runner: destructive test/cleanup немедленно прекращается, если account не `e2e`, и никогда не перечисляет demo accounts.
 - [x] **S12.4.** Свести component suite: first run, filters, все dialogs/forms, loading/empty/error states, mobile navigation и accessible errors.
-- [x] **S12.5.** Завершить восемь обязательных Playwright journeys из PRD на desktop и mobile viewport.
+- [ ] **S12.5.** Завершить восемь обязательных Playwright journeys из PRD на desktop и mobile viewport.
 - [x] **S12.6.** Проверить keyboard navigation, labels/errors, focus, dialog focus trap, WCAG AA contrast основного текста/controls и reduced motion.
 - [x] **S12.7.** Проверить responsive ranges 320–767, 768–1279 и 1280+ px; устранить page-level horizontal scroll и нечитаемые charts/tables.
 - [x] **S12.8.** Измерить performance budgets: первый полезный экран до 3 секунд, filter reaction до 1 секунды после API response, mutation до 2 секунд без network failure.
@@ -440,9 +440,11 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [ ] В логах и telemetry нет secrets, tokens, cookies, feedback contents и произвольных form texts.
 
 > Статус локальной проверки 27.08.2026: unit/component, lint, typecheck, build, schema check и audit
-> проходят. Integration gate заблокирован отсутствующим Docker daemon, а Playwright journeys —
-> отсутствующим Chromium executable; после устранения этих условий нужно повторно выполнить
-> `bun run validate:stage12`, включая system-E2E Docker wrapper и полный Worker-artifact secret scan.
+> проходят. Integration gate заблокирован отсутствующим Docker daemon. Chromium доступен, но полный
+> Playwright suite не проходит: общий browser-failure guard считает ожидаемые mocked `401`/`404`/`500`
+> browser-console errors; Settings journey проходит на desktop и mobile. После устранения этих
+> условий нужно повторно выполнить `bun run validate:stage12`, включая system-E2E Docker wrapper и
+> полный Worker-artifact secret scan.
 
 ---
 

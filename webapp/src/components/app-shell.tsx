@@ -203,8 +203,8 @@ export function AppShell() {
     });
   };
 
-  const navigation = (compact = false) => (
-    <nav aria-label={translate(locale, "appName")} className={compact ? "space-y-1" : "space-y-1"}>
+  const navigation = () => (
+    <nav aria-label={translate(locale, "appName")} className="space-y-1">
       {sections.map((item) => (
         <Link
           key={item}
@@ -212,7 +212,6 @@ export function AppShell() {
           search={{
             period: filters.period,
             locationId: filters.locationId,
-            ...(item === "settings" ? { panel: undefined } : {}),
             ...(item === "inventory" && section === "inventory" && inventoryStatus
               ? { status: inventoryStatus }
               : {}),
@@ -275,7 +274,7 @@ export function AppShell() {
                     </button>
                   </Dialog.Close>
                 </div>
-                <div className="mt-5 flex-1">{navigation(true)}</div>
+                <div className="mt-5 flex-1">{navigation()}</div>
                 <ShellActions
                   locale={locale}
                   onFeedback={() => {

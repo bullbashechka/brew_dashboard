@@ -71,6 +71,13 @@
       "when": 1787831794403,
       "tag": "0009_kind_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787845098779,
+      "tag": "0010_restrict-runtime-grants",
+      "breakpoints": true
     }
   ]
 }
