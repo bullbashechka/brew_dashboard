@@ -72,21 +72,7 @@ const prepareSystemAccount = async (
   await page.getByLabel("Login alias").fill(credentials.login);
   await page.getByLabel("Password").fill(credentials.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-
-  const language = page.getByRole("heading", { name: "Choose your language" });
-  await expect(language).toBeVisible({ timeout: 180_000 });
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Network name").fill("Stage 12 Performance Lab");
-  await page.getByLabel("Owner name").fill("Stage 12 Performance Owner");
-  await page.getByLabel("Number of locations").selectOption("1");
-  await page.getByLabel("Location 1 name").fill("Central");
-  await page.locator('input[name="country"]').fill("KZ");
-  await page.locator('input[name="currency"]').fill("KZT");
-  await page.getByLabel("Timezone").fill("Asia/Almaty");
-  await page.getByRole("button", { name: "Create my dashboard" }).click();
   await expect(page.getByTestId("page-overview")).toBeVisible({ timeout: 180_000 });
-  const tour = page.getByRole("dialog");
-  if (await tour.count()) await tour.getByRole("button", { name: "Skip tour" }).click();
 };
 
 const applySlow4G = async (page: Page) => {
@@ -100,12 +86,16 @@ const applySlow4G = async (page: Page) => {
   });
 };
 
-test("enforces first-screen, filter and mutation release budgets", async ({
+test("@performance enforces first-screen, filter and mutation release budgets", async ({
   page,
   browserFailureGuard,
 }, testInfo) => {
   test.setTimeout(300_000);
   const system = process.env.E2E_SYSTEM === "1";
+  test.skip(
+    !system,
+    "Release performance measurements require the real Worker and isolated PostgreSQL",
+  );
   if (system) {
     const fixture =
       testInfo.project.name === "mobile-chromium"

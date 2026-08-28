@@ -96,31 +96,32 @@ export const test = base.extend<{ browserFailureGuard: BrowserFailureGuard }>({
       watchPage(page);
 
       // These are application-wide, fire-and-forget requests. Supplying a
-      // successful baseline response lets each journey focus on the API it
-      // owns, while any test that exercises either endpoint can still replace
-      // this route with a stricter mock.
-      await page.route("**/api/v1/events", (route) =>
-        route.fulfill({
-          status: 202,
-          contentType: "application/json",
-          body: JSON.stringify({
-            data: { eventId: "123e4567-e89b-12d3-a456-426614174090" },
-            meta: {},
-            requestId: "123e4567-e89b-12d3-a456-426614174099",
+      // successful baseline response keeps mocked journeys deterministic, but
+      // real system mode must exercise the Worker and database boundary.
+      if (process.env.E2E_SYSTEM !== "1") {
+        await page.route("**/api/v1/events", (route) =>
+          route.fulfill({
+            status: 202,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: { eventId: "123e4567-e89b-12d3-a456-426614174090" },
+              meta: {},
+              requestId: "123e4567-e89b-12d3-a456-426614174099",
+            }),
           }),
-        }),
-      );
-      await page.route("**/api/v1/feedback", (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            data: null,
-            meta: {},
-            requestId: "123e4567-e89b-12d3-a456-426614174099",
+        );
+        await page.route("**/api/v1/feedback", (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: null,
+              meta: {},
+              requestId: "123e4567-e89b-12d3-a456-426614174099",
+            }),
           }),
-        }),
-      );
+        );
+      }
 
       await use(guard);
 

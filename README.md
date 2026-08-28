@@ -20,6 +20,7 @@ bun run test
 bun run test:integration:docker
 bun run test:e2e
 bun run test:e2e:system:docker
+bun run test:e2e:performance:docker
 bun run build
 bun run audit
 bun run security:scan
@@ -93,13 +94,16 @@ bun run build
 bun run audit
 ```
 
-Playwright runs the mocked browser journeys in both Desktop Chrome and Pixel 5 projects. The
-system mode additionally runs a critical journey through the local Worker and isolated PostgreSQL
-for separate primary, secondary and performance e2e fixtures per viewport:
+Playwright runs mocked UI/error journeys in both Desktop Chrome and Pixel 5 projects. The system
+gate additionally runs the critical journey and tenant-isolation attacks through the local Worker
+and isolated PostgreSQL for separate primary and secondary e2e fixtures per viewport. Performance
+is a separate serial system gate with three samples per viewport:
 
 ```bash
 DATABASE_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:54329/postgres' \
   bun run test:e2e:system
+DATABASE_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:54329/postgres' \
+  bun run test:e2e:performance
 ```
 
 It creates a disposable database, applies migrations, provisions only explicit
