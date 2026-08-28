@@ -92,6 +92,46 @@ const handler = async (request: Request, env: HyperdriveSmokeEnv): Promise<Respo
       `
         WITH tenant_tables(table_name) AS (
           SELECT unnest($1::text[])
+        ),
+        required_table_privileges(schema_name, table_name, privileges) AS (
+          VALUES
+            ('auth', 'users', 'SELECT'),
+            ('auth', 'accounts', 'SELECT'),
+            ('auth', 'sessions', 'SELECT, INSERT, UPDATE, DELETE'),
+            ('auth', 'rate_limits', 'SELECT, INSERT, UPDATE, DELETE'),
+            ('app', 'app_users', 'SELECT, UPDATE'),
+            ('app', 'networks', 'SELECT, UPDATE'),
+            ('app', 'locations', 'SELECT, INSERT'),
+            ('app', 'categories', 'SELECT, INSERT, DELETE'),
+            ('app', 'orders', 'SELECT, INSERT, DELETE'),
+            ('app', 'order_items', 'SELECT, INSERT, DELETE'),
+            ('app', 'inventory_items', 'SELECT, INSERT, DELETE'),
+            ('app', 'products', 'SELECT, INSERT, UPDATE, DELETE'),
+            ('app', 'revenue_targets', 'SELECT, INSERT, UPDATE, DELETE'),
+            ('app', 'idempotency_keys', 'SELECT, INSERT, UPDATE, DELETE'),
+            ('app', 'feedback_responses', 'SELECT, INSERT, UPDATE'),
+            ('app', 'demo_generations', 'SELECT, INSERT'),
+            ('app', 'product_events', 'SELECT, INSERT'),
+            ('app', 'inventory_balances', 'SELECT'),
+            ('app', 'inventory_movements', 'SELECT')
+        ),
+        denied_table_privileges(schema_name, table_name, privilege) AS (
+          VALUES
+            ('auth', 'users', 'INSERT'), ('auth', 'users', 'UPDATE'), ('auth', 'users', 'DELETE'),
+            ('auth', 'accounts', 'INSERT'), ('auth', 'accounts', 'UPDATE'), ('auth', 'accounts', 'DELETE'),
+            ('auth', 'verifications', 'SELECT'), ('auth', 'verifications', 'INSERT'),
+            ('auth', 'verifications', 'UPDATE'), ('auth', 'verifications', 'DELETE'),
+            ('app', 'app_users', 'INSERT'), ('app', 'app_users', 'DELETE'),
+            ('app', 'networks', 'INSERT'), ('app', 'networks', 'DELETE'),
+            ('app', 'locations', 'UPDATE'), ('app', 'locations', 'DELETE'),
+            ('app', 'categories', 'UPDATE'), ('app', 'orders', 'UPDATE'),
+            ('app', 'order_items', 'UPDATE'), ('app', 'inventory_items', 'UPDATE'),
+            ('app', 'feedback_responses', 'DELETE'),
+            ('app', 'demo_generations', 'UPDATE'), ('app', 'demo_generations', 'DELETE'),
+            ('app', 'product_events', 'UPDATE'), ('app', 'product_events', 'DELETE'),
+            ('app', 'inventory_balances', 'INSERT'), ('app', 'inventory_balances', 'UPDATE'),
+            ('app', 'inventory_balances', 'DELETE'), ('app', 'inventory_movements', 'INSERT'),
+            ('app', 'inventory_movements', 'UPDATE'), ('app', 'inventory_movements', 'DELETE')
         )
         SELECT
           EXISTS (
@@ -118,21 +158,45 @@ const handler = async (request: Request, env: HyperdriveSmokeEnv): Promise<Respo
             )
             AND NOT EXISTS (
               SELECT 1
+              FROM required_table_privileges AS expected
+              WHERE NOT has_table_privilege(
+                'brew_runtime',
+                format('%I.%I', expected.schema_name, expected.table_name),
+                expected.privileges
+              )
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM denied_table_privileges AS denied
+              WHERE has_table_privilege(
+                'brew_runtime',
+                format('%I.%I', denied.schema_name, denied.table_name),
+                denied.privilege
+              )
+            )
+            AND NOT EXISTS (
+              SELECT 1
               FROM pg_class AS relation
               JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
               WHERE namespace.nspname IN ('app', 'auth')
                 AND relation.relkind IN ('r', 'p')
                 AND (
-                  NOT has_table_privilege('brew_runtime', relation.oid, 'SELECT')
-                  OR (
-                    relation.relname NOT IN ('inventory_balances', 'inventory_movements')
-                    AND NOT has_table_privilege('brew_runtime', relation.oid, 'INSERT, UPDATE, DELETE')
-                  )
-                  OR (
-                    relation.relname IN ('inventory_balances', 'inventory_movements')
-                    AND has_table_privilege('brew_runtime', relation.oid, 'INSERT, UPDATE, DELETE')
-                  )
+                  has_table_privilege('brew_runtime', relation.oid, 'TRUNCATE')
+                  OR has_table_privilege('brew_runtime', relation.oid, 'REFERENCES')
+                  OR has_table_privilege('brew_runtime', relation.oid, 'TRIGGER')
                   OR has_table_privilege('public', relation.oid, 'INSERT, UPDATE, DELETE')
+                )
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM pg_class AS relation
+              JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+              WHERE namespace.nspname IN ('app', 'auth')
+                AND relation.relkind = 'S'
+                AND (
+                  has_table_privilege('brew_runtime', relation.oid, 'SELECT')
+                  OR has_table_privilege('brew_runtime', relation.oid, 'UPDATE')
+                  OR has_sequence_privilege('brew_runtime', relation.oid, 'USAGE')
                 )
             ) AS runtime_grants_valid,
           NOT EXISTS (
@@ -165,7 +229,7 @@ const handler = async (request: Request, env: HyperdriveSmokeEnv): Promise<Respo
                 AND policy.with_check IS NOT NULL
             )
           ) AS tenant_policies_present,
-          to_regprocedure('app.enforce_inventory_balance_unit()') IS NOT NULL
+          NOT has_table_privilege('brew_runtime', 'auth.verifications', 'SELECT')
             AS migration_head_applied
       `,
       [tenantTables],

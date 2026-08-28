@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "bun test --preload ./tests/setup.ts tests/unit",
     "test:e2e": "playwright test",
+    "test:e2e:production": "playwright test --config playwright.production.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

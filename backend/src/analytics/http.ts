@@ -7,6 +7,7 @@ import {
 } from "@brew-dashboard/contracts";
 import type { Context } from "hono";
 
+import { authSecretFor } from "../auth/environment.ts";
 import { multiply, parseDecimal, toMoney } from "../domain/decimal.ts";
 import { calculateFinancialMetrics } from "../domain/metrics.ts";
 import type { AnalyticsPeriod } from "../domain/periods.ts";
@@ -288,7 +289,7 @@ export const salesHandler = async (context: Context<AppEnvironment>) => {
     throw new ApiProblem("VALIDATION_ERROR", 400, "Choose cursor or page pagination");
   if (request.pageContext && !request.page)
     throw new ApiProblem("VALIDATION_ERROR", 400, "Page context is required with page");
-  const secret = context.env.BETTER_AUTH_SECRET;
+  const secret = authSecretFor(context.env);
   if (!secret) throw new Error("Analytics continuation secret is unavailable");
   const continuation = request.cursor
     ? await verifyContinuation(request.cursor, secret)
@@ -383,7 +384,7 @@ export const inventoryHandler = async (context: Context<AppEnvironment>) => {
   }>(context);
   if (request.page)
     throw new ApiProblem("VALIDATION_ERROR", 400, "Inventory movements use cursor pagination");
-  const secret = context.env.BETTER_AUTH_SECRET;
+  const secret = authSecretFor(context.env);
   if (!secret) throw new Error("Analytics continuation secret is unavailable");
   const continuation = request.cursor ? await verifyContinuation(request.cursor, secret) : null;
   if (continuation && continuation.kind !== "cursor")

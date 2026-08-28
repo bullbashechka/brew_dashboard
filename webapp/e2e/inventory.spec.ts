@@ -239,33 +239,45 @@ test("records receipt and write off with live stock alert updates", async ({ pag
   await installRoutes(page);
   await page.goto("/app/inventory?period=today");
   await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
-  await expect(page.getByText("Out of stock").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Active alerts: 1" })).toBeVisible();
 
   await page.getByRole("button", { name: "Receipt" }).click();
   await page.getByLabel("Quantity").fill("2");
   await page.getByRole("button", { name: "Record receipt" }).click();
   await expect(page.getByText("Receipt recorded.")).toBeVisible();
-  await expect(page.getByText("In stock").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Active alerts: 0" })).toBeVisible();
 
   await page.getByRole("button", { name: "Write off" }).click();
   await page.getByLabel("Quantity").fill("2");
   await page.getByRole("button", { name: "Write off 2 kg" }).click();
   await expect(page.getByText("Write off recorded.")).toBeVisible();
-  await expect(page.getByText("Out of stock").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Active alerts: 1" })).toBeVisible();
 });
 
 test("keeps a conflicted form available outside its status filter and retries with fresh data", async ({
   page,
+  browserFailureGuard,
 }) => {
+  browserFailureGuard.allowHttpError({
+    method: "POST",
+    url: /\/api\/v1\/inventory\/movements$/u,
+    status: 409,
+  });
   await installRoutes(page, true);
   await page.goto("/app/inventory?period=today&status=out_of_stock");
   await page.getByRole("button", { name: "Receipt" }).click();
   await page.getByLabel("Quantity").fill("2");
+  const conflictResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/v1/inventory/movements",
+  );
   await page.getByRole("button", { name: "Record receipt" }).click();
+  expect((await conflictResponse).status()).toBe(409);
 
-  await expect(page.getByText(/balance changed/i)).toBeVisible();
+  await expect(
+    page.getByText("This information changed. Please refresh and try again."),
+  ).toBeVisible();
   await expect(page.getByLabel("Quantity")).toHaveValue("2");
   await expect(page.getByText("Current balance: 2 kg")).toBeVisible();
   await expect(page).toHaveURL(/status=out_of_stock/);

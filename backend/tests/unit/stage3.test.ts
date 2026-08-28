@@ -86,6 +86,43 @@ describe("Stage 3 login and admin boundaries", () => {
     expect(oversized.status).toBe(413);
   });
 
+  it("fails closed when BETTER_AUTH_URL is malformed without logging its value", async () => {
+    const records: unknown[] = [];
+    const originalError = console.error;
+    console.error = ((record: unknown) => records.push(record)) as typeof console.error;
+    try {
+      const response = await app.request(
+        "http://localhost/api/v1/auth/logout",
+        {
+          method: "POST",
+          headers: { origin: "http://localhost", "content-type": "application/json" },
+          body: "{}",
+        },
+        { BETTER_AUTH_URL: "not a valid configured URL" } as never,
+      );
+      expect(response.status).toBe(500);
+      expect((await response.json()) as { error: { code: string } }).toMatchObject({
+        error: { code: "INTERNAL_ERROR" },
+      });
+    } finally {
+      console.error = originalError;
+    }
+    expect(JSON.stringify(records)).not.toContain("not a valid configured URL");
+  });
+
+  it("keeps a valid configured URL with a mismatched Origin forbidden", async () => {
+    const response = await app.request(
+      "http://localhost/api/v1/auth/logout",
+      {
+        method: "POST",
+        headers: { origin: "http://localhost", "content-type": "application/json" },
+        body: "{}",
+      },
+      { BETTER_AUTH_URL: "https://brew-dashboard.example" } as never,
+    );
+    expect(response.status).toBe(403);
+  });
+
   it("keeps malformed login credentials generic at the route validation boundary", async () => {
     const response = await app.request("http://localhost/api/v1/auth/login", {
       method: "POST",
@@ -144,9 +181,12 @@ describe("Stage 3 login and admin boundaries", () => {
     for (const [name, value] of Object.entries(middlewareTest.SECURITY_HEADERS)) {
       expect(response.headers.get(name)).toBe(value);
     }
-    expect(middlewareTest.signalFor("/api/v1/auth/login", 401)).toBe("login_failure");
-    expect(middlewareTest.signalFor("/api/v1/onboarding/complete", 409)).toBe("onboarding_failure");
-    expect(middlewareTest.signalFor("/api/v1/demo/reset", 500)).toBe("server_error");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(middlewareTest.signalsFor("/api/v1/auth/login", 401)[0]).toBe("login_failure");
+    expect(middlewareTest.signalsFor("/api/v1/onboarding/complete", 409)[0]).toBe(
+      "onboarding_failure",
+    );
+    expect(middlewareTest.signalsFor("/api/v1/demo/reset", 500)[0]).toBe("server_error");
     expect(middlewareTest.signalsFor("/api/v1/demo/reset", 500)).toEqual([
       "server_error",
       "reset_failure",

@@ -17,14 +17,23 @@ import {
 import { appUsers, authSessions, authUsers, networks } from "../db/schema.ts";
 import { recordServerProductEvent } from "../events/service.ts";
 import { errorResponse, unauthenticatedResponse } from "../http/errors.ts";
+import { observableRoute } from "../http/middleware.ts";
 import type { AppEnvironment } from "../http/types.ts";
+import { authSecretFor, authUrlFor } from "./environment.ts";
 import {
   AUTH_BASE_PATH,
   SESSION_COOKIE_NAME,
   createBetterAuth,
   type BetterAuthEnvironment,
 } from "./better-auth.ts";
-import { LoginRateLimitError, consumeLoginRateLimit } from "./rate-limit.ts";
+import {
+  checkLoginAccountRateLimit,
+  clearLoginFailures,
+  consumeLoginIpRateLimit,
+  consumeAuthenticatedRequestRateLimit,
+  loginAccountRateLimitKey,
+  recordLoginFailure,
+} from "./rate-limit.ts";
 import { normalizeLogin } from "./login.ts";
 import { localDateKey } from "../domain/periods.ts";
 import { isLoopbackHostname } from "../security/hosts.ts";
@@ -53,8 +62,8 @@ type LoadedProfile = {
 };
 
 const getAuthEnvironment = (context: Context<AppEnvironment>): BetterAuthEnvironment => {
-  const secret = context.env?.BETTER_AUTH_SECRET;
-  const baseUrl = context.env?.BETTER_AUTH_URL;
+  const secret = authSecretFor(context.env);
+  const baseUrl = authUrlFor(context.env);
   if (!secret || secret.length < 32 || !baseUrl) {
     throw new Error("Better Auth server configuration is unavailable");
   }
@@ -174,38 +183,43 @@ export const loadActiveProfile = async (
   transaction: RequestTransaction,
   authUserId: string,
   now = new Date(),
+  options: { lock?: boolean } = {},
 ): Promise<LoadedProfile | null> => {
-  const rows = await transaction
-    .select({
-      appUser: appUsers,
-      displayUsername: authUsers.displayUsername,
-    })
+  const profileQuery = transaction
+    .select()
     .from(appUsers)
-    .innerJoin(authUsers, eq(authUsers.id, appUsers.authUserId))
     .where(
       and(
         eq(appUsers.authUserId, authUserId),
         eq(appUsers.status, "active"),
         or(isNull(appUsers.expiresAt), gt(appUsers.expiresAt, now)),
       ),
-    )
-    .for("update");
-  const identity = rows[0];
-  if (!identity) return null;
+    );
+  const rows = options.lock === false ? await profileQuery : await profileQuery.for("update");
+  const appUser = rows[0];
+  if (!appUser) return null;
 
-  await setTenantContext(transaction, identity.appUser.networkId);
+  const userRows = await transaction
+    .select({ displayUsername: authUsers.displayUsername })
+    .from(authUsers)
+    .where(eq(authUsers.id, appUser.authUserId))
+    .limit(1);
+  const user = userRows[0];
+  if (!user) return null;
+
+  await setTenantContext(transaction, appUser.networkId);
   const network = await transaction
     .select()
     .from(networks)
-    .where(eq(networks.id, identity.appUser.networkId))
+    .where(eq(networks.id, appUser.networkId))
     .limit(1);
   const currentNetwork = network[0];
   if (!currentNetwork) return null;
 
   const profile = profileSchema.parse({
-    userId: identity.appUser.authUserId,
-    login: identity.displayUsername || identity.appUser.loginNormalized,
-    networkId: identity.appUser.networkId,
+    userId: appUser.authUserId,
+    login: user.displayUsername || appUser.loginNormalized,
+    networkId: appUser.networkId,
     networkName: currentNetwork.name,
     ownerName: currentNetwork.ownerName,
     country: currentNetwork.countryCode,
@@ -220,15 +234,15 @@ export const loadActiveProfile = async (
     demoDataStale:
       Boolean(currentNetwork.demoGeneratedForDate && currentNetwork.timezone) &&
       currentNetwork.demoGeneratedForDate !== localDateKey(now, currentNetwork.timezone!),
-    tourState: identity.appUser.tourCompletedAt
+    tourState: appUser.tourCompletedAt
       ? "completed"
-      : identity.appUser.tourSkippedAt
+      : appUser.tourSkippedAt
         ? "skipped"
         : "pending",
-    expiresAt: identity.appUser.expiresAt?.toISOString() ?? null,
+    expiresAt: appUser.expiresAt?.toISOString() ?? null,
   });
 
-  return { networkId: identity.appUser.networkId, profile };
+  return { networkId: appUser.networkId, profile };
 };
 
 const revokeUserSessions = async (transaction: RequestTransaction, authUserId: string) => {
@@ -259,21 +273,34 @@ const rateLimitedResponse = (context: Context<AppEnvironment>, retryAfter: numbe
 };
 
 export const loginHandler = async (context: Context<AppEnvironment>) => {
+  const environment = getAuthEnvironment(context);
+  const ipRateLimit = consumeLoginIpRateLimit(
+    environment.secret,
+    context.req.header("cf-connecting-ip"),
+  );
+  if (!ipRateLimit.allowed) {
+    return rateLimitedResponse(context, ipRateLimit.retryAfter ?? 1);
+  }
+
   const credentials = await parseLoginRequest(context);
   if (!credentials) return unauthenticatedResponse(context);
 
-  const environment = getAuthEnvironment(context);
-  const ipAddress = context.req.header("cf-connecting-ip") ?? "no-trusted-ip";
-  let result:
+  const accountKey = loginAccountRateLimitKey(environment.secret, credentials.login);
+  const result:
     | { kind: "success"; profile: Profile; response: Response }
     | { kind: "invalid"; clearCookie?: boolean }
-    | { kind: "rate-limited"; retryAfter: number };
-
-  try {
-    result = await withRequestDatabase(getConnectionString(context), (db) =>
+    | { kind: "rate-limited"; retryAfter: number } = await withRequestDatabase(
+    getConnectionString(context),
+    (db) =>
       db.transaction(async (transaction) => {
-        await consumeLoginRateLimit(transaction, ipAddress, credentials.login);
-        await lockLogin(transaction, credentials.login);
+        await lockLogin(transaction, accountKey);
+        const accountRateLimit = await checkLoginAccountRateLimit(transaction, accountKey);
+        if (!accountRateLimit.allowed) {
+          return {
+            kind: "rate-limited" as const,
+            retryAfter: accountRateLimit.retryAfter ?? 1,
+          };
+        }
         const auth = createBetterAuth(transaction, environment);
         const response = await auth.handler(
           internalRequest(context, environment, "/sign-in/username", "POST", {
@@ -284,7 +311,10 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
 
         const responseKind = classifyAuthResponse("login", response);
         if (responseKind.kind === "rate-limited") return responseKind;
-        if (responseKind.kind === "unauthenticated") return { kind: "invalid" as const };
+        if (responseKind.kind === "unauthenticated") {
+          await recordLoginFailure(transaction, accountKey);
+          return { kind: "invalid" as const };
+        }
         const body = await readJson(response);
         if (!body.ok) throw unexpectedAuthResponse("login", response);
         if (!isLoginPayload(body.value)) throw unexpectedAuthResponse("login", response);
@@ -301,6 +331,7 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
           .limit(1);
         if (!profile || !session[0]) {
           await revokeUserSessions(transaction, payload.user.id);
+          await recordLoginFailure(transaction, accountKey);
           return { kind: "invalid" as const, clearCookie: true };
         }
 
@@ -316,16 +347,11 @@ export const loginHandler = async (context: Context<AppEnvironment>) => {
           metadata: {},
           occurredAt: now,
         });
+        await clearLoginFailures(transaction, accountKey);
 
         return { kind: "success" as const, profile: profile.profile, response };
       }),
-    );
-  } catch (error) {
-    if (error instanceof LoginRateLimitError) {
-      return rateLimitedResponse(context, error.retryAfter);
-    }
-    throw error;
-  }
+  );
 
   if (result.kind === "rate-limited") return rateLimitedResponse(context, result.retryAfter);
   if (result.kind === "invalid") {
@@ -373,7 +399,8 @@ export const requireAuthentication = async (
       if (!isSessionPayload(payloadValue)) throw unexpectedAuthResponse("get-session", response);
       const payload = payloadValue;
 
-      await lockAuthUser(transaction, payload.user.id);
+      const isReadRequest = context.req.method === "GET" || context.req.method === "HEAD";
+      if (!isReadRequest) await lockAuthUser(transaction, payload.user.id);
       const authoritativeSession = await transaction
         .select({ id: authSessions.id })
         .from(authSessions)
@@ -386,12 +413,33 @@ export const requireAuthentication = async (
         )
         .limit(1);
       const profile = authoritativeSession[0]
-        ? await loadActiveProfile(transaction, payload.user.id)
+        ? await loadActiveProfile(transaction, payload.user.id, new Date(), {
+            lock: !isReadRequest,
+          })
         : null;
       if (!profile) {
         await revokeUserSessions(transaction, payload.user.id);
         clearSessionCookie(context);
         return unauthenticatedResponse(context);
+      }
+
+      const requestRateLimit = consumeAuthenticatedRequestRateLimit(
+        environment.secret,
+        payload.user.id,
+        context.req.method,
+        context.req.path,
+      );
+      if (requestRateLimit && !requestRateLimit.allowed) {
+        const retryAfter = requestRateLimit.retryAfter ?? 1;
+        context.header("retry-after", String(retryAfter));
+        console.warn({
+          event: "rate_limit_rejected.v1",
+          scope: requestRateLimit.scope,
+          route: observableRoute(context),
+          subjectHash: requestRateLimit.key.slice(-12),
+          retryAfter,
+        });
+        return errorResponse(context, "RATE_LIMITED", 429, "Too many requests");
       }
 
       context.set("database", transaction);

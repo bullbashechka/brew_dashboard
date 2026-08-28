@@ -18,7 +18,12 @@ import {
   completeIdempotency,
   hashOperationPayload,
 } from "../domain/idempotency.ts";
-import { lockAuthUser, lockNetwork, type RequestTransaction } from "../db/client.ts";
+import {
+  lockAuthUser,
+  lockNetwork,
+  setTenantContext,
+  type RequestTransaction,
+} from "../db/client.ts";
 import {
   categories,
   demoGenerations,
@@ -313,6 +318,7 @@ export const setOnboardingLanguage = async (
     revalidate: true,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   });
+  await setTenantContext(transaction, input.networkId);
   const network = await selectNetworkForUpdate(transaction, input.networkId);
   const requestHash = await hashOperationPayload(ONBOARDING_LANGUAGE_OPERATION, {
     language: input.language,
@@ -362,6 +368,7 @@ export const completeOnboarding = async (
     revalidate: true,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   });
+  await setTenantContext(transaction, input.networkId);
   let network = await selectNetworkForUpdate(transaction, input.networkId);
   const requestHash = await hashOperationPayload(ONBOARDING_COMPLETE_OPERATION, normalized);
   const claim = await claimIdempotency(transaction, {
@@ -460,6 +467,7 @@ export const resetDemoData = async (
     revalidate: true,
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
   });
+  await setTenantContext(transaction, input.networkId);
   let network = await selectNetworkForUpdate(transaction, input.networkId);
   if (!network.onboardingCompletedAt || !network.timezone || !network.demoGeneratorVersion) {
     throw new ApiProblem("CONFLICT", 409, "Completed onboarding is required before Reset");

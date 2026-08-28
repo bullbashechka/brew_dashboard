@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { OverviewData, Profile } from "@brew-dashboard/contracts";
 
-import { LocationsPerformanceBadge } from "../../src/pages/locations.lazy";
-import { OverviewMetricCard } from "../../src/pages/overview.lazy";
+import { LocationsPerformanceBadge } from "../../src/components/locations-page";
+import { MetricComparison } from "../../src/components/metric-comparison";
+import { OverviewMetricCard } from "../../src/components/overview-page";
 
 const profile: Profile = {
   userId: "123e4567-e89b-12d3-a456-426614174000",
@@ -42,5 +43,17 @@ describe("analytics cards", () => {
   it("communicates the best location with text, not color alone", () => {
     render(<LocationsPerformanceBadge performance="best" profile={profile} />);
     expect(screen.getByText("Best performing location")).toBeDefined();
+  });
+
+  it("uses a neutral icon and localized label for unchanged and unavailable comparisons", () => {
+    const { rerender } = render(<MetricComparison change="0.00" profile={profile} />);
+    expect(screen.getByLabelText("No change")).toBeDefined();
+    rerender(
+      <MetricComparison
+        change={null}
+        profile={{ ...profile, language: "ru", effectiveLanguage: "ru" }}
+      />,
+    );
+    expect(screen.getByLabelText("Н/Д")).toBeDefined();
   });
 });

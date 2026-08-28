@@ -16,6 +16,8 @@
     "admin:disable-user": "bun scripts/admin-disable-user.ts",
     "admin:delete-user": "bun scripts/admin-delete-user.ts",
     "admin:cleanup-events": "bun scripts/admin-cleanup-events.ts",
+    "admin:cleanup-expired-data": "bun scripts/admin-cleanup-expired-data.ts",
+    "test:e2e:production": "bun scripts/run-production-e2e.ts",
     "lint": "eslint .",
     "test:integration": "bun scripts/run-integration.ts",
     "test:unit": "bun test tests/unit",

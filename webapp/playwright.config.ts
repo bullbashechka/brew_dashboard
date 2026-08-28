@@ -2,8 +2,15 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  ...(process.env.E2E_SYSTEM === "1"
+    ? {}
+    : { testIgnore: [/system\.spec\.ts$/, /performance\.spec\.ts$/] }),
   fullyParallel: process.env.E2E_SYSTEM !== "1",
   ...(process.env.E2E_SYSTEM === "1" ? { workers: 1 } : {}),
+  forbidOnly: true,
+  retries: 0,
+  timeout: process.env.E2E_SYSTEM === "1" ? 300_000 : 60_000,
+  globalTimeout: process.env.E2E_SYSTEM === "1" ? 1_800_000 : 600_000,
   reporter: "line",
   expect: { timeout: 5_000 },
   use: {

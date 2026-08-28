@@ -15,12 +15,15 @@ Install and validate with the repository-pinned Bun version:
 bun install --frozen-lockfile
 bun run lint
 bun run typecheck
+bun run db:check
 bun run test
 bun run test:integration:docker
 bun run test:e2e
 bun run test:e2e:system:docker
+bun run test:e2e:performance:docker
 bun run build
 bun run audit
+bun run security:scan
 ```
 
 The complete Stage 12 release gate is available as one command and stops at the first failed
@@ -91,13 +94,16 @@ bun run build
 bun run audit
 ```
 
-Playwright runs the mocked browser journeys in both Desktop Chrome and Pixel 5 projects. The
-system mode additionally runs a critical journey through the local Worker and isolated PostgreSQL
-for separate primary, secondary and performance e2e fixtures per viewport:
+Playwright runs mocked UI/error journeys in both Desktop Chrome and Pixel 5 projects. The system
+gate additionally runs the critical journey and tenant-isolation attacks through the local Worker
+and isolated PostgreSQL for separate primary and secondary e2e fixtures per viewport. Performance
+is a separate serial system gate with three samples per viewport:
 
 ```bash
 DATABASE_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:54329/postgres' \
   bun run test:e2e:system
+DATABASE_TEST_ADMIN_URL='postgresql://postgres@127.0.0.1:54329/postgres' \
+  bun run test:e2e:performance
 ```
 
 It creates a disposable database, applies migrations, provisions only explicit
@@ -118,6 +124,18 @@ DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
   bun run admin:cleanup-events -- --days 90
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
   bun run admin:cleanup-events -- --days 90 --max-rows 10000 --execute
+```
+
+Expired sessions and verification records receive a 24-hour grace period; completed idempotency
+records are retained for 30 days and incomplete records for 24 hours. Inspect the aggregate-only
+dry run first, then add `--execute`. Remote execution requires
+`ALLOW_PRODUCTION_ADMIN=1 --confirm-production production`, just like every owner-only admin command:
+
+```bash
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:cleanup-expired-data
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:cleanup-expired-data -- --execute
 ```
 
 Application observability logs keep matched route patterns and fixed `unmatched` cardinality for
@@ -143,10 +161,18 @@ under a non-public path and is not routed by the Worker. Sessions are database-b
 cookies; signup, recovery, email confirmation and user-facing password changes are disabled.
 Mutating requests must be same-origin JSON and are limited to 256 KiB.
 
+Login protection is server-side: a login alias has at most 10 failed attempts in 15 minutes
+across all IPs, persisted as an HMAC-derived PostgreSQL key. A successful login clears that
+bucket. The Worker additionally applies best-effort per-isolate limits of 50 login requests per
+15 minutes per trusted `CF-Connecting-IP`, 120 authenticated reads/minute/account, 30 ordinary
+mutations/minute/account, and 3 demo resets/hour/account. Browser event telemetry keeps its
+durable 30/minute and 300/day tenant limits. Memory limits intentionally reset on Worker restart;
+the durable login-failure limit does not.
+
 Admin commands use the owner/unpooled database URL, never the runtime Hyperdrive role. Login aliases
 are normalized to lowercase and must contain 3–64 Latin letters, digits, `.`, `_` or `-`. A generated
 password is printed once only; use `--interactive-password` to enter one without putting it in shell
-history. Production commands additionally require the explicit environment/confirmation gate.
+history or echoing it back to the terminal. Production commands additionally require the explicit environment/confirmation gate.
 
 ```bash
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
@@ -213,6 +239,8 @@ bun run --cwd backend db:provision-runtime
 The password is used only by this server-side command and must not be placed in `.dev.vars`, the
 Worker bundle, source control, shell history, process arguments, or logs. The cache-disabled
 Hyperdrive configuration must use a connection string for `brew_runtime`, not the migration owner.
+`brew_runtime` is default-deny: each table receives only the privileges required by the Worker, and
+future tables receive no runtime privileges until a migration grants them explicitly.
 After Cloudflare authentication, inspect the existing configuration with
 `bun run --cwd webapp wrangler hyperdrive list` and `bun run --cwd webapp wrangler hyperdrive get <id>`;
 create it through the authenticated Cloudflare dashboard or a short-lived local session that does
@@ -243,3 +271,17 @@ Production release order is: apply migrations with the unpooled owner URL, smoke
 and API, then deploy the Worker. Backups and disaster-recovery automation are out of scope for the
 Demo MVP on Railway Hobby; the real Hyperdrive binding remains environment configuration rather
 than a checked-in secret.
+
+For the release load gate, run `bun run test:load:release` only against localhost or a staging host
+explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL` and provide 15
+dedicated session-cookie headers as JSON in `RELEASE_LOAD_SESSION_COOKIES` to exercise the 20 RPS
+authenticated-read phase without exceeding the per-account limiter. It rotates `/auth/me`,
+`/overview` and `/locations`, reports p95 per route, and fails on any unexpected HTTP response,
+network failure, aggregate p95 above 750 ms, or per-route p95 above 750 ms.
+
+Manual release procedure (there is deliberately no hosted CI/Actions) is documented in
+[`docs/production-release.md`](docs/production-release.md). Run `bun run release:verify`, apply
+migrations with the owner connection, run `bun run db:smoke:hyperdrive`, and deploy only through
+`bun run release:deploy`. `BETTER_AUTH_URL` is a non-secret Worker variable; `BETTER_AUTH_SECRET`
+remains a Cloudflare Secret. Keep the previous deployment available for Wrangler rollback if the
+post-deploy checks fail.

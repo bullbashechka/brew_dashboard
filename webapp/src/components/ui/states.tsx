@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
+import type { Profile } from "@brew-dashboard/contracts";
 import { AlertCircle, Inbox, LoaderCircle } from "lucide-react";
 import { Button, type ButtonProps } from "./button";
-import { errorTranslationKey, translate, type AppLocale } from "@/lib/i18n";
+import {
+  errorTranslationKey,
+  formatDate,
+  localeFromProfile,
+  translate,
+  type AppLocale,
+} from "@/lib/i18n";
 import { ApiClientError } from "@/api/client";
 
 export function LoadingState({ locale }: { locale: AppLocale }) {
@@ -18,17 +25,33 @@ export function LoadingState({ locale }: { locale: AppLocale }) {
         {translate(locale, "states.loading")}
       </div>
       <div className="mt-5 grid gap-3" aria-hidden="true">
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
+        <Skeleton variant="textLong" />
+        <Skeleton variant="textShort" />
       </div>
     </div>
   );
 }
 
-export function Skeleton({ className = "" }: { className?: string }) {
+const skeletonVariants = {
+  textLong: "h-4 w-3/4",
+  textShort: "h-4 w-1/2",
+  pageTitle: "h-9 w-56 max-w-full",
+  pageTitleCompact: "h-9 w-40 max-w-full",
+  pageTitleNarrow: "h-9 w-36 max-w-full",
+  pageDescription: "h-5 w-96 max-w-full",
+  filterBar: "h-24 w-full",
+  metricCard: "h-36 w-full",
+  locationCard: "h-64 w-full",
+  chart: "h-80 w-full",
+  panel: "h-56 w-full",
+  productMatrix: "h-96 w-full",
+  productList: "h-72 w-full",
+} as const;
+
+export function Skeleton({ variant }: { variant: keyof typeof skeletonVariants }) {
   return (
     <div
-      className={`animate-pulse rounded bg-stone-200 motion-reduce:animate-none ${className}`}
+      className={`animate-pulse rounded bg-stone-200 motion-reduce:animate-none ${skeletonVariants[variant]}`}
       aria-hidden="true"
     />
   );
@@ -112,6 +135,42 @@ export function ErrorState({
               {translate(locale, "actions.retry")}
             </Button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CachedSnapshotWarning({
+  profile,
+  error,
+  asOf,
+  onRetry,
+}: {
+  profile: Profile;
+  error: unknown;
+  asOf: string;
+  onRetry: () => void;
+}) {
+  const locale = localeFromProfile(profile);
+  const apiError = error instanceof ApiClientError ? error : undefined;
+  return (
+    <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+      <div className="flex gap-3">
+        <AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+        <div className="space-y-3">
+          <p>{translate(locale, "states.cachedSnapshot", { value: formatDate(asOf, profile) })}</p>
+          <p className="text-sm text-amber-900">
+            {translate(locale, errorTranslationKey(apiError?.code))}
+          </p>
+          {apiError?.requestId && (
+            <p className="text-sm text-amber-900">
+              {translate(locale, "errors.requestId", { requestId: apiError.requestId })}
+            </p>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+            {translate(locale, "actions.retry")}
+          </Button>
         </div>
       </div>
     </div>

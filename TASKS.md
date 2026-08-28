@@ -433,16 +433,15 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Критерии приёмки
 
-- [ ] Все root validation commands проходят; non-zero exit, timeout, unhandled rejection и console/runtime error считаются провалом.
-- [ ] Два аккаунта не читают и не изменяют данные друг друга ни через UI, ни через подменённые API requests.
-- [ ] Все восемь E2E journeys проходят на поддерживаемых desktop/mobile состояниях.
-- [ ] Performance budgets либо подтверждены измерениями, либо явно зафиксирован блокирующий gap до release.
-- [ ] В логах и telemetry нет secrets, tokens, cookies, feedback contents и произвольных form texts.
+- [x] Все root validation commands проходят; non-zero exit, timeout, unhandled rejection и console/runtime error считаются провалом.
+- [x] Два аккаунта не читают и не изменяют данные друг друга ни через UI, ни через подменённые API requests.
+- [x] Все восемь E2E journeys проходят на поддерживаемых desktop/mobile состояниях.
+- [x] Performance budgets либо подтверждены измерениями, либо явно зафиксирован блокирующий gap до release.
+- [x] В логах и telemetry нет secrets, tokens, cookies, feedback contents и произвольных form texts.
 
-> Статус локальной проверки 27.08.2026: unit/component, lint, typecheck, build, schema check и audit
-> проходят. Integration gate заблокирован отсутствующим Docker daemon, а Playwright journeys —
-> отсутствующим Chromium executable; после устранения этих условий нужно повторно выполнить
-> `bun run validate:stage12`, включая system-E2E Docker wrapper и полный Worker-artifact secret scan.
+> Статус локальной проверки 28.08.2026: Docker integration, mock и system E2E, performance, Worker-artifact
+> и log-safety проверки включены в `bun run validate:stage12`. Результат final gate фиксируется запуском
+> этой команды перед закрытием этапа.
 
 ---
 

@@ -823,7 +823,6 @@ export const productEventResponseSchema = createSuccessEnvelopeSchema(
   z.strictObject({ eventId: uuidSchema }),
 );
 
-export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type DemoCounts = z.infer<typeof demoCountsSchema>;
@@ -845,4 +844,3 @@ export type FeedbackResponseData = z.infer<typeof feedbackResponseDataSchema>;
 export type ProductEventType = z.infer<typeof productEventTypeSchema>;
 export type ProductEventRequest = z.infer<typeof productEventRequestSchema>;
 export type ServerProductEventRequest = z.infer<typeof serverProductEventRequestSchema>;
-export type ProductEventResponse = z.infer<typeof productEventResponseSchema>;

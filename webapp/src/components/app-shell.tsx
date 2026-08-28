@@ -203,8 +203,8 @@ export function AppShell() {
     });
   };
 
-  const navigation = (compact = false) => (
-    <nav aria-label={translate(locale, "appName")} className={compact ? "space-y-1" : "space-y-1"}>
+  const navigation = () => (
+    <nav aria-label={translate(locale, "appName")} className="space-y-1">
       {sections.map((item) => (
         <Link
           key={item}
@@ -212,7 +212,6 @@ export function AppShell() {
           search={{
             period: filters.period,
             locationId: filters.locationId,
-            ...(item === "settings" ? { panel: undefined } : {}),
             ...(item === "inventory" && section === "inventory" && inventoryStatus
               ? { status: inventoryStatus }
               : {}),
@@ -275,7 +274,7 @@ export function AppShell() {
                     </button>
                   </Dialog.Close>
                 </div>
-                <div className="mt-5 flex-1">{navigation(true)}</div>
+                <div className="mt-5 flex-1">{navigation()}</div>
                 <ShellActions
                   locale={locale}
                   onFeedback={() => {
@@ -375,9 +374,11 @@ export function AppShell() {
               <X className="size-4" />
             </button>
           </div>
-          <Button className="mt-3" type="button" onClick={() => setFeedbackOpen(true)}>
-            {translate(locale, "actions.feedback")}
-          </Button>
+          <div className="mt-3">
+            <Button type="button" onClick={() => setFeedbackOpen(true)}>
+              {translate(locale, "actions.feedback")}
+            </Button>
+          </div>
         </aside>
       )}
       <FeedbackDialog
@@ -418,22 +419,20 @@ function ShellActions({
       <Button
         data-tour="feedback"
         type="button"
-        variant="outline"
-        className="w-full justify-start"
+        variant="sidebar"
+        icon={MessageSquare}
         onClick={onFeedback}
       >
-        <MessageSquare className="mr-2 size-4" />
         {translate(locale, "actions.feedback")}
       </Button>
       <PendingButton
         type="button"
-        variant="outline"
-        className="w-full justify-start"
+        variant="sidebar"
+        icon={LogOut}
         onClick={onLogout}
         pending={pending}
         pendingLabel={translate(locale, "states.loading")}
       >
-        <LogOut className="mr-2 size-4" />
         {translate(locale, "actions.logout")}
       </PendingButton>
     </div>

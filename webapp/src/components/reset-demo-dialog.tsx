@@ -10,6 +10,7 @@ export function ResetDemoDialog({
   onOpenChange,
   locale,
   pending,
+  disabled = false,
   error,
   onConfirm,
 }: {
@@ -17,6 +18,7 @@ export function ResetDemoDialog({
   onOpenChange: (open: boolean) => void;
   locale: AppLocale;
   pending: boolean;
+  disabled?: boolean;
   error: Error | null;
   onConfirm: () => void;
 }) {
@@ -63,7 +65,10 @@ export function ResetDemoDialog({
               type="button"
               pending={pending}
               pendingLabel={translate(locale, "reset.pending")}
-              onClick={onConfirm}
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) onConfirm();
+              }}
             >
               {translate(locale, "reset.confirm")}
             </PendingButton>

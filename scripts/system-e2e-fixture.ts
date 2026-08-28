@@ -16,4 +16,15 @@ export const SYSTEM_E2E_FIXTURES = {
   },
 } as const;
 
-export type SystemE2eFixture = (typeof SYSTEM_E2E_FIXTURES)[keyof typeof SYSTEM_E2E_FIXTURES];
+/**
+ * Deliberately distinctive values submitted by the system journey. They are
+ * not secrets; they are sentinels which must never appear in persisted logs
+ * or telemetry payloads.
+ */
+export const SYSTEM_E2E_CANARIES = {
+  networkName: "stage12-network-form-canary",
+  ownerName: "stage12-owner-form-canary",
+  locationName: "stage12-location-form-canary",
+  feedbackComment: "stage12-feedback-comment-canary",
+  desiredFeatures: "stage12-feedback-features-canary",
+} as const;

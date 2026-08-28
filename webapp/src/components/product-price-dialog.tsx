@@ -21,6 +21,7 @@ export function PriceDialog({
   demoDataRevision,
   open,
   pending,
+  disabled = false,
   error,
   onOpenChange,
   onSave,
@@ -31,6 +32,7 @@ export function PriceDialog({
   demoDataRevision: number;
   open: boolean;
   pending: boolean;
+  disabled?: boolean;
   error: Error | null;
   onOpenChange: (open: boolean) => void;
   onSave: (id: string, request: PriceMutation) => void;
@@ -55,7 +57,7 @@ export function PriceDialog({
   };
 
   const submit = (overwrite = false) => {
-    if (!product || pending || submitting.current || invalid || unchanged) return;
+    if (!product || pending || disabled || submitting.current || invalid || unchanged) return;
     if (overwrite) key.current = null;
     key.current ??= crypto.randomUUID();
     submitting.current = true;
@@ -105,7 +107,7 @@ export function PriceDialog({
                     setPrice(event.target.value);
                   }}
                   aria-invalid={invalid || undefined}
-                  disabled={pending}
+                  disabled={pending || disabled}
                 />
               </label>
               {invalid && (
@@ -126,7 +128,7 @@ export function PriceDialog({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={pending}
+                      disabled={pending || disabled}
                       onClick={() => {
                         setPrice(product.currentPrice);
                         key.current = null;
@@ -138,7 +140,7 @@ export function PriceDialog({
                     <Button
                       type="button"
                       size="sm"
-                      disabled={pending || invalid || unchanged}
+                      disabled={pending || disabled || invalid || unchanged}
                       onClick={() => submit(true)}
                     >
                       {translate(locale, "actions.overwrite")}
@@ -158,7 +160,7 @@ export function PriceDialog({
                 </Button>
                 <Button
                   type="button"
-                  disabled={pending || invalid || unchanged || conflict}
+                  disabled={pending || disabled || invalid || unchanged || conflict}
                   onClick={() => submit()}
                 >
                   {pending

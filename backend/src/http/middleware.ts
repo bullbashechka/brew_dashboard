@@ -3,6 +3,7 @@ import { routePath } from "hono/route";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 
+import { authUrlFor } from "../auth/environment.ts";
 import { errorResponse } from "./errors.ts";
 import type { AppEnvironment } from "./types.ts";
 
@@ -39,10 +40,6 @@ export const signalsFor = (path: string, status: number): RequestSignal[] => {
   return signals.length ? signals : ["request"];
 };
 
-export const signalFor = (path: string, status: number): RequestSignal => {
-  return signalsFor(path, status)[0]!;
-};
-
 export const normalizeRoutePattern = (matchedRoute: string | undefined): string => {
   if (!matchedRoute || matchedRoute.endsWith("*")) return UNMATCHED_ROUTE;
   return matchedRoute;
@@ -63,13 +60,10 @@ const isJsonContentType = (value: string | undefined) => {
 };
 
 const expectedOrigin = (context: Context<AppEnvironment>) => {
-  const configured = context.env?.BETTER_AUTH_URL;
+  const configured = authUrlFor(context.env);
   if (configured) {
-    try {
-      return new URL(configured).origin;
-    } catch {
-      return null;
-    }
+    if (!URL.canParse(configured)) throw new Error("Configured authentication URL is invalid");
+    return new URL(configured).origin;
   }
   return new URL(context.req.url).origin;
 };
@@ -86,6 +80,13 @@ export const securityHeadersMiddleware = createMiddleware<AppEnvironment>(async 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) context.header(name, value);
   await next();
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) context.header(name, value);
+});
+
+/** API responses can contain session- and tenant-specific data. */
+export const noStoreMiddleware = createMiddleware<AppEnvironment>(async (context, next) => {
+  context.header("Cache-Control", "no-store");
+  await next();
+  context.header("Cache-Control", "no-store");
 });
 
 export const observabilityMiddleware = createMiddleware<AppEnvironment>(async (context, next) => {
@@ -152,8 +153,8 @@ export const __test = {
   JSON_BODY_LIMIT,
   expectedOrigin,
   SECURITY_HEADERS,
+  noStoreMiddleware,
   signalsFor,
-  signalFor,
   UNMATCHED_ROUTE,
   UNMATCHED_ROUTE_SAMPLE_RATE,
   normalizeRoutePattern,

@@ -4,7 +4,11 @@ import { createAccount, deleteAccount } from "../src/admin/accounts.ts";
 import { completeOnboarding, setOnboardingLanguage } from "../src/onboarding/service.ts";
 import { withRequestDatabase } from "../src/db/client.ts";
 import { createIsolatedTestDatabase } from "./isolated-test-db.ts";
-import { SYSTEM_E2E_FIXTURES } from "../../scripts/system-e2e-fixture.ts";
+import { SYSTEM_E2E_CANARIES, SYSTEM_E2E_FIXTURES } from "../../scripts/system-e2e-fixture.ts";
+import {
+  assertSystemE2eLogFilesSafe,
+  type SystemE2eLogCanary,
+} from "../../scripts/system-e2e-log-safety.ts";
 import { assertE2eAccountKind } from "./test-safety.ts";
 
 const adminUrl = process.env.DATABASE_TEST_ADMIN_URL;
@@ -39,11 +43,40 @@ const isolated = await createIsolatedTestDatabase(adminUrl);
 const accounts: Awaited<ReturnType<typeof createAccount>>[] = [];
 let server: Bun.Subprocess | undefined;
 let stopped = false;
+const systemSecret = crypto.randomUUID() + crypto.randomUUID();
+const runtimeUrl = new URL(isolated.runtimeUrl);
+const logCanaries: SystemE2eLogCanary[] = [
+  ...Object.values(SYSTEM_E2E_CANARIES).map((value) => ({
+    category: "form canary" as const,
+    value,
+  })),
+  { category: "auth secret", value: systemSecret },
+  ...Object.values(SYSTEM_E2E_FIXTURES).flatMap((group) =>
+    Object.values(group).flatMap((fixture) => [
+      { category: "fixture identity" as const, value: fixture.login },
+      { category: "fixture credential" as const, value: fixture.password },
+    ]),
+  ),
+  { category: "database credential", value: isolated.runtimeUrl },
+  { category: "database credential", value: runtimeUrl.password },
+];
+const serverStdoutLog = Bun.file(
+  new URL("../../.scratch/system-e2e-server.stdout.log", import.meta.url),
+);
+const serverStderrLog = Bun.file(
+  new URL("../../.scratch/system-e2e-server.stderr.log", import.meta.url),
+);
 const stop = async (exitCode?: number) => {
   if (stopped) return;
   stopped = true;
   server?.kill();
   await server?.exited.catch(() => undefined);
+  try {
+    await assertSystemE2eLogFilesSafe([serverStdoutLog, serverStderrLog], logCanaries);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "System E2E log safety check failed");
+    exitCode = 1;
+  }
   for (const account of accounts) {
     await withRequestDatabase(isolated.databaseUrl, async (db) => {
       await deleteAccount(db, { login: account.login, accountKind: "e2e" });
@@ -57,6 +90,8 @@ process.on("SIGINT", () => void stop(130));
 process.on("SIGTERM", () => void stop(143));
 
 try {
+  await Bun.write(serverStdoutLog, "");
+  await Bun.write(serverStderrLog, "");
   for (const fixture of Object.values(SYSTEM_E2E_FIXTURES).flatMap((group) =>
     Object.values(group),
   )) {
@@ -68,7 +103,7 @@ try {
       }),
     );
     accounts.push(account);
-    if (secondaryLogins.has(account.login)) {
+    if (secondaryLogins.has(account.login) || account.login.endsWith("-p")) {
       const startedAt = new Date();
       await withRequestDatabase(isolated.databaseUrl, (db) =>
         db.transaction(async (transaction) => {
@@ -116,13 +151,15 @@ try {
         ...workerEnvironment,
         E2E_SYSTEM: "1",
         E2E_ACCOUNT_KIND: "e2e",
-        BETTER_AUTH_SECRET: crypto.randomUUID() + crypto.randomUUID(),
-        BETTER_AUTH_URL: "http://127.0.0.1:4173",
+        SYSTEM_E2E_AUTH_SECRET: systemSecret,
+        SYSTEM_E2E_AUTH_URL: "http://127.0.0.1:4173",
         CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: isolated.runtimeUrl,
         WRANGLER_WRITE_LOGS: "false",
       },
-      stdout: "inherit",
-      stderr: "inherit",
+      // Workerd starts children with inherited descriptors. Use durable local
+      // files instead of Playwright's short-lived reporter pipes.
+      stdout: serverStdoutLog,
+      stderr: serverStderrLog,
     },
   );
 

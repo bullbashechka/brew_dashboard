@@ -39,6 +39,7 @@ export function InventoryMovementDialog({
   demoDataRevision,
   open,
   pending,
+  disabled = false,
   error,
   conflictState = "ready",
   onOpenChange,
@@ -52,6 +53,7 @@ export function InventoryMovementDialog({
   demoDataRevision: number;
   open: boolean;
   pending: boolean;
+  disabled?: boolean;
   error: Error | null;
   conflictState?: "ready" | "refresh_failed" | "unavailable" | undefined;
   onOpenChange: (open: boolean) => void;
@@ -92,6 +94,7 @@ export function InventoryMovementDialog({
       !balance ||
       !type ||
       pending ||
+      disabled ||
       submitting.current ||
       invalid ||
       !normalized ||
@@ -179,7 +182,7 @@ export function InventoryMovementDialog({
                     if (!conflict || conflictState === "ready") onClearError();
                   }}
                   aria-invalid={invalid || undefined}
-                  disabled={pending}
+                  disabled={pending || disabled}
                 />
               </label>
               <p className="text-sm text-stone-600">
@@ -230,7 +233,7 @@ export function InventoryMovementDialog({
                       <Button
                         type="button"
                         size="sm"
-                        disabled={pending || invalid}
+                        disabled={pending || disabled || invalid}
                         onClick={() => submit(true)}
                       >
                         {translate(locale, "inventory.retryLatest")}
@@ -241,7 +244,7 @@ export function InventoryMovementDialog({
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={pending}
+                        disabled={pending || disabled}
                         onClick={onRefreshConflict}
                       >
                         {translate(locale, "actions.retry")}
@@ -262,7 +265,7 @@ export function InventoryMovementDialog({
                 </Button>
                 <Button
                   type="button"
-                  disabled={pending || invalid || conflict}
+                  disabled={pending || disabled || invalid || conflict}
                   onClick={() => submit()}
                 >
                   {pending

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, openAppSection, test } from "./fixtures";
 
 const requestId = "123e4567-e89b-12d3-a456-426614174099";
 const apiError = {
@@ -42,7 +42,30 @@ const completeProfile = {
 
 test("completes Login → Language → Onboarding → Overview → Tour and can restart it", async ({
   page,
+  browserFailureGuard,
 }) => {
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/auth\/me$/u,
+    status: 401,
+  });
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/overview\?period=today$/u,
+    status: 500,
+    times: 3,
+  });
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/locations\?/u,
+    status: 500,
+    times: 2,
+  });
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/inventory\?period=today&pageSize=20$/u,
+    status: 500,
+  });
   let profile: typeof incompleteProfile | typeof completeProfile | null = null;
   const tourStates: string[] = [];
 
@@ -134,6 +157,9 @@ test("completes Login → Language → Onboarding → Overview → Tour and can 
   await page.route("**/api/v1/overview?*", (route) =>
     route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify(apiError) }),
   );
+  await page.route("**/api/v1/inventory?*", (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify(apiError) }),
+  );
 
   await page.goto("/");
   await page.getByLabel("Login alias").fill("demo.owner");
@@ -164,7 +190,7 @@ test("completes Login → Language → Onboarding → Overview → Tour and can 
   await expect(page.getByRole("dialog")).toBeHidden();
   expect(tourStates).toEqual(["completed"]);
 
-  await page.getByRole("link", { name: "Settings" }).click();
+  await openAppSection(page, "Settings");
   await page.getByRole("button", { name: "Start tour" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "Skip tour" }).click();
