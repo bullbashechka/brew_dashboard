@@ -26,7 +26,12 @@ const scan = async (page: Page) => {
   expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
 };
 
-test("keeps the public login surface WCAG AA clean", async ({ page }) => {
+test("keeps the public login surface WCAG AA clean", async ({ page, browserFailureGuard }) => {
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/auth\/me$/u,
+    status: 401,
+  });
   await page.route("**/api/v1/auth/me", (route) =>
     route.fulfill({
       status: 401,
@@ -44,7 +49,23 @@ test("keeps the public login surface WCAG AA clean", async ({ page }) => {
 
 test("keeps the guarded loading/error surface keyboard and WCAG AA accessible", async ({
   page,
+  browserFailureGuard,
 }) => {
+  browserFailureGuard.allowHttpError({
+    method: "POST",
+    url: "http://127.0.0.1:4173/api/v1/events",
+    status: 500,
+    // The fire-and-forget telemetry dispatcher retries transient failures.
+    minTimes: 1,
+    maxTimes: 3,
+  });
+  for (const path of ["overview?period=today", "feedback", "locations?period=today"]) {
+    browserFailureGuard.allowHttpError({
+      method: "GET",
+      url: new RegExp(`/api/v1/${path.replace("?", "\\?")}$`, "u"),
+      status: 500,
+    });
+  }
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/v1/**", (route) =>
     route.fulfill({

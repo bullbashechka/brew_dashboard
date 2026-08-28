@@ -122,6 +122,18 @@ DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
   bun run admin:cleanup-events -- --days 90 --max-rows 10000 --execute
 ```
 
+Expired sessions and verification records receive a 24-hour grace period; completed idempotency
+records are retained for 30 days and incomplete records for 24 hours. Inspect the aggregate-only
+dry run first, then add `--execute`. Remote execution requires
+`ALLOW_PRODUCTION_ADMIN=1 --confirm-production production`, just like every owner-only admin command:
+
+```bash
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:cleanup-expired-data
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:cleanup-expired-data -- --execute
+```
+
 Application observability logs keep matched route patterns and fixed `unmatched` cardinality for
 unknown paths; unmatched non-5xx requests are sampled at 1%, while all 5xx and matched signals are
 retained. Cloudflare invocation logs are disabled so only the structured application records are
@@ -257,7 +269,15 @@ Demo MVP on Railway Hobby; the real Hyperdrive binding remains environment confi
 than a checked-in secret.
 
 For the release load gate, run `bun run test:load:release` only against localhost or a staging host
-explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL`; optionally provide
-15 dedicated session-cookie headers as JSON in `RELEASE_LOAD_SESSION_COOKIES` to exercise the
-20 RPS authenticated-read phase without exceeding the per-account limiter. The script rejects
-unexpected network/5xx failure rates above 1% or aggregate p95 latency above 750 ms.
+explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL` and provide 15
+dedicated session-cookie headers as JSON in `RELEASE_LOAD_SESSION_COOKIES` to exercise the 20 RPS
+authenticated-read phase without exceeding the per-account limiter. It rotates `/auth/me`,
+`/overview` and `/locations`, reports p95 per route, and fails on any unexpected HTTP response,
+network failure, aggregate p95 above 750 ms, or per-route p95 above 750 ms.
+
+Manual release procedure (there is deliberately no hosted CI/Actions): run
+`bun run validate:stage12`, apply `0011_release-hardening.sql` with the owner connection, run
+`bun run db:smoke:hyperdrive`, and only then deploy with `bun run --cwd webapp wrangler deploy`.
+Before the deploy, set `BETTER_AUTH_SECRET` and the exact HTTPS `BETTER_AUTH_URL` as Cloudflare
+secrets; verify the deployment with `/api/v1/health`, the authenticated route mix, and the load
+gate. Keep the previous deployment available for Wrangler rollback if these checks fail.

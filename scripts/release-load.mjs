@@ -35,6 +35,7 @@ if (cookies.length > 0 && cookies.length < 15) {
 }
 
 const durations = [];
+const routeDurations = new Map();
 let unexpectedFailures = 0;
 let requestCount = 0;
 
@@ -44,11 +45,15 @@ const request = async (path, cookie) => {
     const response = await fetch(new URL(path, baseUrl), {
       headers: cookie ? { cookie } : undefined,
     });
-    if (response.status >= 500) unexpectedFailures += 1;
+    if (response.status < 200 || response.status >= 300) unexpectedFailures += 1;
   } catch {
     unexpectedFailures += 1;
   } finally {
-    durations.push(performance.now() - startedAt);
+    const duration = performance.now() - startedAt;
+    durations.push(duration);
+    const values = routeDurations.get(path) ?? [];
+    values.push(duration);
+    routeDurations.set(path, values);
     requestCount += 1;
   }
 };
@@ -81,10 +86,18 @@ const publicLoad = (async () => {
 const authenticatedLoad = cookies.length
   ? (async () => {
       let cookieIndex = 0;
+      let routeIndex = 0;
+      const routes = [
+        "/api/v1/auth/me",
+        "/api/v1/overview?period=today",
+        "/api/v1/locations?period=today",
+      ];
       await scheduleRequests(authenticatedRequestsPerSecond, durationSeconds, () => {
         const cookie = cookies[cookieIndex % cookies.length];
         cookieIndex += 1;
-        return request("/api/v1/auth/me", cookie);
+        const route = routes[routeIndex % routes.length];
+        routeIndex += 1;
+        return request(route, cookie);
       });
     })()
   : Promise.resolve();
@@ -92,18 +105,25 @@ await Promise.all([publicLoad, authenticatedLoad]);
 
 const p95 = percentile(durations, 0.95);
 const failureRate = requestCount ? unexpectedFailures / requestCount : 1;
+const routeP95Ms = Object.fromEntries(
+  [...routeDurations.entries()].map(([path, values]) => [
+    path,
+    Math.round(percentile(values, 0.95)),
+  ]),
+);
 console.log(
   JSON.stringify({
     event: "release_load_completed.v1",
     target: baseUrl.origin,
     requests: requestCount,
     p95Ms: Math.round(p95),
-    unexpected5xxOrNetworkFailures: unexpectedFailures,
+    routeP95Ms,
+    unexpectedResponsesOrNetworkFailures: unexpectedFailures,
     failureRate,
     authenticatedLoadIncluded: Boolean(cookies.length),
   }),
 );
 
-if (p95 > 750 || failureRate > 0.01) {
+if (p95 > 750 || Object.values(routeP95Ms).some((value) => value > 750) || failureRate > 0) {
   throw new Error("Release load acceptance criteria were not met");
 }

@@ -17,6 +17,7 @@ import {
 import { appUsers, authSessions, authUsers, networks } from "../db/schema.ts";
 import { recordServerProductEvent } from "../events/service.ts";
 import { errorResponse, unauthenticatedResponse } from "../http/errors.ts";
+import { observableRoute } from "../http/middleware.ts";
 import type { AppEnvironment } from "../http/types.ts";
 import {
   AUTH_BASE_PATH,
@@ -184,12 +185,8 @@ export const loadActiveProfile = async (
   options: { lock?: boolean } = {},
 ): Promise<LoadedProfile | null> => {
   const profileQuery = transaction
-    .select({
-      appUser: appUsers,
-      displayUsername: authUsers.displayUsername,
-    })
+    .select()
     .from(appUsers)
-    .innerJoin(authUsers, eq(authUsers.id, appUsers.authUserId))
     .where(
       and(
         eq(appUsers.authUserId, authUserId),
@@ -198,22 +195,30 @@ export const loadActiveProfile = async (
       ),
     );
   const rows = options.lock === false ? await profileQuery : await profileQuery.for("update");
-  const identity = rows[0];
-  if (!identity) return null;
+  const appUser = rows[0];
+  if (!appUser) return null;
 
-  await setTenantContext(transaction, identity.appUser.networkId);
+  const userRows = await transaction
+    .select({ displayUsername: authUsers.displayUsername })
+    .from(authUsers)
+    .where(eq(authUsers.id, appUser.authUserId))
+    .limit(1);
+  const user = userRows[0];
+  if (!user) return null;
+
+  await setTenantContext(transaction, appUser.networkId);
   const network = await transaction
     .select()
     .from(networks)
-    .where(eq(networks.id, identity.appUser.networkId))
+    .where(eq(networks.id, appUser.networkId))
     .limit(1);
   const currentNetwork = network[0];
   if (!currentNetwork) return null;
 
   const profile = profileSchema.parse({
-    userId: identity.appUser.authUserId,
-    login: identity.displayUsername || identity.appUser.loginNormalized,
-    networkId: identity.appUser.networkId,
+    userId: appUser.authUserId,
+    login: user.displayUsername || appUser.loginNormalized,
+    networkId: appUser.networkId,
     networkName: currentNetwork.name,
     ownerName: currentNetwork.ownerName,
     country: currentNetwork.countryCode,
@@ -228,15 +233,15 @@ export const loadActiveProfile = async (
     demoDataStale:
       Boolean(currentNetwork.demoGeneratedForDate && currentNetwork.timezone) &&
       currentNetwork.demoGeneratedForDate !== localDateKey(now, currentNetwork.timezone!),
-    tourState: identity.appUser.tourCompletedAt
+    tourState: appUser.tourCompletedAt
       ? "completed"
-      : identity.appUser.tourSkippedAt
+      : appUser.tourSkippedAt
         ? "skipped"
         : "pending",
-    expiresAt: identity.appUser.expiresAt?.toISOString() ?? null,
+    expiresAt: appUser.expiresAt?.toISOString() ?? null,
   });
 
-  return { networkId: identity.appUser.networkId, profile };
+  return { networkId: appUser.networkId, profile };
 };
 
 const revokeUserSessions = async (transaction: RequestTransaction, authUserId: string) => {
@@ -429,7 +434,7 @@ export const requireAuthentication = async (
         console.warn({
           event: "rate_limit_rejected.v1",
           scope: requestRateLimit.scope,
-          route: context.req.path,
+          route: observableRoute(context),
           subjectHash: requestRateLimit.key.slice(-12),
           retryAfter,
         });

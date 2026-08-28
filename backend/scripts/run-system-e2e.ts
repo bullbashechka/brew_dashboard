@@ -97,6 +97,12 @@ try {
     }
   }
 
+  const serverStdoutLog = Bun.file(
+    new URL("../../.scratch/system-e2e-server.stdout.log", import.meta.url),
+  );
+  const serverStderrLog = Bun.file(
+    new URL("../../.scratch/system-e2e-server.stderr.log", import.meta.url),
+  );
   server = Bun.spawn(
     [
       process.execPath,
@@ -121,8 +127,10 @@ try {
         CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: isolated.runtimeUrl,
         WRANGLER_WRITE_LOGS: "false",
       },
-      stdout: "inherit",
-      stderr: "inherit",
+      // Workerd starts children with inherited descriptors. Use durable local
+      // files instead of Playwright's short-lived reporter pipes.
+      stdout: serverStdoutLog,
+      stderr: serverStderrLog,
     },
   );
 

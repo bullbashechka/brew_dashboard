@@ -100,7 +100,10 @@ const applySlow4G = async (page: Page) => {
   });
 };
 
-test("enforces first-screen, filter and mutation release budgets", async ({ page }, testInfo) => {
+test("enforces first-screen, filter and mutation release budgets", async ({
+  page,
+  browserFailureGuard,
+}, testInfo) => {
   test.setTimeout(300_000);
   const system = process.env.E2E_SYSTEM === "1";
   if (system) {
@@ -111,6 +114,18 @@ test("enforces first-screen, filter and mutation release budgets", async ({ page
     await prepareSystemAccount(page, fixture);
     await applySlow4G(page);
   } else {
+    for (const path of [
+      "overview?period=today",
+      "feedback",
+      "locations?period=today",
+      "overview?period=7d",
+    ]) {
+      browserFailureGuard.allowHttpError({
+        method: "GET",
+        url: new RegExp(`/api/v1/${path.replace("?", "\\?")}$`, "u"),
+        status: 500,
+      });
+    }
     await installRoutes(page);
   }
   const measurements: Record<string, number> = {};

@@ -55,6 +55,7 @@ import {
 } from "./http/errors.ts";
 import {
   mutationSecurityMiddleware,
+  noStoreMiddleware,
   observabilityMiddleware,
   requestIdMiddleware,
   securityHeadersMiddleware,
@@ -510,6 +511,7 @@ export const app = new OpenAPIHono<AppEnvironment>({ defaultHook: validationHook
 
 app.use("*", requestIdMiddleware);
 app.use("*", securityHeadersMiddleware);
+app.use("*", noStoreMiddleware);
 app.use("*", observabilityMiddleware);
 app.use("*", mutationSecurityMiddleware);
 
@@ -650,6 +652,9 @@ app.onError((error, context) => {
   console.error({
     event: "http_request_failed.v1",
     errorName: error instanceof Error ? error.name : "UnknownError",
+    ...(typeof error === "object" && error && "code" in error && typeof error.code === "string"
+      ? { errorCode: error.code }
+      : {}),
     message: "Unhandled request error",
     method: context.req.method,
     route,
@@ -657,7 +662,6 @@ app.onError((error, context) => {
     requestId,
     signal: signals[0],
     signals,
-    ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
     durationMs: context.get("requestStartedAt") ? Date.now() - context.get("requestStartedAt") : 0,
     ...(account ? { userId: account.userId, networkId: account.networkId } : {}),
   });

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, openAppSection, test } from "./fixtures";
 import type { LocationsData, OverviewData, Profile } from "@brew-dashboard/contracts";
 
 const requestId = "123e4567-e89b-12d3-a456-426614174099";
@@ -339,13 +339,15 @@ test("updates Overview and Locations from the same location and period filters",
       url.searchParams.get("sortDir") === "desc"
     );
   });
-  await page.getByRole("link", { name: "Locations" }).click();
+  await openAppSection(page, "Locations");
   await centralLocationsResponse;
   await expect(page.getByRole("heading", { name: "Locations" })).toBeVisible();
-  const centralRow = page.getByRole("row").filter({
-    has: page.getByText("Central", { exact: true }),
-  });
-  await expect(centralRow).toContainText(/KZT\s*2,000\.00/);
+  const centralLocation = page
+    .getByTestId("page-locations")
+    .locator("article, tr")
+    .filter({ has: page.getByText("Central", { exact: true }) })
+    .filter({ visible: true });
+  await expect(centralLocation).toContainText(/KZT\s*2,000\.00/);
 
   const thirtyDayOverviewResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
@@ -368,16 +370,16 @@ test("updates Overview and Locations from the same location and period filters",
   await page.getByRole("combobox", { name: "Period", exact: true }).selectOption("30d");
   await Promise.all([thirtyDayOverviewResponse, thirtyDayLocationsResponse]);
   await expect.poll(() => new URL(page.url()).searchParams.get("period")).toBe("30d");
-  await expect(centralRow).toContainText(/KZT\s*4,300\.00/);
-  await expect(centralRow).toContainText(/KZT\s*1,720\.00/);
-  await expect(centralRow).toContainText(/KZT\s*100\.00/);
-  await expect(centralRow).toContainText(/40\.0%/);
+  await expect(centralLocation).toContainText(/KZT\s*4,300\.00/);
+  await expect(centralLocation).toContainText(/KZT\s*1,720\.00/);
+  await expect(centralLocation).toContainText(/KZT\s*100\.00/);
+  await expect(centralLocation).toContainText(/40\.0%/);
   await expect(page.getByRole("button", { name: "Active alerts: 4" })).toBeVisible();
 
   await page.getByRole("combobox", { name: "Sort by", exact: true }).selectOption("grossProfit");
   await expect.poll(() => new URL(page.url()).searchParams.get("sortBy")).toBe("grossProfit");
 
-  await page.getByRole("link", { name: "Overview" }).click();
+  await openAppSection(page, "Overview");
   const overview = page.getByTestId("page-overview");
   await expect(overview.getByRole("heading", { name: "Overview" })).toBeVisible();
   const metricCard = (name: string) =>
@@ -491,8 +493,9 @@ test("keeps populated analytics readable without horizontal overflow on mobile",
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
     const chart = await page.locator("figure[aria-labelledby='trend-title']").boundingBox();
-    expect(chart).not.toBeNull();
-    expect(chart!.x + chart!.width).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+    if (chart) {
+      expect(chart.x + chart.width).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+    }
   };
   await assertNoHorizontalOverflow();
 

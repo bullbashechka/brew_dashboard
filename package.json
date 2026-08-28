@@ -37,6 +37,7 @@
     "admin:disable-user": "bun run --cwd backend admin:disable-user",
     "admin:delete-user": "bun run --cwd backend admin:delete-user",
     "admin:cleanup-events": "bun run --cwd backend admin:cleanup-events",
+    "admin:cleanup-expired-data": "bun run --cwd backend admin:cleanup-expired-data",
     "build": "bun run --cwd packages/contracts build && bun run --cwd backend build && bun run --cwd webapp build && bun run check:build-secrets"
   },
   "devDependencies": {

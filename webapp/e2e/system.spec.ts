@@ -9,6 +9,7 @@ test.describe("Stage 12 real Worker system journey", () => {
     page,
     browser,
     baseURL,
+    browserFailureGuard,
   }, testInfo) => {
     const fixture =
       testInfo.project.name === "mobile-chromium"
@@ -110,6 +111,7 @@ test.describe("Stage 12 real Worker system journey", () => {
       baseURL: baseURL ?? "http://127.0.0.1:4173",
     });
     const secondaryPage = await secondaryContext.newPage();
+    browserFailureGuard.watchPage(secondaryPage);
     try {
       await secondaryPage.goto("/login");
       await secondaryPage.getByLabel("Login alias").fill(fixture.secondary.login);

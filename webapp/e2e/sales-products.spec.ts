@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, openAppSection, test, type Page } from "./fixtures";
 
 const requestId = "123e4567-e89b-12d3-a456-426614174099";
 const networkId = "123e4567-e89b-12d3-a456-426614174001";
@@ -283,10 +283,10 @@ test("updates current product pricing without changing mocked historical sales",
   await expect(
     page
       .getByTestId("page-products")
-      .locator("table")
-      .getByText(/KZT\s*9\.99/),
+      .getByText(/KZT\s*9\.99/)
+      .filter({ visible: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Sales" }).click();
+  await openAppSection(page, "Sales");
   await expect(page.getByRole("heading", { name: "Sales", exact: true })).toBeVisible();
   await expect(page.getByText(/KZT\s*100\.00/).first()).toBeVisible();
   await page.getByRole("button", { name: "Load more" }).click();

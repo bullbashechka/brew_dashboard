@@ -256,7 +256,13 @@ test("records receipt and write off with live stock alert updates", async ({ pag
 
 test("keeps a conflicted form available outside its status filter and retries with fresh data", async ({
   page,
+  browserFailureGuard,
 }) => {
+  browserFailureGuard.allowHttpError({
+    method: "POST",
+    url: /\/api\/v1\/inventory\/movements$/u,
+    status: 409,
+  });
   await installRoutes(page, true);
   await page.goto("/app/inventory?period=today&status=out_of_stock");
   await page.getByRole("button", { name: "Receipt" }).click();
@@ -269,7 +275,9 @@ test("keeps a conflicted form available outside its status filter and retries wi
   await page.getByRole("button", { name: "Record receipt" }).click();
   expect((await conflictResponse).status()).toBe(409);
 
-  await expect(page.getByText(/balance changed/i)).toBeVisible();
+  await expect(
+    page.getByText("This information changed. Please refresh and try again."),
+  ).toBeVisible();
   await expect(page.getByLabel("Quantity")).toHaveValue("2");
   await expect(page.getByText("Current balance: 2 kg")).toBeVisible();
   await expect(page).toHaveURL(/status=out_of_stock/);

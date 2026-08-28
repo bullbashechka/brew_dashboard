@@ -181,6 +181,7 @@ describe("Stage 3 login and admin boundaries", () => {
     for (const [name, value] of Object.entries(middlewareTest.SECURITY_HEADERS)) {
       expect(response.headers.get(name)).toBe(value);
     }
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(middlewareTest.signalsFor("/api/v1/auth/login", 401)[0]).toBe("login_failure");
     expect(middlewareTest.signalsFor("/api/v1/onboarding/complete", 409)[0]).toBe(
       "onboarding_failure",

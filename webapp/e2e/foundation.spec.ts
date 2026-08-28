@@ -60,7 +60,22 @@ test("keeps the SPA/API fallback boundary and directs guests to login", async ({
   expect(missingApiResponse.headers()["content-type"]).toContain("application/json");
 });
 
-test("renders the compact guarded shell without horizontal page overflow", async ({ page }) => {
+test("renders the compact guarded shell without horizontal page overflow", async ({
+  page,
+  browserFailureGuard,
+}) => {
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/locations\?period=today$/u,
+    status: 500,
+    times: 3,
+  });
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/overview\?period=7d(?:&locationId=.*)?$/u,
+    status: 500,
+    times: 4,
+  });
   await page.setViewportSize({ width: 320, height: 720 });
   await page.route("**/api/v1/auth/me", (route) =>
     route.fulfill({
@@ -76,7 +91,7 @@ test("renders the compact guarded shell without horizontal page overflow", async
   await page.route("**/api/v1/locations?period=today", (route) =>
     route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify(apiError) }),
   );
-  await page.route("**/api/v1/overview?period=7d", (route) =>
+  await page.route("**/api/v1/overview?*", (route) =>
     route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify(apiError) }),
   );
 
@@ -104,7 +119,14 @@ test("renders the compact guarded shell without horizontal page overflow", async
   expect(new URL(page.url()).searchParams.get("locationId")).toBe(profile.networkId);
 });
 
-test("localizes public and guarded routes", async ({ page }) => {
+test("localizes public and guarded routes", async ({ page, browserFailureGuard }) => {
+  for (const path of ["locations?period=today", "overview?period=today"]) {
+    browserFailureGuard.allowHttpError({
+      method: "GET",
+      url: new RegExp(`/api/v1/${path.replace("?", "\\?")}$`, "u"),
+      status: 500,
+    });
+  }
   const russianProfile = { ...profile, language: "ru", effectiveLanguage: "ru" };
   await page.route("**/api/v1/auth/me", (route) =>
     route.fulfill({
@@ -132,7 +154,27 @@ test("localizes public and guarded routes", async ({ page }) => {
   );
 });
 
-test("returns to login after an authenticated API request receives 401", async ({ page }) => {
+test("returns to login after an authenticated API request receives 401", async ({
+  page,
+  browserFailureGuard,
+}) => {
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/overview\?period=7d$/u,
+    status: 401,
+  });
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/locations\?period=today$/u,
+    status: 500,
+    minTimes: 0,
+    maxTimes: 1,
+  });
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/auth\/me$/u,
+    status: 401,
+  });
   let sessionRequests = 0;
   await page.route("**/api/v1/auth/me", (route) => {
     sessionRequests += 1;

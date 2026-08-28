@@ -63,7 +63,10 @@ export const authSessions = auth.table(
       .references(() => authUsers.id, { onDelete: "cascade" }),
     ...timestampColumns,
   },
-  (table) => [index("auth_sessions_user_id_idx").on(table.userId)],
+  (table) => [
+    index("auth_sessions_user_id_idx").on(table.userId),
+    index("auth_sessions_expires_at_idx").on(table.expiresAt),
+  ],
 );
 
 export const authAccounts = auth.table(
@@ -106,7 +109,10 @@ export const authVerifications = auth.table(
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     ...timestampColumns,
   },
-  (table) => [index("auth_verifications_identifier_idx").on(table.identifier)],
+  (table) => [
+    index("auth_verifications_identifier_idx").on(table.identifier),
+    index("auth_verifications_expires_at_idx").on(table.expiresAt),
+  ],
 );
 
 export const authRateLimits = auth.table(
@@ -615,6 +621,7 @@ export const idempotencyKeys = app
     },
     (table) => [
       unique("idempotency_keys_network_key_unique").on(table.networkId, table.key),
+      index("idempotency_keys_completed_at_idx").on(table.completedAt),
       check("idempotency_keys_hash_format_check", sql`${table.requestHash} ~ '^[a-f0-9]{64}$'`),
       tenantPolicy("idempotency_keys"),
     ],

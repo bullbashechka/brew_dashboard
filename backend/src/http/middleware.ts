@@ -81,6 +81,13 @@ export const securityHeadersMiddleware = createMiddleware<AppEnvironment>(async 
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) context.header(name, value);
 });
 
+/** API responses can contain session- and tenant-specific data. */
+export const noStoreMiddleware = createMiddleware<AppEnvironment>(async (context, next) => {
+  context.header("Cache-Control", "no-store");
+  await next();
+  context.header("Cache-Control", "no-store");
+});
+
 export const observabilityMiddleware = createMiddleware<AppEnvironment>(async (context, next) => {
   await next();
   if (context.get("requestErrorLogged")) return;
@@ -145,6 +152,7 @@ export const __test = {
   JSON_BODY_LIMIT,
   expectedOrigin,
   SECURITY_HEADERS,
+  noStoreMiddleware,
   signalsFor,
   UNMATCHED_ROUTE,
   UNMATCHED_ROUTE_SAMPLE_RATE,

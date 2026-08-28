@@ -58,9 +58,6 @@ export function InventoryPage({
   const refreshConflictTarget = async () => {
     if (!profile || !target) return;
     const currentTarget = target;
-    setTarget((current) =>
-      current === currentTarget ? { ...current, conflictState: "refresh_failed" } : current,
-    );
     try {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tenant", profile.networkId, "inventory"] }),
