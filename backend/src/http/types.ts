@@ -7,6 +7,10 @@ export type WorkerBindings = {
   HYPERDRIVE: Hyperdrive;
   BETTER_AUTH_SECRET?: string;
   BETTER_AUTH_URL?: string;
+  /** Injected only by the isolated local system-E2E Worker. */
+  SYSTEM_E2E?: string;
+  SYSTEM_E2E_AUTH_SECRET?: string;
+  SYSTEM_E2E_AUTH_URL?: string;
 };
 
 export type AuthenticatedRequest = {

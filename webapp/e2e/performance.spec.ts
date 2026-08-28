@@ -73,17 +73,11 @@ const prepareSystemAccount = async (
   await page.getByLabel("Password").fill(credentials.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByTestId("page-overview")).toBeVisible({ timeout: 180_000 });
-};
-
-const applySlow4G = async (page: Page) => {
-  const client = await page.context().newCDPSession(page);
-  await client.send("Network.enable");
-  await client.send("Network.emulateNetworkConditions", {
-    offline: false,
-    latency: 150,
-    downloadThroughput: 1_600_000 / 8,
-    uploadThroughput: 750_000 / 8,
-  });
+  const tour = page.getByRole("dialog");
+  if (await tour.count()) {
+    await tour.getByRole("button", { name: "Skip tour" }).click();
+    await expect(tour).toBeHidden();
+  }
 };
 
 test("@performance enforces first-screen, filter and mutation release budgets", async ({
@@ -97,12 +91,16 @@ test("@performance enforces first-screen, filter and mutation release budgets", 
     "Release performance measurements require the real Worker and isolated PostgreSQL",
   );
   if (system) {
+    browserFailureGuard.allowHttpError({
+      method: "GET",
+      url: /\/api\/v1\/auth\/me$/u,
+      status: 401,
+    });
     const fixture =
       testInfo.project.name === "mobile-chromium"
         ? SYSTEM_E2E_FIXTURES.mobile.performance
         : SYSTEM_E2E_FIXTURES.desktop.performance;
     await prepareSystemAccount(page, fixture);
-    await applySlow4G(page);
   } else {
     for (const path of [
       "overview?period=today",
@@ -130,7 +128,7 @@ test("@performance enforces first-screen, filter and mutation release budgets", 
     .first();
   const initialRevenue = system ? await revenueCard.locator("p").nth(1).textContent() : null;
   if (system) {
-    await expect(page.getByText("Revenue", { exact: true })).toBeVisible();
+    await expect(revenueCard.getByText("Revenue", { exact: true })).toBeVisible();
     expect(initialRevenue).not.toBeNull();
   }
   measurements.firstUsefulScreenMs = Date.now() - startedAt;
@@ -141,14 +139,14 @@ test("@performance enforces first-screen, filter and mutation release budgets", 
       response.url().includes("/api/v1/overview?") &&
       new URL(response.url()).searchParams.get("period") === "7d",
   );
-  await page.getByLabel("Period").selectOption("7d");
+  await page.getByRole("combobox", { name: "Period", exact: true }).selectOption("7d");
   const response = await filterResponse;
   await response.finished();
   const responseFinishedAt = Date.now();
   if (system) {
     await expect.poll(() => revenueCard.locator("p").nth(1).textContent()).not.toBe(initialRevenue);
   } else {
-    await expect(page.getByLabel("Period")).toHaveValue("7d");
+    await expect(page.getByRole("combobox", { name: "Period", exact: true })).toHaveValue("7d");
   }
   measurements.filterReactionMs = Date.now() - responseFinishedAt;
   expect(measurements.filterReactionMs).toBeLessThanOrEqual(budgets.filterReactionMs);

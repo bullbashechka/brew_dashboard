@@ -370,7 +370,7 @@ export function OnboardingForm({
                     name={field.name}
                     onBlur={field.handleBlur}
                     onChange={(event) => field.handleChange(event.target.value)}
-                    value={field.state.value}
+                    value={field.state.value ?? ""}
                   />
                   <ValidationMessage errors={field.state.meta.errors} />
                 </label>
@@ -385,7 +385,7 @@ export function OnboardingForm({
                     name={field.name}
                     onBlur={field.handleBlur}
                     onChange={(event) => field.handleChange(event.target.value)}
-                    value={field.state.value}
+                    value={field.state.value ?? ""}
                   />
                   <ValidationMessage errors={field.state.meta.errors} />
                 </label>
@@ -417,7 +417,7 @@ export function OnboardingForm({
                         name={field.name}
                         onBlur={field.handleBlur}
                         onChange={(event) => field.handleChange(event.target.value)}
-                        value={field.state.value}
+                        value={field.state.value ?? ""}
                       />
                       <ValidationMessage errors={field.state.meta.errors} />
                     </label>
@@ -440,7 +440,7 @@ export function OnboardingForm({
                         field.handleChange(country);
                         applyCountrySuggestion(country);
                       }}
-                      value={field.state.value}
+                      value={field.state.value ?? ""}
                     />
                     <span className="text-xs font-normal text-stone-600">
                       {translate(locale, "onboarding.countryHint")}
@@ -461,7 +461,7 @@ export function OnboardingForm({
                       onChange={(event) =>
                         updateSuggestedField("currency", event.target.value.toUpperCase())
                       }
-                      value={field.state.value}
+                      value={field.state.value ?? ""}
                     />
                     <ValidationMessage errors={field.state.meta.errors} />
                   </label>
@@ -478,7 +478,7 @@ export function OnboardingForm({
                     name={field.name}
                     onBlur={field.handleBlur}
                     onChange={(event) => updateSuggestedField("timeZone", event.target.value)}
-                    value={field.state.value}
+                    value={field.state.value ?? ""}
                   />
                   <datalist id="time-zone-options">
                     {Intl.supportedValuesOf("timeZone").map((timeZone) => (

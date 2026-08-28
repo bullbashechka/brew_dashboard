@@ -19,6 +19,7 @@ import { recordServerProductEvent } from "../events/service.ts";
 import { errorResponse, unauthenticatedResponse } from "../http/errors.ts";
 import { observableRoute } from "../http/middleware.ts";
 import type { AppEnvironment } from "../http/types.ts";
+import { authSecretFor, authUrlFor } from "./environment.ts";
 import {
   AUTH_BASE_PATH,
   SESSION_COOKIE_NAME,
@@ -61,8 +62,8 @@ type LoadedProfile = {
 };
 
 const getAuthEnvironment = (context: Context<AppEnvironment>): BetterAuthEnvironment => {
-  const secret = context.env?.BETTER_AUTH_SECRET;
-  const baseUrl = context.env?.BETTER_AUTH_URL;
+  const secret = authSecretFor(context.env);
+  const baseUrl = authUrlFor(context.env);
   if (!secret || secret.length < 32 || !baseUrl) {
     throw new Error("Better Auth server configuration is unavailable");
   }

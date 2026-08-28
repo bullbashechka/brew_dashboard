@@ -334,7 +334,9 @@ describeIntegration("Stage 3 authentication and account administration", () => {
             login: `stage3-alias-${index}-${crypto.randomUUID().slice(0, 8)}`,
             password: "wrong-password-123",
           },
-          ip: "198.51.100.43",
+          // Keep this IP independent from the expired-account assertion above:
+          // the limiter intentionally counts every login attempt, successful or not.
+          ip: "198.51.100.61",
         }),
       ),
     );

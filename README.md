@@ -172,7 +172,7 @@ the durable login-failure limit does not.
 Admin commands use the owner/unpooled database URL, never the runtime Hyperdrive role. Login aliases
 are normalized to lowercase and must contain 3–64 Latin letters, digits, `.`, `_` or `-`. A generated
 password is printed once only; use `--interactive-password` to enter one without putting it in shell
-history. Production commands additionally require the explicit environment/confirmation gate.
+history or echoing it back to the terminal. Production commands additionally require the explicit environment/confirmation gate.
 
 ```bash
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
@@ -279,9 +279,9 @@ authenticated-read phase without exceeding the per-account limiter. It rotates `
 `/overview` and `/locations`, reports p95 per route, and fails on any unexpected HTTP response,
 network failure, aggregate p95 above 750 ms, or per-route p95 above 750 ms.
 
-Manual release procedure (there is deliberately no hosted CI/Actions): run
-`bun run validate:stage12`, apply `0011_release-hardening.sql` with the owner connection, run
-`bun run db:smoke:hyperdrive`, and only then deploy with `bun run --cwd webapp wrangler deploy`.
-Before the deploy, set `BETTER_AUTH_SECRET` and the exact HTTPS `BETTER_AUTH_URL` as Cloudflare
-secrets; verify the deployment with `/api/v1/health`, the authenticated route mix, and the load
-gate. Keep the previous deployment available for Wrangler rollback if these checks fail.
+Manual release procedure (there is deliberately no hosted CI/Actions) is documented in
+[`docs/production-release.md`](docs/production-release.md). Run `bun run release:verify`, apply
+migrations with the owner connection, run `bun run db:smoke:hyperdrive`, and deploy only through
+`bun run release:deploy`. `BETTER_AUTH_URL` is a non-secret Worker variable; `BETTER_AUTH_SECRET`
+remains a Cloudflare Secret. Keep the previous deployment available for Wrangler rollback if the
+post-deploy checks fail.

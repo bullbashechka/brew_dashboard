@@ -37,6 +37,7 @@ lerna-debug.log*
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+.railway/
 
 # Terraform working data and secret-bearing local inputs
 **/.terraform/

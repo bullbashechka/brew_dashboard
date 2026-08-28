@@ -40,6 +40,17 @@ export default defineConfig(({ mode }) => ({
             configPath: "../wrangler.jsonc",
             inspectorPort: false,
             persistState: false,
+            ...(mode === "system"
+              ? {
+                  config: () => ({
+                    vars: {
+                      SYSTEM_E2E: "1",
+                      SYSTEM_E2E_AUTH_SECRET: process.env.SYSTEM_E2E_AUTH_SECRET ?? "",
+                      SYSTEM_E2E_AUTH_URL: process.env.SYSTEM_E2E_AUTH_URL ?? "",
+                    },
+                  }),
+                }
+              : {}),
           }),
         ]),
   ],

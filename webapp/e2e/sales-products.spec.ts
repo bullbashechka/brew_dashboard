@@ -287,7 +287,12 @@ test("updates current product pricing without changing mocked historical sales",
       .filter({ visible: true }),
   ).toBeVisible();
   await openAppSection(page, "Sales");
-  await expect(page.getByRole("heading", { name: "Sales", exact: true })).toBeVisible();
+  // Sales can be this worker's first lazy-loaded route while the shared Vite
+  // server is cold. Wait for route readiness rather than treating transform
+  // latency as a failed pricing journey.
+  await expect(page.getByRole("heading", { name: "Sales", exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByText(/KZT\s*100\.00/).first()).toBeVisible();
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByRole("button", { name: "Load more" })).toBeHidden();
@@ -304,7 +309,13 @@ test("keeps heatmap, matrix, and data views accessible across desktop and mobile
   await page.goto("/app/products?period=7d");
   const productsPage = page.getByTestId("page-products");
   const matrix = productsPage.locator("section[aria-labelledby='menu-matrix-title']");
-  await expect(matrix.getByRole("heading", { name: "Menu engineering matrix" })).toBeVisible();
+  // A cold Vite server can take longer than the default assertion window to
+  // transform the lazily loaded Products route while four browser workers open
+  // their first routes. This is an initial-render readiness wait, not a retry
+  // of the journey itself.
+  await expect(matrix.getByRole("heading", { name: "Menu engineering matrix" })).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(matrix.locator(".recharts-responsive-container")).toBeVisible();
   for (const group of ["Stars", "Workhorses", "Puzzles", "Dogs"]) {
     await expect(matrix.getByRole("heading", { name: group })).toBeVisible();

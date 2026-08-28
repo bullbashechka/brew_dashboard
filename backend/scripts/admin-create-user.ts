@@ -30,4 +30,8 @@ const result = await withAdminDatabase((db) => {
 });
 
 console.log(`Login: ${result.login}`);
-console.log(`Password (shown once): ${result.password}`);
+if (argumentsMap.has("--interactive-password")) {
+  console.log("Password was accepted interactively and is not echoed.");
+} else {
+  console.log(`Password (shown once): ${result.password}`);
+}

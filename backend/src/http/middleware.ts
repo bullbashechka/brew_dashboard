@@ -3,6 +3,7 @@ import { routePath } from "hono/route";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 
+import { authUrlFor } from "../auth/environment.ts";
 import { errorResponse } from "./errors.ts";
 import type { AppEnvironment } from "./types.ts";
 
@@ -59,7 +60,7 @@ const isJsonContentType = (value: string | undefined) => {
 };
 
 const expectedOrigin = (context: Context<AppEnvironment>) => {
-  const configured = context.env?.BETTER_AUTH_URL;
+  const configured = authUrlFor(context.env);
   if (configured) {
     if (!URL.canParse(configured)) throw new Error("Configured authentication URL is invalid");
     return new URL(configured).origin;

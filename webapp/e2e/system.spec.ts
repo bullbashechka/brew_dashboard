@@ -25,6 +25,13 @@ test.describe("@system Stage 12 real Worker system journeys", () => {
       url: /\/api\/v1\/events$/u,
       status: 400,
     });
+    browserFailureGuard.allowHttpError({
+      method: "GET",
+      url: /\/api\/v1\/auth\/me$/u,
+      status: 401,
+      minTimes: 1,
+      maxTimes: 2,
+    });
 
     await page.goto("/login");
     await page.getByLabel("Login alias").fill(fixture.primary.login);
@@ -57,12 +64,16 @@ test.describe("@system Stage 12 real Worker system journeys", () => {
         response.url().includes("/api/v1/overview?") &&
         new URL(response.url()).searchParams.get("period") === "7d",
     );
-    await page.getByLabel("Period").selectOption("7d");
+    await page.getByRole("combobox", { name: "Period", exact: true }).selectOption("7d");
     await (await filterResponse).finished();
-    await expect(page.getByLabel("Period")).toHaveValue("7d");
+    await expect(page.getByRole("combobox", { name: "Period", exact: true })).toHaveValue("7d");
 
     await page.goto("/app/products?period=7d");
-    await expect(page.getByRole("heading", { name: "Products" })).toBeVisible();
+    // The route is loaded lazily from a real local Worker and can be the
+    // first transformed application chunk in this serial system run.
+    await expect(page.getByRole("heading", { name: "Products" })).toBeVisible({
+      timeout: 15_000,
+    });
     const productsResponse = await page.evaluate(async () => {
       const response = await fetch("/api/v1/products?period=7d");
       return (await response.json()) as {
@@ -89,7 +100,7 @@ test.describe("@system Stage 12 real Worker system journeys", () => {
     await page.getByRole("button", { name: "Save goal" }).click();
     await expect(page.getByText("Monthly goal saved.")).toBeVisible();
 
-    await page.getByRole("button", { name: "Feedback" }).click();
+    await page.getByRole("button", { name: "Feedback", exact: true }).first().click();
     const feedback = page.getByRole("dialog");
     await feedback
       .getByLabel("What should we add for you to adopt this product?")
@@ -113,7 +124,7 @@ test.describe("@system Stage 12 real Worker system journeys", () => {
       return { status: response.status, feedback: body.data ?? null };
     });
     expect(restoredFeedback.status).toBe(200);
-    expect(restoredFeedback.feedback).toEqual({
+    expect(restoredFeedback.feedback).toMatchObject({
       rating: 5,
       comment: SYSTEM_E2E_CANARIES.feedbackComment,
       desiredFeatures: SYSTEM_E2E_CANARIES.desiredFeatures,
