@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Client } from "pg";
+import { Client, type ClientConfig } from "pg";
 
 import * as schema from "./schema.ts";
 
@@ -20,6 +20,15 @@ export class DatabaseConnectionCloseError extends Error {
     this.name = "DatabaseConnectionCloseError";
   }
 }
+
+export const REQUEST_DATABASE_CLIENT_CONFIG = {
+  connectionTimeoutMillis: 5_000,
+  lock_timeout: 3_000,
+  statement_timeout: 15_000,
+  query_timeout: 20_000,
+  idle_in_transaction_session_timeout: 20_000,
+  application_name: "brew-dashboard-worker",
+} satisfies Omit<ClientConfig, "connectionString">;
 
 const withClientLifecycle = async <T>(
   client: RequestClientLifecycle,
@@ -52,7 +61,7 @@ export const withRequestDatabase = async <T>(
   connectionString: string,
   callback: (db: RequestDatabase) => Promise<T>,
 ): Promise<T> => {
-  const client = new Client({ connectionString });
+  const client = new Client({ connectionString, ...REQUEST_DATABASE_CLIENT_CONFIG });
   return withClientLifecycle(client, () => callback(drizzle(client, { schema })));
 };
 
@@ -64,8 +73,8 @@ const advisoryLock = async (transaction: RequestTransaction, key: string) => {
   await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 };
 
-export const lockLogin = (transaction: RequestTransaction, loginNormalized: string) =>
-  advisoryLock(transaction, `brew-dashboard:login:${loginNormalized}`);
+export const lockLogin = (transaction: RequestTransaction, accountKey: string) =>
+  advisoryLock(transaction, `brew-dashboard:login:${accountKey}`);
 
 export const lockAuthUser = (transaction: RequestTransaction, authUserId: string) =>
   advisoryLock(transaction, `brew-dashboard:user:${authUserId}`);

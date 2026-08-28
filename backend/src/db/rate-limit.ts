@@ -16,6 +16,34 @@ export type FixedWindowResult = {
   retryAfter: number | null;
 };
 
+export const inspectFixedWindow = async (
+  transaction: RequestTransaction,
+  input: FixedWindowInput,
+): Promise<FixedWindowResult> => {
+  const rows = await transaction
+    .select()
+    .from(authRateLimits)
+    .where(eq(authRateLimits.key, input.key))
+    .for("update");
+  const existing = rows[0];
+  if (!existing) return { allowed: true, startedWindow: true, retryAfter: null };
+
+  const windowMs = input.windowSeconds * 1000;
+  const elapsed = input.nowMs - existing.lastRequest;
+  if (elapsed >= windowMs) return { allowed: true, startedWindow: true, retryAfter: null };
+  if (existing.count < input.max) return { allowed: true, startedWindow: false, retryAfter: null };
+
+  return {
+    allowed: false,
+    startedWindow: false,
+    retryAfter: Math.max(1, Math.ceil((windowMs - Math.max(0, elapsed)) / 1000)),
+  };
+};
+
+export const clearFixedWindow = async (transaction: RequestTransaction, key: string) => {
+  await transaction.delete(authRateLimits).where(eq(authRateLimits.key, key));
+};
+
 export const consumeFixedWindow = async (
   transaction: RequestTransaction,
   input: FixedWindowInput,

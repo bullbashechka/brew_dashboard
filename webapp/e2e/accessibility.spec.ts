@@ -113,6 +113,6 @@ test("keeps the first-run form labels and validation surface WCAG AA accessible"
   await page.goto("/first-run/onboarding");
   await expect(page.getByRole("heading", { name: "Set up your coffee network" })).toBeVisible();
   await page.getByRole("button", { name: "Create my dashboard" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert").first()).toBeVisible();
   await scan(page);
 });

@@ -15,12 +15,14 @@ Install and validate with the repository-pinned Bun version:
 bun install --frozen-lockfile
 bun run lint
 bun run typecheck
+bun run db:check
 bun run test
 bun run test:integration:docker
 bun run test:e2e
 bun run test:e2e:system:docker
 bun run build
 bun run audit
+bun run security:scan
 ```
 
 The complete Stage 12 release gate is available as one command and stops at the first failed
@@ -143,6 +145,14 @@ under a non-public path and is not routed by the Worker. Sessions are database-b
 cookies; signup, recovery, email confirmation and user-facing password changes are disabled.
 Mutating requests must be same-origin JSON and are limited to 256 KiB.
 
+Login protection is server-side: a login alias has at most 10 failed attempts in 15 minutes
+across all IPs, persisted as an HMAC-derived PostgreSQL key. A successful login clears that
+bucket. The Worker additionally applies best-effort per-isolate limits of 50 login requests per
+15 minutes per trusted `CF-Connecting-IP`, 120 authenticated reads/minute/account, 30 ordinary
+mutations/minute/account, and 3 demo resets/hour/account. Browser event telemetry keeps its
+durable 30/minute and 300/day tenant limits. Memory limits intentionally reset on Worker restart;
+the durable login-failure limit does not.
+
 Admin commands use the owner/unpooled database URL, never the runtime Hyperdrive role. Login aliases
 are normalized to lowercase and must contain 3–64 Latin letters, digits, `.`, `_` or `-`. A generated
 password is printed once only; use `--interactive-password` to enter one without putting it in shell
@@ -245,3 +255,9 @@ Production release order is: apply migrations with the unpooled owner URL, smoke
 and API, then deploy the Worker. Backups and disaster-recovery automation are out of scope for the
 Demo MVP on Railway Hobby; the real Hyperdrive binding remains environment configuration rather
 than a checked-in secret.
+
+For the release load gate, run `bun run test:load:release` only against localhost or a staging host
+explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL`; optionally provide
+15 dedicated session-cookie headers as JSON in `RELEASE_LOAD_SESSION_COOKIES` to exercise the
+20 RPS authenticated-read phase without exceeding the per-account limiter. The script rejects
+unexpected network/5xx failure rates above 1% or aggregate p95 latency above 750 ms.

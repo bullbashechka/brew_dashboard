@@ -28,7 +28,14 @@ test("keeps the SPA/API fallback boundary and directs guests to login", async ({
   page,
   request,
   baseURL,
+  browserFailureGuard,
 }) => {
+  browserFailureGuard.allowHttpError({
+    method: "GET",
+    url: /\/api\/v1\/auth\/me$/u,
+    status: 401,
+    times: 2,
+  });
   await page.route("**/api/v1/auth/me", (route) =>
     route.fulfill({
       status: 401,

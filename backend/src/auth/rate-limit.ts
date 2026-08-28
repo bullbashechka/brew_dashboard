@@ -1,74 +1,114 @@
-import { createHash } from "node:crypto";
-import { and, like, lt, or } from "drizzle-orm";
+import { and, asc, inArray, like, lt } from "drizzle-orm";
 
 import { type RequestTransaction } from "../db/client.ts";
-import { consumeFixedWindow } from "../db/rate-limit.ts";
+import { consumeFixedWindow, inspectFixedWindow, clearFixedWindow } from "../db/rate-limit.ts";
 import { authRateLimits } from "../db/schema.ts";
+import { consumeMemoryFixedWindow, rateLimitKey, trustedClientIp } from "../http/rate-limit.ts";
 
-export const LOGIN_PAIR_WINDOW_SECONDS = 15 * 60;
-export const LOGIN_PAIR_MAX_ATTEMPTS = 5;
-export const LOGIN_IP_MAX_ATTEMPTS = 20;
-export const LOGIN_GLOBAL_MAX_ATTEMPTS = 300;
-export const LOGIN_GLOBAL_KEY = "brew-dashboard:login-global";
+export const LOGIN_WINDOW_SECONDS = 15 * 60;
+export const LOGIN_ACCOUNT_MAX_FAILURES = 10;
+export const LOGIN_IP_MAX_ATTEMPTS = 50;
+export const AUTHENTICATED_READ_WINDOW_SECONDS = 60;
+export const AUTHENTICATED_READ_MAX_REQUESTS = 120;
+export const AUTHENTICATED_MUTATION_WINDOW_SECONDS = 60;
+export const AUTHENTICATED_MUTATION_MAX_REQUESTS = 30;
+export const DEMO_RESET_WINDOW_SECONDS = 60 * 60;
+export const DEMO_RESET_MAX_REQUESTS = 3;
 
-const LOGIN_KEY_PREFIX = "brew-dashboard:login-";
+const LOGIN_KEY_PREFIX = "brew-dashboard:login-account:";
 const LOGIN_RETENTION_SECONDS = 24 * 60 * 60;
+const LOGIN_CLEANUP_BATCH_SIZE = 500;
+let lastCleanupAt = 0;
 
-const digest = (value: string) => createHash("sha256").update(value).digest("hex");
+export const loginAccountRateLimitKey = (secret: string, loginNormalized: string) =>
+  rateLimitKey(secret, "login-account", loginNormalized);
 
-const pairKey = (ipAddress: string, login: string) =>
-  `${LOGIN_KEY_PREFIX}pair:${digest(`${ipAddress}\u0000${login}`)}`;
+const loginIpRateLimitKey = (secret: string, ipAddress: string) =>
+  rateLimitKey(secret, "login-ip", trustedClientIp(ipAddress));
 
-const ipKey = (ipAddress: string) => `${LOGIN_KEY_PREFIX}ip:${digest(ipAddress)}`;
+export const consumeLoginIpRateLimit = (secret: string, ipAddress: string | undefined) =>
+  consumeMemoryFixedWindow({
+    key: loginIpRateLimitKey(secret, ipAddress ?? "unknown"),
+    windowSeconds: LOGIN_WINDOW_SECONDS,
+    max: LOGIN_IP_MAX_ATTEMPTS,
+  });
 
-const cleanupExpiredRateLimits = async (transaction: RequestTransaction, nowMs: number) => {
-  const loginCutoff = nowMs - LOGIN_PAIR_WINDOW_SECONDS * 1000;
-  const retentionCutoff = nowMs - LOGIN_RETENTION_SECONDS * 1000;
-  const loginKeys = and(
-    like(authRateLimits.key, `${LOGIN_KEY_PREFIX}%`),
-    lt(authRateLimits.lastRequest, loginCutoff),
-  )!;
-  await transaction
-    .delete(authRateLimits)
-    .where(or(loginKeys, lt(authRateLimits.lastRequest, retentionCutoff)));
+export const consumeAuthenticatedRequestRateLimit = (
+  secret: string,
+  authUserId: string,
+  method: string,
+  path: string,
+) => {
+  if (path.endsWith("/events")) return null;
+
+  const isReset = path.endsWith("/demo/reset");
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+  const scope = isReset ? "demo-reset" : isMutation ? "api-mutation" : "api-read";
+  const windowSeconds = isReset
+    ? DEMO_RESET_WINDOW_SECONDS
+    : isMutation
+      ? AUTHENTICATED_MUTATION_WINDOW_SECONDS
+      : AUTHENTICATED_READ_WINDOW_SECONDS;
+  const max = isReset
+    ? DEMO_RESET_MAX_REQUESTS
+    : isMutation
+      ? AUTHENTICATED_MUTATION_MAX_REQUESTS
+      : AUTHENTICATED_READ_MAX_REQUESTS;
+  const key = rateLimitKey(secret, scope, authUserId);
+  return { scope, key, ...consumeMemoryFixedWindow({ key, windowSeconds, max }) };
 };
 
-export class LoginRateLimitError extends Error {
-  constructor(readonly retryAfter: number) {
-    super("Login rate limit exceeded");
-    this.name = "LoginRateLimitError";
-  }
-}
+const cleanupExpiredRateLimits = async (transaction: RequestTransaction, nowMs: number) => {
+  if (nowMs - lastCleanupAt < LOGIN_WINDOW_SECONDS * 1000) return;
+  lastCleanupAt = nowMs;
+  const retentionCutoff = nowMs - LOGIN_RETENTION_SECONDS * 1000;
+  const stale = await transaction
+    .select({ id: authRateLimits.id })
+    .from(authRateLimits)
+    .where(
+      and(
+        like(authRateLimits.key, `${LOGIN_KEY_PREFIX}%`),
+        lt(authRateLimits.lastRequest, retentionCutoff),
+      ),
+    )
+    .orderBy(asc(authRateLimits.lastRequest))
+    .limit(LOGIN_CLEANUP_BATCH_SIZE);
+  if (!stale.length) return;
+  await transaction.delete(authRateLimits).where(
+    inArray(
+      authRateLimits.id,
+      stale.map((row) => row.id),
+    ),
+  );
+};
 
-export const consumeLoginRateLimit = async (
+export const checkLoginAccountRateLimit = async (
   transaction: RequestTransaction,
-  ipAddress: string,
-  login: string,
+  accountKey: string,
 ) => {
   const nowMs = Date.now();
-  const global = await consumeFixedWindow(transaction, {
-    key: LOGIN_GLOBAL_KEY,
-    windowSeconds: LOGIN_PAIR_WINDOW_SECONDS,
-    max: LOGIN_GLOBAL_MAX_ATTEMPTS,
+  await cleanupExpiredRateLimits(transaction, nowMs);
+  return inspectFixedWindow(transaction, {
+    key: accountKey,
+    windowSeconds: LOGIN_WINDOW_SECONDS,
+    max: LOGIN_ACCOUNT_MAX_FAILURES,
     nowMs,
   });
-  if (!global.allowed)
-    throw new LoginRateLimitError(global.retryAfter ?? LOGIN_PAIR_WINDOW_SECONDS);
-  if (global.startedWindow) await cleanupExpiredRateLimits(transaction, nowMs);
+};
 
-  const ip = await consumeFixedWindow(transaction, {
-    key: ipKey(ipAddress),
-    windowSeconds: LOGIN_PAIR_WINDOW_SECONDS,
-    max: LOGIN_IP_MAX_ATTEMPTS,
-    nowMs,
+export const recordLoginFailure = async (transaction: RequestTransaction, accountKey: string) =>
+  consumeFixedWindow(transaction, {
+    key: accountKey,
+    windowSeconds: LOGIN_WINDOW_SECONDS,
+    max: LOGIN_ACCOUNT_MAX_FAILURES,
+    nowMs: Date.now(),
   });
-  if (!ip.allowed) throw new LoginRateLimitError(ip.retryAfter ?? LOGIN_PAIR_WINDOW_SECONDS);
 
-  const pair = await consumeFixedWindow(transaction, {
-    key: pairKey(ipAddress, login),
-    windowSeconds: LOGIN_PAIR_WINDOW_SECONDS,
-    max: LOGIN_PAIR_MAX_ATTEMPTS,
-    nowMs,
-  });
-  if (!pair.allowed) throw new LoginRateLimitError(pair.retryAfter ?? LOGIN_PAIR_WINDOW_SECONDS);
+export const clearLoginFailures = (transaction: RequestTransaction, accountKey: string) =>
+  clearFixedWindow(transaction, accountKey);
+
+export const __test = {
+  resetCleanupClock: () => {
+    lastCleanupAt = 0;
+  },
 };

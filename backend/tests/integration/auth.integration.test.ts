@@ -292,7 +292,7 @@ describeIntegration("Stage 3 authentication and account administration", () => {
     expect((await login(accountB, "198.51.100.40")).response.status).toBe(401);
   });
 
-  it("rejects an expired account and applies the pair plus IP login rate limits", async () => {
+  it("rejects an expired account and applies per-login and IP login rate limits", async () => {
     const expiring = await createE2eAccount(
       `stage3-expired-${crypto.randomUUID().slice(0, 8)}`,
       "Stage3-expired-A1",
@@ -303,24 +303,31 @@ describeIntegration("Stage 3 authentication and account administration", () => {
     );
     expect((await login(expiring, "198.51.100.41")).response.status).toBe(401);
 
-    const rateLogin = accountA.login;
+    const rateAccount = await createE2eAccount(
+      `stage3-rate-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage3-rate-account-A1",
+    );
     const responses = await Promise.all(
-      Array.from({ length: 6 }, () =>
+      Array.from({ length: 10 }, (_, index) =>
         request("/api/v1/auth/login", {
           method: "POST",
-          body: { login: rateLogin, password: "wrong-password-123" },
-          ip: "198.51.100.42",
+          body: { login: rateAccount.login.toUpperCase(), password: "wrong-password-123" },
+          ip: `198.51.100.${42 + index}`,
         }),
       ),
     );
     const statuses = responses.map((response) => response.status);
-    expect(statuses.filter((status) => status === 401)).toHaveLength(5);
-    const rateLimited = responses.filter((response) => response.status === 429);
-    expect(rateLimited).toHaveLength(1);
-    expect(Number(rateLimited[0]?.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(statuses.filter((status) => status === 401)).toHaveLength(10);
+    const rateLimited = await request("/api/v1/auth/login", {
+      method: "POST",
+      body: { login: rateAccount.login, password: rateAccount.password },
+      ip: "198.51.100.60",
+    });
+    expect(rateLimited.status).toBe(429);
+    expect(Number(rateLimited.headers.get("retry-after"))).toBeGreaterThan(0);
 
     const aliasesFromOneIp = await Promise.all(
-      Array.from({ length: 21 }, (_, index) =>
+      Array.from({ length: 51 }, (_, index) =>
         request("/api/v1/auth/login", {
           method: "POST",
           body: {
@@ -332,6 +339,33 @@ describeIntegration("Stage 3 authentication and account administration", () => {
       ),
     );
     expect(aliasesFromOneIp.filter((response) => response.status === 429)).toHaveLength(1);
+  });
+
+  it("clears a login failure bucket after a successful authentication", async () => {
+    const account = await createE2eAccount(
+      `stage3-reset-limit-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage3-reset-limit-A1",
+    );
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const rejected = await request("/api/v1/auth/login", {
+        method: "POST",
+        body: { login: account.login, password: "wrong-password-123" },
+        ip: `198.51.101.${attempt + 1}`,
+      });
+      expect(rejected.status).toBe(401);
+    }
+    expect((await login(account, "198.51.101.3")).response.status).toBe(200);
+
+    const afterReset = await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        request("/api/v1/auth/login", {
+          method: "POST",
+          body: { login: account.login, password: "wrong-password-123" },
+          ip: `198.51.101.${index + 10}`,
+        }),
+      ),
+    );
+    expect(afterReset.every((response) => response.status === 401)).toBe(true);
   });
 
   it("serializes the fifteen-active-demo cap while excluding e2e accounts", async () => {

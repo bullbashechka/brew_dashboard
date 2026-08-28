@@ -1,8 +1,23 @@
 import { describe, expect, it } from "bun:test";
 
-import { DatabaseConnectionCloseError, __test as databaseClientTest } from "../../src/db/client.ts";
+import {
+  DatabaseConnectionCloseError,
+  REQUEST_DATABASE_CLIENT_CONFIG,
+  __test as databaseClientTest,
+} from "../../src/db/client.ts";
 
 describe("request database client lifecycle", () => {
+  it("uses bounded connection, statement, lock, query and idle-transaction timeouts", () => {
+    expect(REQUEST_DATABASE_CLIENT_CONFIG).toMatchObject({
+      connectionTimeoutMillis: 5_000,
+      lock_timeout: 3_000,
+      statement_timeout: 15_000,
+      query_timeout: 20_000,
+      idle_in_transaction_session_timeout: 20_000,
+      application_name: "brew-dashboard-worker",
+    });
+  });
+
   it("returns the callback result when connect and close succeed", async () => {
     const calls: string[] = [];
     const result = await databaseClientTest.withClientLifecycle(
