@@ -308,14 +308,6 @@ export function OnboardingForm({
     },
   });
 
-  const setLocationCount = (count: number) => {
-    const locations = form.state.values.locations;
-    form.setFieldValue(
-      "locations",
-      Array.from({ length: count }, (_, index) => locations[index] ?? { name: "" }),
-    );
-  };
-
   const applyCountrySuggestion = (country: string) => {
     const suggestion = countrySuggestions[country];
     const nextAutoSuggestedFields = new Set(autoSuggestedFields.current);
@@ -391,40 +383,59 @@ export function OnboardingForm({
                 </label>
               )}
             </form.Field>
-            <label className="grid gap-1 text-sm font-medium text-stone-800">
-              {translate(locale, "onboarding.locationCount")}
-              <select
-                className="control w-full"
-                onChange={(event) => setLocationCount(Number(event.target.value))}
-                value={form.state.values.locations.length}
-              >
-                {[1, 2, 3, 4, 5].map((count) => (
-                  <option key={count} value={count}>
-                    {count}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {form.state.values.locations.slice(0, 5).map((_, index) => {
-              const fieldName = locationFieldNames[index]!;
-              return (
-                <form.Field key={fieldName} name={fieldName}>
-                  {(field) => (
-                    <label className="grid gap-1 text-sm font-medium text-stone-800">
-                      {translate(locale, "onboarding.locationName", { number: index + 1 })}
-                      <input
-                        className="control w-full"
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onChange={(event) => field.handleChange(event.target.value)}
-                        value={field.state.value ?? ""}
-                      />
-                      <ValidationMessage errors={field.state.meta.errors} />
-                    </label>
-                  )}
-                </form.Field>
-              );
-            })}
+            <form.Field name="locations" mode="array">
+              {(locationsField) => (
+                <>
+                  <label className="grid gap-1 text-sm font-medium text-stone-800">
+                    {translate(locale, "onboarding.locationCount")}
+                    <select
+                      className="control w-full"
+                      onChange={(event) => {
+                        const count = Number(event.target.value);
+                        const currentCount = locationsField.state.value.length;
+
+                        if (count > currentCount) {
+                          for (let index = currentCount; index < count; index += 1) {
+                            locationsField.pushValue({ name: "" });
+                          }
+                        } else {
+                          for (let index = currentCount; index > count; index -= 1) {
+                            locationsField.removeValue(index - 1);
+                          }
+                        }
+                      }}
+                      value={locationsField.state.value.length}
+                    >
+                      {[1, 2, 3, 4, 5].map((count) => (
+                        <option key={count} value={count}>
+                          {count}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {locationsField.state.value.slice(0, 5).map((_, index) => {
+                    const fieldName = locationFieldNames[index]!;
+                    return (
+                      <form.Field key={fieldName} name={fieldName}>
+                        {(field) => (
+                          <label className="grid gap-1 text-sm font-medium text-stone-800">
+                            {translate(locale, "onboarding.locationName", { number: index + 1 })}
+                            <input
+                              className="control w-full"
+                              name={field.name}
+                              onBlur={field.handleBlur}
+                              onChange={(event) => field.handleChange(event.target.value)}
+                              value={field.state.value ?? ""}
+                            />
+                            <ValidationMessage errors={field.state.meta.errors} />
+                          </label>
+                        )}
+                      </form.Field>
+                    );
+                  })}
+                </>
+              )}
+            </form.Field>
             <div className="grid gap-5 sm:grid-cols-2">
               <form.Field name="country">
                 {(field) => (
