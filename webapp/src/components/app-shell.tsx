@@ -159,6 +159,7 @@ export function AppShell() {
   const showFeedbackPrompt =
     feedback.isSuccess &&
     feedback.data.data === null &&
+    section !== "settings" &&
     !feedbackOpen &&
     !promptState.dismissed &&
     (promptState.sections.length >= 3 || promptState.mutations >= 2);
@@ -218,8 +219,10 @@ export function AppShell() {
           }}
           onClick={() => setDrawerOpen(false)}
           data-tour={item === "locations" ? "navigation-locations" : undefined}
-          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-stone-700 hover:bg-amber-50 hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800"
-          activeProps={{ className: "bg-amber-100 text-amber-950" }}
+          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-accent-subtle)] hover:text-[var(--color-accent-active)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+          activeProps={{
+            className: "bg-[var(--color-accent-subtle)] text-[var(--color-accent)]",
+          }}
         >
           {translate(locale, `navigation.${item}`)}
         </Link>
@@ -228,13 +231,13 @@ export function AppShell() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f3ee] text-stone-900">
+    <div className="min-h-screen bg-[var(--color-canvas)] text-[var(--color-text)]">
       <a className="skip-link" href="#main-content">
         {translate(locale, "public.skipToContent")}
       </a>
-      <aside className="fixed inset-y-0 hidden w-64 border-r border-stone-200 bg-[#fffaf2] p-4 xl:flex xl:flex-col">
+      <aside className="fixed inset-y-0 hidden w-64 border-r border-[var(--color-border)] bg-[var(--color-surface)] p-4 xl:flex xl:flex-col">
         <div className="flex items-center gap-2 px-3 py-3 text-lg font-semibold">
-          <Coffee className="size-5 text-amber-900" aria-hidden="true" />
+          <Coffee className="size-5 text-[var(--color-accent)]" aria-hidden="true" />
           {translate(locale, "appName")}
         </div>
         <div className="mt-6 flex-1">{navigation()}</div>
@@ -245,7 +248,7 @@ export function AppShell() {
           pending={logoutMutation.isPending}
         />
       </aside>
-      <header className="sticky top-0 z-20 border-b border-stone-200 bg-[#fffaf2]/95 backdrop-blur xl:ml-64">
+      <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_95%,transparent)] backdrop-blur xl:ml-64">
         <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6">
           <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
             <Dialog.Trigger asChild>
@@ -258,8 +261,8 @@ export function AppShell() {
               </button>
             </Dialog.Trigger>
             <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-40 bg-stone-950/35" />
-              <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-[min(20rem,calc(100vw-2rem))] flex-col bg-[#fffaf2] p-4 shadow-xl focus:outline-none">
+              <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--color-overlay)]" />
+              <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-[var(--drawer-width)] flex-col bg-[var(--color-surface)] p-4 shadow-[var(--shadow-dialog)] focus:outline-none">
                 <div className="flex items-center justify-between px-2 py-2">
                   <Dialog.Title className="font-semibold">
                     {translate(locale, "appName")}
@@ -288,7 +291,7 @@ export function AppShell() {
             </Dialog.Portal>
           </Dialog.Root>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-stone-950">
+            <p className="truncate text-sm font-semibold text-[var(--color-text)]">
               {translate(locale, `navigation.${section}`)}
             </p>
           </div>
@@ -297,9 +300,9 @@ export function AppShell() {
         {isAnalytics && (
           <div
             data-tour="overview-filters"
-            className="flex flex-wrap gap-3 border-t border-stone-100 px-4 py-3 sm:px-6"
+            className="grid gap-3 border-t border-[var(--color-border-subtle)] bg-[var(--color-canvas)] px-4 py-3 min-[480px]:grid-cols-2 sm:px-6 xl:flex"
           >
-            <label className="grid min-w-36 gap-1 text-xs font-medium text-stone-700">
+            <label className="grid min-w-0 gap-1 text-xs font-medium text-[var(--color-text-secondary)] xl:min-w-44">
               {translate(locale, "filters.location")}
               <select
                 value={filters.locationId ?? ""}
@@ -314,7 +317,7 @@ export function AppShell() {
                 ))}
               </select>
             </label>
-            <label className="grid min-w-32 gap-1 text-xs font-medium text-stone-700">
+            <label className="grid min-w-0 gap-1 text-xs font-medium text-[var(--color-text-secondary)] xl:min-w-40">
               {translate(locale, "filters.period")}
               <select
                 value={filters.period}
@@ -342,45 +345,24 @@ export function AppShell() {
       </header>
       <main
         id="main-content"
-        className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 xl:ml-64 xl:w-[calc(100%-16rem)]"
+        className="mx-auto w-full max-w-[var(--container-app)] px-4 py-6 sm:px-6 xl:ml-64 xl:w-[calc(100%-16rem)] xl:px-8 xl:py-8"
       >
         {logoutMutation.isError && (
           <div className="mb-4">
             <ErrorState locale={locale} error={logoutMutation.error} />
           </div>
         )}
+        {showFeedbackPrompt && (
+          <div className="mb-6">
+            <FeedbackPrompt
+              locale={locale}
+              onClose={() => setPromptState(dismissFeedbackPrompt(profile.networkId))}
+              onOpen={() => setFeedbackOpen(true)}
+            />
+          </div>
+        )}
         <Outlet />
       </main>
-      {showFeedbackPrompt && (
-        <aside
-          className="fixed bottom-4 right-4 z-30 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-lg"
-          aria-label={translate(locale, "feedback.promptTitle")}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-amber-950">
-                {translate(locale, "feedback.promptTitle")}
-              </p>
-              <p className="mt-1 text-sm text-amber-950/80">
-                {translate(locale, "feedback.promptDescription")}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={translate(locale, "actions.close")}
-              onClick={() => setPromptState(dismissFeedbackPrompt(profile.networkId))}
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-          <div className="mt-3">
-            <Button type="button" onClick={() => setFeedbackOpen(true)}>
-              {translate(locale, "actions.feedback")}
-            </Button>
-          </div>
-        </aside>
-      )}
       <FeedbackDialog
         profile={profile}
         open={feedbackOpen}
@@ -403,6 +385,43 @@ export function AppShell() {
   );
 }
 
+function FeedbackPrompt({
+  locale,
+  onClose,
+  onOpen,
+}: {
+  locale: ReturnType<typeof localeFromProfile>;
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <aside
+      className="rounded-xl border border-[var(--color-info-border)] bg-[var(--color-info-surface)] p-4 text-[var(--color-info)]"
+      aria-label={translate(locale, "feedback.promptTitle")}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{translate(locale, "feedback.promptTitle")}</p>
+          <p className="mt-1 text-sm">{translate(locale, "feedback.promptDescription")}</p>
+        </div>
+        <button
+          type="button"
+          className="icon-button shrink-0"
+          aria-label={translate(locale, "actions.close")}
+          onClick={onClose}
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      <div className="mt-3">
+        <Button type="button" onClick={onOpen}>
+          {translate(locale, "actions.feedback")}
+        </Button>
+      </div>
+    </aside>
+  );
+}
+
 function ShellActions({
   locale,
   onFeedback,
@@ -415,7 +434,7 @@ function ShellActions({
   pending: boolean;
 }) {
   return (
-    <div className="space-y-2 border-t border-stone-200 pt-3">
+    <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
       <Button
         data-tour="feedback"
         type="button"
@@ -466,7 +485,7 @@ function AlertsControl({
         >
           <Bell className="size-5" />
           {total > 0 && (
-            <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-700 px-1 text-xs font-bold text-white">
+            <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[var(--color-danger)] px-1 text-xs font-bold text-white">
               {total}
             </span>
           )}
@@ -475,11 +494,13 @@ function AlertsControl({
       <Popover.Portal>
         <Popover.Content
           align="end"
-          className="z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-stone-200 bg-white p-4 shadow-lg"
+          className="z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-popover)]"
         >
           <h2 className="font-semibold">{translate(locale, "alerts.label")}</h2>
           {query.isPending && (
-            <p className="mt-3 text-sm text-stone-600">{translate(locale, "states.loading")}</p>
+            <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+              {translate(locale, "states.loading")}
+            </p>
           )}
           {query.isError && (
             <div className="mt-3">
@@ -494,22 +515,27 @@ function AlertsControl({
             (alerts.length ? (
               <div className="mt-3 space-y-2">
                 {alerts.map((alert) => (
-                  <div key={alert.id} className="rounded-lg bg-stone-50 p-3 text-sm">
+                  <div
+                    key={alert.id}
+                    className="rounded-lg bg-[var(--color-surface-subtle)] p-3 text-sm"
+                  >
                     <p className="font-medium">{translate(locale, labels[alert.type])}</p>
-                    <p className="text-stone-600">
+                    <p className="text-[var(--color-text-secondary)]">
                       {alert.locationName}
                       {alert.entityName ? ` · ${alert.entityName}` : ""}
                     </p>
                   </div>
                 ))}
                 {total > alerts.length && (
-                  <p className="text-xs text-stone-600">
+                  <p className="text-xs text-[var(--color-text-muted)]">
                     {translate(locale, "alerts.showing", { shown: alerts.length, total })}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="mt-3 text-sm text-stone-600">{translate(locale, "alerts.none")}</p>
+              <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                {translate(locale, "alerts.none")}
+              </p>
             ))}
         </Popover.Content>
       </Popover.Portal>

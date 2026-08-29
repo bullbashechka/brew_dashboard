@@ -16,6 +16,10 @@ import { salesInfiniteQuery, type AnalyticsFilters } from "@/api/analytics";
 import { MetricComparison } from "@/components/metric-comparison";
 import { sessionQueryOptions } from "@/api/session";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/layout";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { Badge } from "@/components/ui/badge";
+import { ChartAccessibility } from "@/components/ui/chart-accessibility";
 import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
@@ -74,7 +78,7 @@ export function SalesPage({ filters }: { filters: AnalyticsFilters }) {
           onRetry={() => void analytics.refetch()}
         />
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 min-[560px]:grid-cols-2 xl:grid-cols-3">
         {metricNames.map((name) => (
           <SalesMetricCard
             key={name}
@@ -114,13 +118,12 @@ function SalesFrame({
   const locale = localeFromProfile(profile);
   return (
     <section className="space-y-6" aria-labelledby="sales-title" data-testid="page-sales">
-      <div className="space-y-2">
-        <h1 id="sales-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "sales.title")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "sales.description")}</p>
-        {updatedAt && <p className="text-sm text-stone-600">{formatDate(updatedAt, profile)}</p>}
-      </div>
+      <PageHeader
+        id="sales-title"
+        title={translate(locale, "sales.title")}
+        description={translate(locale, "sales.description")}
+        meta={updatedAt ? formatDate(updatedAt, profile) : undefined}
+      />
       {children}
     </section>
   );
@@ -146,13 +149,17 @@ function SalesMetricCard({
         ? translate(locale, "comparison.notAvailable")
         : formatCurrency(metric.value, profile);
   return (
-    <article className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-stone-600">
-        {translate(locale, `metrics.${name}` as TranslationKey)}
-      </p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-stone-950">{value}</p>
-      <MetricComparison change={metric.changePercent} profile={profile} />
-    </article>
+    <KpiCard
+      label={translate(locale, `metrics.${name}` as TranslationKey)}
+      value={value}
+      comparison={
+        <MetricComparison
+          change={metric.changePercent}
+          profile={profile}
+          effect={name === "cogs" ? "inverse" : "direct"}
+        />
+      }
+    />
   );
 }
 
@@ -172,19 +179,24 @@ function SalesTrend({ data, profile }: { data: SalesData; profile: Profile }) {
     comparisonRevenue: `${translate(locale, "metrics.revenue")} · ${translate(locale, "overview.previousPeriod")}`,
     comparisonGrossProfit: `${translate(locale, "metrics.grossProfit")} · ${translate(locale, "overview.previousPeriod")}`,
   };
+  const formatTrendMoney = (value: string | null) =>
+    value === null ? translate(locale, "comparison.notAvailable") : formatCurrency(value, profile);
   return (
     <figure
-      className="min-w-0 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
+      className="min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] sm:p-5"
       aria-labelledby="sales-trend-title"
     >
-      <figcaption id="sales-trend-title" className="mb-4 text-lg font-semibold text-stone-950">
+      <figcaption
+        id="sales-trend-title"
+        className="mb-4 text-lg font-semibold text-[var(--color-text)]"
+      >
         {translate(locale, "sales.dailyTrend")}
       </figcaption>
       {data.dailySeries.length ? (
-        <div className="h-80 min-w-0">
+        <div className="h-[264px] min-w-0 md:h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data.dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" />
+              <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
               <XAxis
                 dataKey="bucket"
                 tickFormatter={formatBucket}
@@ -197,6 +209,14 @@ function SalesTrend({ data, profile }: { data: SalesData; profile: Profile }) {
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
+                contentStyle={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-popover)",
+                }}
+                labelStyle={{ color: "var(--color-text)", fontWeight: 600 }}
+                itemStyle={{ color: "var(--color-text-secondary)" }}
                 labelFormatter={(label) => formatBucket(String(label ?? ""))}
                 formatter={(value, name) => [
                   formatCurrency(String(value ?? 0), profile),
@@ -209,29 +229,31 @@ function SalesTrend({ data, profile }: { data: SalesData; profile: Profile }) {
               <Line
                 type="monotone"
                 dataKey="revenue"
-                stroke="var(--chart-one)"
+                stroke="var(--color-chart-1)"
                 strokeWidth={2.5}
                 dot={false}
               />
               <Line
                 type="monotone"
                 dataKey="grossProfit"
-                stroke="var(--chart-two)"
+                stroke="var(--color-chart-2)"
                 strokeWidth={2.5}
                 dot={false}
               />
               <Line
                 type="monotone"
                 dataKey="comparisonRevenue"
-                stroke="var(--chart-one)"
-                strokeDasharray="5 5"
+                stroke="var(--color-chart-1)"
+                strokeDasharray="6 4"
+                strokeOpacity={0.55}
                 dot={false}
               />
               <Line
                 type="monotone"
                 dataKey="comparisonGrossProfit"
-                stroke="var(--chart-two)"
-                strokeDasharray="5 5"
+                stroke="var(--color-chart-2)"
+                strokeDasharray="6 4"
+                strokeOpacity={0.55}
                 dot={false}
               />
             </LineChart>
@@ -240,6 +262,39 @@ function SalesTrend({ data, profile }: { data: SalesData; profile: Profile }) {
       ) : (
         <EmptyState locale={locale} />
       )}
+      <ChartAccessibility
+        summary={`${translate(locale, "sales.dailyTrend")}. ${translate(locale, "comparison.versusPrevious")}`}
+        caption={translate(locale, "sales.dailyTrend")}
+        rows={data.dailySeries}
+        rowKey={(row) => row.bucket}
+        columns={[
+          {
+            key: "period",
+            header: translate(locale, "filters.period"),
+            render: (row) => formatBucket(row.bucket),
+          },
+          {
+            key: "revenue",
+            header: labels.revenue,
+            render: (row) => formatCurrency(row.revenue, profile),
+          },
+          {
+            key: "grossProfit",
+            header: labels.grossProfit,
+            render: (row) => formatCurrency(row.grossProfit, profile),
+          },
+          {
+            key: "comparisonRevenue",
+            header: labels.comparisonRevenue,
+            render: (row) => formatTrendMoney(row.comparisonRevenue),
+          },
+          {
+            key: "comparisonGrossProfit",
+            header: labels.comparisonGrossProfit,
+            render: (row) => formatTrendMoney(row.comparisonGrossProfit),
+          },
+        ]}
+      />
     </figure>
   );
 }
@@ -248,6 +303,13 @@ function Heatmap({ data, profile }: { data: SalesData; profile: Profile }) {
   const locale = localeFromProfile(profile);
   const cells = new Map(data.heatmap.map((cell) => [`${cell.weekday}:${cell.hour}`, cell]));
   const maxOrders = Math.max(...data.heatmap.map((cell) => cell.orders), 1);
+  const heatmapColors = [
+    "var(--color-heatmap-1)",
+    "var(--color-heatmap-2)",
+    "var(--color-heatmap-3)",
+    "var(--color-heatmap-4)",
+    "var(--color-heatmap-5)",
+  ];
   const weekdays = Array.from({ length: 7 }, (_, weekday) =>
     new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
       weekday: "short",
@@ -256,14 +318,14 @@ function Heatmap({ data, profile }: { data: SalesData; profile: Profile }) {
   );
   return (
     <figure
-      className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-4 shadow-sm [contain:paint] sm:p-5"
+      className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] [contain:paint] sm:p-5"
       aria-labelledby="sales-heatmap-title"
     >
       <figcaption id="sales-heatmap-title" className="space-y-1">
-        <span className="block text-lg font-semibold text-stone-950">
+        <span className="block text-lg font-semibold text-[var(--color-text)]">
           {translate(locale, "sales.heatmap")}
         </span>
-        <span className="block text-sm text-stone-600">
+        <span className="block text-sm text-[var(--color-text-muted)]">
           {translate(locale, "sales.heatmapHint")}
         </span>
       </figcaption>
@@ -271,12 +333,15 @@ function Heatmap({ data, profile }: { data: SalesData; profile: Profile }) {
         <table className="min-w-[46rem] border-separate border-spacing-1 text-xs">
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 bg-white p-1 text-left text-stone-600" />
+              <th
+                scope="col"
+                className="sticky left-0 bg-[var(--color-surface-raised)] p-1 text-left text-[var(--color-text-muted)]"
+              />
               {Array.from({ length: 24 }, (_, hour) => (
                 <th
                   key={hour}
                   scope="col"
-                  className="min-w-7 p-1 text-center font-medium text-stone-600"
+                  className="min-w-7 p-1 text-center font-medium text-[var(--color-text-muted)]"
                 >
                   {hour}
                 </th>
@@ -288,20 +353,22 @@ function Heatmap({ data, profile }: { data: SalesData; profile: Profile }) {
               <tr key={weekday}>
                 <th
                   scope="row"
-                  className="sticky left-0 bg-white p-1 text-left font-medium text-stone-600"
+                  className="sticky left-0 bg-[var(--color-surface-raised)] p-1 text-left font-medium text-[var(--color-text-muted)]"
                 >
                   {weekdayName}
                 </th>
                 {Array.from({ length: 24 }, (_, hour) => {
                   const cell = cells.get(`${weekday}:${hour}`);
                   const orders = cell?.orders ?? 0;
-                  const opacity = orders ? 0.2 + (orders / maxOrders) * 0.8 : 0.08;
+                  const colorIndex = orders
+                    ? Math.min(4, Math.max(1, Math.ceil((orders / maxOrders) * 4)))
+                    : 0;
                   const label = `${translate(locale, "sales.weekdayHour", { weekday: weekdayName, hour })}: ${translate(locale, "sales.ordersAtHour", { count: orders })}, ${formatCurrency(cell?.revenue ?? "0.00", profile)}`;
                   return (
                     <td key={hour} className="p-0.5" aria-label={label} title={label}>
                       <span
                         className="block size-6 rounded-sm"
-                        style={{ backgroundColor: `rgb(120 53 15 / ${opacity})` }}
+                        style={{ backgroundColor: heatmapColors[colorIndex] }}
                       >
                         <span className="sr-only">{label}</span>
                       </span>
@@ -326,23 +393,26 @@ function PeakHours({ data, profile }: { data: SalesData; profile: Profile }) {
     }).format(new Date(Date.UTC(2024, 0, 7 + value, 12)));
   return (
     <article
-      className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]"
       aria-labelledby="peak-hours-title"
     >
-      <h2 id="peak-hours-title" className="text-lg font-semibold text-stone-950">
+      <h2 id="peak-hours-title" className="text-lg font-semibold text-[var(--color-text)]">
         {translate(locale, "sales.peakHours")}
       </h2>
       {data.peakHours.length ? (
         <ol className="mt-5 space-y-3">
           {data.peakHours.map((peak) => (
-            <li key={`${peak.weekday}:${peak.hour}`} className="rounded-lg bg-amber-50 p-3">
-              <p className="font-medium text-amber-950">
+            <li
+              key={`${peak.weekday}:${peak.hour}`}
+              className="rounded-lg bg-[var(--color-accent-subtle)] p-3"
+            >
+              <p className="font-medium text-[var(--color-accent-active)]">
                 {translate(locale, "sales.weekdayHour", {
                   weekday: weekday(peak.weekday),
                   hour: peak.hour,
                 })}
               </p>
-              <p className="mt-1 text-sm text-amber-900">
+              <p className="mt-1 text-sm text-[var(--color-accent)]">
                 {translate(locale, "sales.ordersAtHour", {
                   count: formatNumber(peak.orders, profile),
                 })}
@@ -351,7 +421,7 @@ function PeakHours({ data, profile }: { data: SalesData; profile: Profile }) {
           ))}
         </ol>
       ) : (
-        <p className="mt-5 text-stone-600">{translate(locale, "states.empty")}</p>
+        <p className="mt-5 text-[var(--color-text-muted)]">{translate(locale, "states.empty")}</p>
       )}
     </article>
   );
@@ -366,25 +436,30 @@ function Breakdowns({ data, profile }: { data: SalesData; profile: Profile }) {
   ] as const;
   return (
     <section className="space-y-4" aria-labelledby="sales-breakdown-title">
-      <h2 id="sales-breakdown-title" className="text-xl font-semibold text-stone-950">
+      <h2 id="sales-breakdown-title" className="text-xl font-semibold text-[var(--color-text)]">
         {translate(locale, "sales.breakdown")}
       </h2>
       <div className="grid gap-6 xl:grid-cols-3">
         {lists.map(([title, rows]) => (
           <article
             key={title}
-            className="min-w-0 rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+            className="min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)]"
           >
-            <h3 className="text-lg font-semibold text-stone-950">{translate(locale, title)}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text)]">
+              {translate(locale, title)}
+            </h3>
             {rows.length ? (
               <div className="mt-4 space-y-3">
                 {rows.map((row) => (
-                  <div key={row.id} className="rounded-lg bg-stone-50 p-3 text-sm">
+                  <div
+                    key={row.id}
+                    className="rounded-lg bg-[var(--color-surface-subtle)] p-3 text-sm"
+                  >
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate font-medium">{row.name}</span>
                       <span className="shrink-0">{formatCurrency(row.revenue, profile)}</span>
                     </div>
-                    <p className="mt-1 text-stone-600">
+                    <p className="mt-1 text-[var(--color-text-muted)]">
                       {formatCurrency(row.grossProfit, profile)} ·{" "}
                       {formatNumber(row.orders, profile)} {translate(locale, "metrics.orders")} ·{" "}
                       {formatNumber(row.unitsSold, profile)} {translate(locale, "sales.unitsSold")}
@@ -393,7 +468,9 @@ function Breakdowns({ data, profile }: { data: SalesData; profile: Profile }) {
                 ))}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-stone-600">{translate(locale, "states.empty")}</p>
+              <p className="mt-4 text-sm text-[var(--color-text-muted)]">
+                {translate(locale, "states.empty")}
+              </p>
             )}
           </article>
         ))}
@@ -420,10 +497,10 @@ function RecentOrders({
   const locale = localeFromProfile(profile);
   return (
     <section
-      className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] sm:p-5"
       aria-labelledby="recent-orders-title"
     >
-      <h2 id="recent-orders-title" className="text-xl font-semibold text-stone-950">
+      <h2 id="recent-orders-title" className="text-xl font-semibold text-[var(--color-text)]">
         {translate(locale, "sales.recentOrders")}
       </h2>
       {!orders.length ? (
@@ -439,7 +516,7 @@ function RecentOrders({
           </div>
           <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[48rem] text-left text-sm">
-              <thead className="border-b border-stone-200 text-stone-600">
+              <thead className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
                 <tr>
                   <th className="pb-3 pr-3">{translate(locale, "sales.occurredAt")}</th>
                   <th className="pb-3 pr-3">{translate(locale, "filters.location")}</th>
@@ -450,7 +527,10 @@ function RecentOrders({
               </thead>
               <tbody>
                 {orders.map((order) => (
-                  <tr key={order.orderId} className="border-b border-stone-100 align-top">
+                  <tr
+                    key={order.orderId}
+                    className="border-b border-[var(--color-border-subtle)] align-top"
+                  >
                     <td className="py-4 pr-3 whitespace-nowrap">
                       {formatDate(order.occurredAt, profile)}
                     </td>
@@ -495,11 +575,13 @@ function OrderCard({
   profile: Profile;
 }) {
   return (
-    <article className="rounded-lg border border-stone-200 p-4">
+    <article className="rounded-lg border border-[var(--color-border)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-medium">{order.locationName}</p>
-          <p className="mt-1 text-sm text-stone-600">{formatDate(order.occurredAt, profile)}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+            {formatDate(order.occurredAt, profile)}
+          </p>
         </div>
         <OrderStatus status={order.status} profile={profile} />
       </div>
@@ -535,11 +617,9 @@ function OrderItems({
 function OrderStatus({ status, profile }: { status: "completed" | "cancelled"; profile: Profile }) {
   const locale = localeFromProfile(profile);
   return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${status === "completed" ? "bg-emerald-50 text-emerald-800" : "bg-stone-100 text-stone-700"}`}
-    >
+    <Badge tone={status === "completed" ? "success" : "neutral"}>
       {translate(locale, `sales.${status}`)}
-    </span>
+    </Badge>
   );
 }
 
@@ -550,7 +630,7 @@ function SalesSkeleton() {
         <Skeleton variant="pageTitleNarrow" />
         <Skeleton variant="pageDescription" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 min-[560px]:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }, (_, index) => (
           <Skeleton key={index} variant="metricCard" />
         ))}

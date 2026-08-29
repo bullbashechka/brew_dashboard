@@ -7,7 +7,9 @@ Bun monorepo for the Brew Dashboard MVP. The active application surfaces are:
 - `packages/contracts/` — shared Zod schemas and TypeScript API contracts.
 - Docker Compose + PostgreSQL 16 — local-only isolated database for integration tests.
 
-Product intent and architecture live in [PRD.md](PRD.md); implementation stages and acceptance criteria live in [TASKS.md](TASKS.md).
+Product intent and architecture live in [PRD.md](PRD.md); implementation stages and acceptance
+criteria live in [TASKS.md](TASKS.md); visual tokens, component states and responsive screen
+recipes live in [DESIGN.md](DESIGN.md).
 
 Install and validate with the repository-pinned Bun version:
 

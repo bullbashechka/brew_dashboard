@@ -18,6 +18,8 @@ import { sessionQueryOptions } from "@/api/session";
 import { Button } from "@/components/ui/button";
 import { CachedSnapshotWarning, ErrorState, Skeleton } from "@/components/ui/states";
 import { ResetDemoDialog } from "@/components/reset-demo-dialog";
+import { PageHeader } from "@/components/ui/layout";
+import { KpiCard } from "@/components/ui/kpi-card";
 import {
   formatCurrency,
   formatDate,
@@ -68,32 +70,27 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
 
   return (
     <section className="space-y-6" aria-labelledby="overview-title" data-testid="page-overview">
-      <div className="space-y-2">
-        <h1 id="overview-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "overview.title")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "overview.description")}</p>
-        <p className="text-sm text-stone-600">
-          {translate(locale, "overview.updatedAt", {
-            value: formatDate(analytics.data.meta.asOf, profile),
-          })}
-        </p>
-      </div>
+      <PageHeader
+        id="overview-title"
+        title={translate(locale, "overview.title")}
+        description={translate(locale, "overview.description")}
+        meta={translate(locale, "overview.updatedAt", {
+          value: formatDate(analytics.data.meta.asOf, profile),
+        })}
+      />
 
       {profile.demoDataStale && (
         <section
-          className="flex flex-col gap-4 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-4 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-4 text-[var(--color-warning)] sm:flex-row sm:items-center sm:justify-between"
           aria-labelledby="stale-demo-title"
         >
           <div className="flex gap-3">
-            <RefreshCw className="mt-0.5 size-5 shrink-0 text-amber-900" aria-hidden="true" />
+            <RefreshCw className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <div>
-              <h2 id="stale-demo-title" className="font-semibold text-amber-950">
+              <h2 id="stale-demo-title" className="font-semibold">
                 {translate(locale, "reset.staleTitle")}
               </h2>
-              <p className="mt-1 text-sm text-amber-950/80">
-                {translate(locale, "reset.staleDescription")}
-              </p>
+              <p className="mt-1 text-sm">{translate(locale, "reset.staleDescription")}</p>
             </div>
           </div>
           <Button
@@ -115,7 +112,7 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 min-[560px]:grid-cols-2 xl:grid-cols-3">
         {metricNames.map((metric) => (
           <OverviewMetricCard
             key={metric}
@@ -133,6 +130,8 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
       <div className="grid gap-6 xl:grid-cols-2">
         <GoalCard data={analytics.data.data} profile={profile} />
         <LocationComparison data={analytics.data.data} profile={profile} />
+        <AlertsList data={analytics.data.data} profile={profile} />
+        <StockSummary data={analytics.data.data} profile={profile} />
         <ProductList
           title="overview.topProducts"
           products={analytics.data.data.topProducts}
@@ -145,8 +144,6 @@ export function OverviewPage({ filters }: { filters: AnalyticsFilters }) {
           profile={profile}
           trend="down"
         />
-        <StockSummary data={analytics.data.data} profile={profile} />
-        <AlertsList data={analytics.data.data} profile={profile} />
       </div>
 
       <ResetDemoDialog
@@ -184,29 +181,29 @@ export function OverviewMetricCard({
         ? translate(locale, "comparison.notAvailable")
         : formatCurrency(metric.value, profile);
   return (
-    <article className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-stone-600">
-        {translate(locale, `metrics.${name}` as TranslationKey)}
-      </p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-stone-950">{value}</p>
-      {name !== "activeAlerts" && (
-        <MetricComparison
-          change={metric.changePercent as string | number | null}
-          profile={profile}
-        />
-      )}
-    </article>
+    <KpiCard
+      label={translate(locale, `metrics.${name}` as TranslationKey)}
+      value={value}
+      comparison={
+        name !== "activeAlerts" ? (
+          <MetricComparison
+            change={metric.changePercent as string | number | null}
+            profile={profile}
+          />
+        ) : undefined
+      }
+    />
   );
 }
 
 function TrendChartFallback({ locale }: { locale: ReturnType<typeof localeFromProfile> }) {
   return (
     <figure
-      className="min-w-0 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
+      className="min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] sm:p-5"
       aria-labelledby="trend-title"
       aria-busy="true"
     >
-      <figcaption id="trend-title" className="text-lg font-semibold text-stone-950">
+      <figcaption id="trend-title" className="text-lg font-semibold text-[var(--color-text)]">
         {translate(locale, "overview.trend")}
       </figcaption>
       <div className="mt-4">
@@ -224,30 +221,34 @@ function GoalCard({ data, profile }: { data: OverviewData; profile: Profile }) {
     completion === null ? 0 : Math.min(100, Math.max(0, Number(completion)));
   return (
     <article
-      className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]"
       aria-labelledby="goal-title"
     >
       <div className="flex items-center gap-2">
-        <Target className="size-5 text-amber-900" aria-hidden="true" />
-        <h2 id="goal-title" className="text-lg font-semibold text-stone-950">
+        <Target className="size-5 text-[var(--color-accent)]" aria-hidden="true" />
+        <h2 id="goal-title" className="text-lg font-semibold text-[var(--color-text)]">
           {translate(locale, "overview.monthlyGoal")}
         </h2>
       </div>
-      <p className="mt-1 text-sm text-stone-600">{translate(locale, "overview.networkWide")}</p>
+      <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+        {translate(locale, "overview.networkWide")}
+      </p>
       {!goal ? (
-        <p className="mt-8 text-stone-600">{translate(locale, "overview.goalNotSet")}</p>
+        <p className="mt-8 text-[var(--color-text-muted)]">
+          {translate(locale, "overview.goalNotSet")}
+        </p>
       ) : (
         <>
-          <p className="mt-6 text-2xl font-semibold text-stone-950">
+          <p className="mt-6 text-2xl font-semibold text-[var(--color-text)]">
             {formatPercent(completion, profile)}
           </p>
-          <div className="mt-3 h-3 overflow-hidden rounded-full bg-stone-100">
+          <div className="mt-3 h-3 overflow-hidden rounded-full bg-[var(--color-surface-inset)]">
             <div
-              className="h-full rounded-full bg-amber-800"
+              className="h-full rounded-full bg-[var(--color-accent)]"
               style={{ width: `${visibleCompletion}%` }}
             />
           </div>
-          <p className="mt-3 text-sm text-stone-600">
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">
             {formatCurrency(goal.revenue, profile)} / {formatCurrency(goal.target, profile)}
           </p>
         </>
@@ -261,10 +262,10 @@ function LocationComparison({ data, profile }: { data: OverviewData; profile: Pr
   const maxRevenue = Math.max(...data.locations.map((location) => Number(location.revenue)), 0);
   return (
     <article
-      className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]"
       aria-labelledby="location-comparison-title"
     >
-      <h2 id="location-comparison-title" className="text-lg font-semibold text-stone-950">
+      <h2 id="location-comparison-title" className="text-lg font-semibold text-[var(--color-text)]">
         {translate(locale, "overview.locationComparison")}
       </h2>
       {data.locations.length ? (
@@ -272,20 +273,22 @@ function LocationComparison({ data, profile }: { data: OverviewData; profile: Pr
           {data.locations.map((location) => (
             <div key={location.locationId}>
               <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate font-medium text-stone-800">{location.name}</span>
-                <span className="shrink-0 text-stone-600">
+                <span className="min-w-0 truncate font-medium text-[var(--color-text)]">
+                  {location.name}
+                </span>
+                <span className="shrink-0 text-[var(--color-text-muted)]">
                   {formatCurrency(location.revenue, profile)}
                 </span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-inset)]">
                 <div
-                  className="h-full rounded-full bg-amber-800"
+                  className="h-full rounded-full bg-[var(--color-accent)]"
                   style={{
                     width: `${maxRevenue ? (Number(location.revenue) / maxRevenue) * 100 : 0}%`,
                   }}
                 />
               </div>
-              <p className="mt-1 text-xs text-stone-600">
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                 {formatNumber(location.orders, profile)} · {translate(locale, "metrics.orders")} ·{" "}
                 {formatNumber(location.activeAlerts, profile)} ·{" "}
                 {translate(locale, "metrics.activeAlerts")}
@@ -294,7 +297,7 @@ function LocationComparison({ data, profile }: { data: OverviewData; profile: Pr
           ))}
         </div>
       ) : (
-        <p className="mt-6 text-stone-600">{translate(locale, "states.empty")}</p>
+        <p className="mt-6 text-[var(--color-text-muted)]">{translate(locale, "states.empty")}</p>
       )}
     </article>
   );
@@ -314,30 +317,40 @@ function ProductList({
   const locale = localeFromProfile(profile);
   const Icon = trend === "up" ? TrendingUp : TrendingDown;
   return (
-    <article className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+    <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]">
       <div className="flex items-center gap-2">
         <Icon
-          className={trend === "up" ? "size-5 text-emerald-700" : "size-5 text-amber-800"}
+          className={
+            trend === "up"
+              ? "size-5 text-[var(--color-success)]"
+              : "size-5 text-[var(--color-warning)]"
+          }
           aria-hidden="true"
         />
-        <h2 className="text-lg font-semibold text-stone-950">{translate(locale, title)}</h2>
+        <h2 className="text-lg font-semibold text-[var(--color-text)]">
+          {translate(locale, title)}
+        </h2>
       </div>
       {products.length ? (
         <ol className="mt-4 space-y-3">
           {products.map((product) => (
             <li key={product.productId} className="flex items-center justify-between gap-3 text-sm">
               <span className="min-w-0">
-                <span className="block truncate font-medium text-stone-800">{product.name}</span>
-                <span className="block truncate text-stone-600">{product.categoryName}</span>
+                <span className="block truncate font-medium text-[var(--color-text)]">
+                  {product.name}
+                </span>
+                <span className="block truncate text-[var(--color-text-muted)]">
+                  {product.categoryName}
+                </span>
               </span>
-              <span className="shrink-0 text-stone-700">
+              <span className="shrink-0 text-[var(--color-text-secondary)]">
                 {formatCurrency(product.revenue, profile)}
               </span>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="mt-6 text-stone-600">{translate(locale, "states.empty")}</p>
+        <p className="mt-6 text-[var(--color-text-muted)]">{translate(locale, "states.empty")}</p>
       )}
     </article>
   );
@@ -346,26 +359,26 @@ function ProductList({
 function StockSummary({ data, profile }: { data: OverviewData; profile: Profile }) {
   const locale = localeFromProfile(profile);
   const items = [
-    { key: "inStock" as const, icon: PackageCheck, color: "text-emerald-700" },
-    { key: "lowStock" as const, icon: AlertTriangle, color: "text-amber-800" },
-    { key: "outOfStock" as const, icon: PackageX, color: "text-red-700" },
+    { key: "inStock" as const, icon: PackageCheck, color: "text-[var(--color-success)]" },
+    { key: "lowStock" as const, icon: AlertTriangle, color: "text-[var(--color-warning)]" },
+    { key: "outOfStock" as const, icon: PackageX, color: "text-[var(--color-danger)]" },
   ];
   return (
     <article
-      className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]"
       aria-labelledby="stock-summary-title"
     >
-      <h2 id="stock-summary-title" className="text-lg font-semibold text-stone-950">
+      <h2 id="stock-summary-title" className="text-lg font-semibold text-[var(--color-text)]">
         {translate(locale, "overview.stockSummary")}
       </h2>
       <dl className="mt-5 grid gap-3 sm:grid-cols-3">
         {items.map(({ key, icon: Icon, color }) => (
-          <div key={key} className="rounded-lg bg-stone-50 p-3">
+          <div key={key} className="rounded-lg bg-[var(--color-surface-subtle)] p-3">
             <dt className={`flex items-center gap-1.5 text-sm font-medium ${color}`}>
               <Icon className="size-4" aria-hidden="true" />
               {translate(locale, `overview.${key}` as TranslationKey)}
             </dt>
-            <dd className="mt-2 text-xl font-semibold text-stone-950">
+            <dd className="mt-2 text-xl font-semibold text-[var(--color-text)]">
               {formatNumber(data.stockSummary[key], profile)}
             </dd>
           </div>
@@ -384,22 +397,28 @@ function AlertsList({ data, profile }: { data: OverviewData; profile: Profile })
   } as const;
   return (
     <article
-      className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]"
       aria-labelledby="recent-alerts-title"
     >
-      <h2 id="recent-alerts-title" className="text-lg font-semibold text-stone-950">
+      <h2 id="recent-alerts-title" className="text-lg font-semibold text-[var(--color-text)]">
         {translate(locale, "overview.recentAlerts")}
       </h2>
       {data.alerts.length ? (
         <ul className="mt-4 space-y-3">
           {data.alerts.map((alert) => (
-            <li key={alert.id} className="flex gap-3 rounded-lg bg-stone-50 p-3 text-sm">
-              <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-800" aria-hidden="true" />
+            <li
+              key={alert.id}
+              className="flex gap-3 rounded-lg bg-[var(--color-surface-subtle)] p-3 text-sm"
+            >
+              <CircleAlert
+                className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]"
+                aria-hidden="true"
+              />
               <span>
-                <span className="block font-medium text-stone-800">
+                <span className="block font-medium text-[var(--color-text)]">
                   {translate(locale, labels[alert.type])}
                 </span>
-                <span className="block text-stone-600">
+                <span className="block text-[var(--color-text-muted)]">
                   {alert.locationName}
                   {alert.entityName ? ` · ${alert.entityName}` : ""}
                 </span>
@@ -408,7 +427,7 @@ function AlertsList({ data, profile }: { data: OverviewData; profile: Profile })
           ))}
         </ul>
       ) : (
-        <p className="mt-6 text-stone-600">{translate(locale, "alerts.none")}</p>
+        <p className="mt-6 text-[var(--color-text-muted)]">{translate(locale, "alerts.none")}</p>
       )}
     </article>
   );
@@ -425,7 +444,7 @@ function OverviewSkeleton({ locale }: { locale: ReturnType<typeof localeFromProf
         <Skeleton variant="pageTitle" />
         <Skeleton variant="pageDescription" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 min-[560px]:grid-cols-2 xl:grid-cols-3">
         {metricNames.map((metric) => (
           <Skeleton key={metric} variant="metricCard" />
         ))}
@@ -446,12 +465,11 @@ function OverviewError({
 }) {
   return (
     <section className="space-y-6" aria-labelledby="overview-title" data-testid="page-overview">
-      <div className="space-y-2">
-        <h1 id="overview-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "overview.title")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "overview.description")}</p>
-      </div>
+      <PageHeader
+        id="overview-title"
+        title={translate(locale, "overview.title")}
+        description={translate(locale, "overview.description")}
+      />
       <ErrorState locale={locale} error={error} onRetry={onRetry} />
     </section>
   );

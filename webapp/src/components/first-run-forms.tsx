@@ -102,7 +102,7 @@ function ValidationMessage({ errors }: { errors: unknown[] }) {
   const messages = errors.map(messageFor).filter((message): message is string => Boolean(message));
   if (!messages.length) return null;
   return (
-    <p role="alert" className="mt-1 text-sm text-red-800">
+    <p role="alert" className="mt-1 text-sm text-[var(--color-danger)]">
       {messages.join(" ")}
     </p>
   );
@@ -118,7 +118,7 @@ function LoginSubmitError({ locale, error }: { locale: AppLocale; error: unknown
         : "errors.generic";
 
   return (
-    <div role="alert" className="space-y-1 text-sm text-red-800">
+    <div role="alert" className="space-y-1 text-sm text-[var(--color-danger)]">
       <p>{translate(locale, messageKey)}</p>
       {apiError?.requestId && (
         <p>{translate(locale, "errors.requestId", { requestId: apiError.requestId })}</p>
@@ -160,7 +160,7 @@ export function LoginForm({
 
   return (
     <form className="space-y-5" onSubmit={(event) => void submit(event)} noValidate>
-      <label className="grid gap-1 text-sm font-medium text-stone-800">
+      <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
         {translate(locale, "auth.alias")}
         <input
           autoComplete="username"
@@ -171,7 +171,7 @@ export function LoginForm({
           value={values.login}
         />
       </label>
-      <label className="grid gap-1 text-sm font-medium text-stone-800">
+      <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
         {translate(locale, "auth.password")}
         <input
           autoComplete="current-password"
@@ -186,7 +186,7 @@ export function LoginForm({
         />
       </label>
       {validationError && (
-        <p role="alert" className="text-sm text-red-800">
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
           {validationError}
         </p>
       )}
@@ -235,7 +235,7 @@ export function LanguageForm({
         {(["en", "ru"] as const).map((value) => (
           <label
             key={value}
-            className="flex min-h-12 items-center gap-3 rounded-lg border border-stone-200 bg-white px-4 text-sm font-medium text-stone-800"
+            className="flex min-h-12 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 text-sm font-medium text-[var(--color-text)] has-[:checked]:border-[var(--color-accent-border)] has-[:checked]:bg-[var(--color-accent-subtle)] has-[:checked]:text-[var(--color-accent-active)]"
           >
             <input
               checked={language === value}
@@ -355,7 +355,7 @@ export function OnboardingForm({
           <fieldset disabled={pending} className="space-y-5">
             <form.Field name="networkName">
               {(field) => (
-                <label className="grid gap-1 text-sm font-medium text-stone-800">
+                <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                   {translate(locale, "onboarding.networkName")}
                   <input
                     className="control w-full"
@@ -370,7 +370,7 @@ export function OnboardingForm({
             </form.Field>
             <form.Field name="ownerName">
               {(field) => (
-                <label className="grid gap-1 text-sm font-medium text-stone-800">
+                <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                   {translate(locale, "onboarding.ownerName")}
                   <input
                     className="control w-full"
@@ -386,7 +386,7 @@ export function OnboardingForm({
             <form.Field name="locations" mode="array">
               {(locationsField) => (
                 <>
-                  <label className="grid gap-1 text-sm font-medium text-stone-800">
+                  <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                     {translate(locale, "onboarding.locationCount")}
                     <select
                       className="control w-full"
@@ -418,7 +418,7 @@ export function OnboardingForm({
                     return (
                       <form.Field key={fieldName} name={fieldName}>
                         {(field) => (
-                          <label className="grid gap-1 text-sm font-medium text-stone-800">
+                          <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                             {translate(locale, "onboarding.locationName", { number: index + 1 })}
                             <input
                               className="control w-full"
@@ -439,7 +439,7 @@ export function OnboardingForm({
             <div className="grid gap-5 sm:grid-cols-2">
               <form.Field name="country">
                 {(field) => (
-                  <label className="grid gap-1 text-sm font-medium text-stone-800">
+                  <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                     {translate(locale, "onboarding.country")}
                     <input
                       className="control w-full uppercase"
@@ -453,7 +453,7 @@ export function OnboardingForm({
                       }}
                       value={field.state.value ?? ""}
                     />
-                    <span className="text-xs font-normal text-stone-600">
+                    <span className="text-xs font-normal text-[var(--color-text-muted)]">
                       {translate(locale, "onboarding.countryHint")}
                     </span>
                     <ValidationMessage errors={field.state.meta.errors} />
@@ -462,7 +462,7 @@ export function OnboardingForm({
               </form.Field>
               <form.Field name="currency">
                 {(field) => (
-                  <label className="grid gap-1 text-sm font-medium text-stone-800">
+                  <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                     {translate(locale, "onboarding.currency")}
                     <input
                       className="control w-full uppercase"
@@ -481,7 +481,7 @@ export function OnboardingForm({
             </div>
             <form.Field name="timeZone">
               {(field) => (
-                <label className="grid gap-1 text-sm font-medium text-stone-800">
+                <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
                   {translate(locale, "onboarding.timeZone")}
                   <input
                     className="control w-full"

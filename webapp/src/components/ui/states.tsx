@@ -15,11 +15,11 @@ export function LoadingState({ locale }: { locale: AppLocale }) {
   return (
     <div
       aria-live="polite"
-      className="min-h-40 rounded-xl border border-stone-200 bg-white p-6 text-stone-700"
+      className="min-h-40 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-6 text-[var(--color-text-secondary)] shadow-[var(--shadow-card)]"
     >
       <div className="flex items-center gap-3">
         <LoaderCircle
-          className="size-5 animate-spin text-amber-800 motion-reduce:animate-none"
+          className="size-5 animate-spin text-[var(--color-accent)] motion-reduce:animate-none"
           aria-hidden="true"
         />
         {translate(locale, "states.loading")}
@@ -51,7 +51,7 @@ const skeletonVariants = {
 export function Skeleton({ variant }: { variant: keyof typeof skeletonVariants }) {
   return (
     <div
-      className={`animate-pulse rounded bg-stone-200 motion-reduce:animate-none ${skeletonVariants[variant]}`}
+      className={`animate-pulse rounded bg-[var(--color-surface-inset)] motion-reduce:animate-none ${skeletonVariants[variant]}`}
       aria-hidden="true"
     />
   );
@@ -59,13 +59,9 @@ export function Skeleton({ variant }: { variant: keyof typeof skeletonVariants }
 
 export function ProgressState({ locale, label }: { locale: AppLocale; label?: string }) {
   return (
-    <div
-      className="flex items-center gap-3 text-sm text-stone-700"
-      role="status"
-      aria-live="polite"
-    >
+    <div className="flex items-center gap-3 text-sm text-current" role="status" aria-live="polite">
       <LoaderCircle
-        className="size-4 animate-spin text-amber-800 motion-reduce:animate-none"
+        className="size-4 animate-spin text-current motion-reduce:animate-none"
         aria-hidden="true"
       />
       {label ?? translate(locale, "states.loading")}
@@ -91,7 +87,7 @@ export function FormError({ locale, error }: { locale: AppLocale; error?: unknow
   if (!error) return null;
   const apiError = error instanceof ApiClientError ? error : undefined;
   return (
-    <div role="alert" className="space-y-1 text-sm text-red-800">
+    <div role="alert" className="space-y-1 text-sm text-[var(--color-danger)]">
       <p>{translate(locale, errorTranslationKey(apiError?.code))}</p>
       {apiError?.requestId && (
         <p>{translate(locale, "errors.requestId", { requestId: apiError.requestId })}</p>
@@ -102,8 +98,8 @@ export function FormError({ locale, error }: { locale: AppLocale; error?: unknow
 
 export function EmptyState({ locale, children }: { locale: AppLocale; children?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center text-stone-700">
-      <Inbox className="mx-auto mb-3 size-6 text-stone-600" aria-hidden="true" />
+    <div className="rounded-xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] p-8 text-center text-[var(--color-text-secondary)]">
+      <Inbox className="mx-auto mb-3 size-6 text-[var(--color-text-muted)]" aria-hidden="true" />
       <p>{children ?? translate(locale, "states.empty")}</p>
     </div>
   );
@@ -120,13 +116,16 @@ export function ErrorState({
 }) {
   const apiError = error instanceof ApiClientError ? error : undefined;
   return (
-    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-950">
+    <div
+      role="alert"
+      className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-surface)] p-5 text-[var(--color-danger)]"
+    >
       <div className="flex gap-3">
         <AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         <div className="space-y-3">
           <p>{translate(locale, errorTranslationKey(apiError?.code))}</p>
           {apiError?.requestId && (
-            <p className="text-sm text-red-800">
+            <p className="text-sm text-[var(--color-danger)]">
               {translate(locale, "errors.requestId", { requestId: apiError.requestId })}
             </p>
           )}
@@ -155,16 +154,19 @@ export function CachedSnapshotWarning({
   const locale = localeFromProfile(profile);
   const apiError = error instanceof ApiClientError ? error : undefined;
   return (
-    <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+    <div
+      role="alert"
+      className="rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-4 text-[var(--color-warning)]"
+    >
       <div className="flex gap-3">
         <AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         <div className="space-y-3">
           <p>{translate(locale, "states.cachedSnapshot", { value: formatDate(asOf, profile) })}</p>
-          <p className="text-sm text-amber-900">
+          <p className="text-sm text-[var(--color-warning)]">
             {translate(locale, errorTranslationKey(apiError?.code))}
           </p>
           {apiError?.requestId && (
-            <p className="text-sm text-amber-900">
+            <p className="text-sm text-[var(--color-warning)]">
               {translate(locale, "errors.requestId", { requestId: apiError.requestId })}
             </p>
           )}

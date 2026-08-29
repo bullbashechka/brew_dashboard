@@ -92,18 +92,18 @@ export function GuidedTour({
   return (
     <Dialog.Root open={open} onOpenChange={() => undefined}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-stone-950/25" />
-        <Dialog.Content className="fixed inset-x-4 bottom-4 z-[60] mx-auto w-auto max-w-md rounded-2xl border border-stone-200 bg-[#fffaf2] p-5 shadow-xl focus:outline-none sm:bottom-8">
-          <Dialog.Title className="text-lg font-semibold text-stone-950">
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--color-overlay)]" />
+        <Dialog.Content className="fixed inset-x-4 bottom-4 z-[60] mx-auto w-auto max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-dialog)] focus:outline-none sm:bottom-8">
+          <Dialog.Title className="text-lg font-semibold text-[var(--color-text)]">
             {translate(locale, "tour.title")}
           </Dialog.Title>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
             {translate(locale, "tour.progress", { current: stepIndex + 1, total: steps.length })}
           </p>
-          <h2 className="mt-5 text-xl font-semibold text-stone-950">
+          <h2 className="mt-5 text-xl font-semibold text-[var(--color-text)]">
             {translate(locale, step.title)}
           </h2>
-          <Dialog.Description className="mt-2 text-sm leading-6 text-stone-700">
+          <Dialog.Description className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
             {translate(locale, step.description)}
           </Dialog.Description>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

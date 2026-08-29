@@ -20,6 +20,8 @@ import { sessionQueryOptions } from "@/api/session";
 import { PriceDialog } from "@/components/product-price-dialog";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/layout";
+import { ChartAccessibility } from "@/components/ui/chart-accessibility";
 import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
@@ -32,10 +34,10 @@ import {
 
 const menuGroups = ["stars", "workhorses", "puzzles", "dogs"] as const;
 const groupColors = {
-  stars: "#166534",
-  workhorses: "#a16207",
-  puzzles: "#0f766e",
-  dogs: "#9f1239",
+  stars: "var(--color-chart-1)",
+  workhorses: "var(--color-chart-2)",
+  puzzles: "var(--color-chart-3)",
+  dogs: "var(--color-chart-4)",
 } as const;
 
 export function ProductsPage({ filters }: { filters: AnalyticsFilters }) {
@@ -107,7 +109,7 @@ export function ProductsPage({ filters }: { filters: AnalyticsFilters }) {
       ) : (
         <>
           {analytics.isFetching && (
-            <p className="text-sm text-stone-600" role="status">
+            <p className="text-sm text-[var(--color-text-muted)]" role="status">
               {translate(locale, "products.refreshing")}
             </p>
           )}
@@ -151,13 +153,12 @@ function ProductsFrame({
   const locale = localeFromProfile(profile);
   return (
     <section className="space-y-6" aria-labelledby="products-title" data-testid="page-products">
-      <div className="space-y-2">
-        <h1 id="products-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "products.title")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "products.description")}</p>
-        {updatedAt && <p className="text-sm text-stone-600">{formatDate(updatedAt, profile)}</p>}
-      </div>
+      <PageHeader
+        id="products-title"
+        title={translate(locale, "products.title")}
+        description={translate(locale, "products.description")}
+        meta={updatedAt ? formatDate(updatedAt, profile) : undefined}
+      />
       {children}
     </section>
   );
@@ -183,19 +184,21 @@ function MenuMatrix({ data, profile }: { data: ProductsData; profile: Profile })
     }));
   return (
     <section
-      className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] sm:p-5"
       aria-labelledby="menu-matrix-title"
     >
       <div className="space-y-1">
-        <h2 id="menu-matrix-title" className="text-xl font-semibold text-stone-950">
+        <h2 id="menu-matrix-title" className="text-xl font-semibold text-[var(--color-text)]">
           {translate(locale, "products.matrix")}
         </h2>
-        <p className="text-sm text-stone-600">{translate(locale, "products.matrixDescription")}</p>
+        <p className="text-sm text-[var(--color-text-muted)]">
+          {translate(locale, "products.matrixDescription")}
+        </p>
       </div>
       <div className="mt-5 hidden h-96 min-w-0 md:block">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 16, right: 24, bottom: 24, left: 10 }}>
-            <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" />
+            <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
             <XAxis
               type="number"
               dataKey="units"
@@ -221,20 +224,30 @@ function MenuMatrix({ data, profile }: { data: ProductsData; profile: Profile })
             />
             <Tooltip
               cursor={{ strokeDasharray: "3 3" }}
-              formatter={(value, _name, item) => [
-                formatCurrency(value as number, profile),
-                item.payload?.name ?? "",
+              contentStyle={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-popover)",
+              }}
+              labelStyle={{ color: "var(--color-text)", fontWeight: 600 }}
+              itemStyle={{ color: "var(--color-text-secondary)" }}
+              formatter={(value, name, item) => [
+                name === translate(locale, "sales.unitsSold")
+                  ? formatNumber(value as number, profile)
+                  : formatCurrency(value as number, profile),
+                `${item.payload?.name ?? ""} · ${String(name)}`,
               ]}
             />
             <ReferenceLine
               x={Number(data.medians.unitsSold)}
-              stroke="#57534e"
-              strokeDasharray="5 5"
+              stroke="var(--color-chart-neutral)"
+              strokeDasharray="6 4"
             />
             <ReferenceLine
               y={Number(data.medians.unitContribution)}
-              stroke="#57534e"
-              strokeDasharray="5 5"
+              stroke="var(--color-chart-neutral)"
+              strokeDasharray="6 4"
             />
             {menuGroups.map((group) => (
               <Scatter
@@ -263,6 +276,37 @@ function MenuMatrix({ data, profile }: { data: ProductsData; profile: Profile })
           />
         ))}
       </div>
+      <ChartAccessibility
+        summary={translate(locale, "products.matrixDescription")}
+        caption={translate(locale, "products.matrix")}
+        rows={data.products}
+        rowKey={(product) => product.productId}
+        columns={[
+          {
+            key: "product",
+            header: translate(locale, "products.title"),
+            render: (product) => product.name,
+          },
+          {
+            key: "group",
+            header: translate(locale, "products.matrix"),
+            render: (product) =>
+              product.menuGroup
+                ? translate(locale, `products.${product.menuGroup}`)
+                : translate(locale, "comparison.notAvailable"),
+          },
+          {
+            key: "units",
+            header: translate(locale, "sales.unitsSold"),
+            render: (product) => formatNumber(product.unitsSold, profile),
+          },
+          {
+            key: "contribution",
+            header: translate(locale, "products.unitContribution"),
+            render: (product) => formatCurrency(product.unitContribution, profile),
+          },
+        ]}
+      />
     </section>
   );
 }
@@ -282,17 +326,19 @@ function MenuGroupCard({
   const firstRecommendation = products[0]?.recommendation;
   return (
     <article
-      className="rounded-lg border border-stone-200 p-3"
+      className="rounded-lg border border-[var(--color-border)] p-3"
       style={{ borderTopColor: groupColors[group], borderTopWidth: 3 }}
     >
-      <h3 className="font-semibold text-stone-950">{translate(locale, `products.${group}`)}</h3>
+      <h3 className="font-semibold text-[var(--color-text)]">
+        {translate(locale, `products.${group}`)}
+      </h3>
       {firstRecommendation && (
-        <p className="mt-1 text-sm text-stone-600">
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
           {translate(locale, `products.${firstRecommendation}`)}
         </p>
       )}
       <ul
-        className={`mt-3 space-y-1 text-sm text-stone-700 ${compact ? "max-h-24 overflow-y-auto" : ""}`}
+        className={`mt-3 space-y-1 text-sm text-[var(--color-text-secondary)] ${compact ? "max-h-24 overflow-y-auto" : ""}`}
       >
         {products.length ? (
           products.map((product) => (
@@ -302,7 +348,7 @@ function MenuGroupCard({
             </li>
           ))
         ) : (
-          <li className="text-stone-600">{translate(locale, "states.empty")}</li>
+          <li className="text-[var(--color-text-muted)]">{translate(locale, "states.empty")}</li>
         )}
       </ul>
     </article>
@@ -331,9 +377,9 @@ function ProductCategories({
         return (
           <article
             key={category.categoryId}
-            className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
+            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] sm:p-5"
           >
-            <h2 className="text-xl font-semibold text-stone-950">{category.name}</h2>
+            <h2 className="text-xl font-semibold text-[var(--color-text)]">{category.name}</h2>
             <div className="mt-5 space-y-3 md:hidden">
               {products.map((product) => (
                 <ProductCard
@@ -347,7 +393,8 @@ function ProductCategories({
             </div>
             <div className="mt-5 hidden overflow-x-auto md:block">
               <table className="w-full min-w-[58rem] text-left text-sm">
-                <thead className="border-b border-stone-200 text-stone-600">
+                <caption className="sr-only">{category.name}</caption>
+                <thead className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
                   <tr>
                     <th className="pb-3 pr-3">{translate(locale, "products.title")}</th>
                     <th className="pb-3 pr-3">{translate(locale, "products.currentPrice")}</th>
@@ -360,7 +407,10 @@ function ProductCategories({
                 </thead>
                 <tbody>
                   {products.map((product) => (
-                    <tr key={product.productId} className="border-b border-stone-100 align-top">
+                    <tr
+                      key={product.productId}
+                      className="border-b border-[var(--color-border-subtle)] align-top"
+                    >
                       <td className="py-4 pr-3 font-medium">{product.name}</td>
                       <td className="py-4 pr-3">
                         <PriceDetails product={product} profile={profile} />
@@ -369,14 +419,14 @@ function ProductCategories({
                       <td className="py-4 pr-3">
                         {formatCurrency(product.revenue, profile)}
                         <br />
-                        <span className="text-xs text-stone-600">
+                        <span className="text-xs text-[var(--color-text-muted)]">
                           {formatPercent(product.revenueShare, profile)}
                         </span>
                       </td>
                       <td className="py-4 pr-3">
                         {formatCurrency(product.grossProfit, profile)}
                         <br />
-                        <span className="text-xs text-stone-600">
+                        <span className="text-xs text-[var(--color-text-muted)]">
                           {formatPercent(product.grossMargin, profile)}
                         </span>
                       </td>
@@ -415,9 +465,9 @@ function ProductCard({
   disabled: boolean;
 }) {
   return (
-    <article className="rounded-lg border border-stone-200 p-4">
+    <article className="rounded-lg border border-[var(--color-border)] p-4">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="font-semibold text-stone-950">{product.name}</h3>
+        <h3 className="font-semibold text-[var(--color-text)]">{product.name}</h3>
         <EditButton product={product} profile={profile} onEdit={onEdit} disabled={disabled} />
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -447,10 +497,10 @@ function ProductCard({
 function PriceDetails({ product, profile }: { product: ProductAnalytics; profile: Profile }) {
   const locale = localeFromProfile(profile);
   return (
-    <div className="text-sm text-stone-700">
+    <div className="text-sm text-[var(--color-text-secondary)]">
       <p>
         {translate(locale, "products.currentPrice")}:{" "}
-        <span className="font-medium text-stone-950">
+        <span className="font-medium text-[var(--color-text)]">
           {formatCurrency(product.currentPrice, profile)}
         </span>
       </p>
@@ -469,7 +519,7 @@ function PriceDetails({ product, profile }: { product: ProductAnalytics; profile
 function Balances({ product, profile }: { product: ProductAnalytics; profile: Profile }) {
   const locale = localeFromProfile(profile);
   return product.balances.length ? (
-    <ul className="space-y-1 text-sm text-stone-700">
+    <ul className="space-y-1 text-sm text-[var(--color-text-secondary)]">
       {product.balances.map((balance) => (
         <li key={balance.locationId}>
           {balance.locationName}: {formatNumber(balance.onHand, profile)}
@@ -477,7 +527,9 @@ function Balances({ product, profile }: { product: ProductAnalytics; profile: Pr
       ))}
     </ul>
   ) : (
-    <span className="text-sm text-stone-600">{translate(locale, "products.noBalances")}</span>
+    <span className="text-sm text-[var(--color-text-muted)]">
+      {translate(locale, "products.noBalances")}
+    </span>
   );
 }
 

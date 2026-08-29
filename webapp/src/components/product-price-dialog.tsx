@@ -72,14 +72,14 @@ export function PriceDialog({
   return (
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-stone-950/35" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-5 shadow-xl focus:outline-none">
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--color-overlay)]" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(var(--dialog-sm),calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-dialog)] focus:outline-none">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <Dialog.Title className="text-xl font-semibold text-stone-950">
+              <Dialog.Title className="text-xl font-semibold text-[var(--color-text)]">
                 {translate(locale, "products.editPriceTitle")}
               </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm text-stone-600">
+              <Dialog.Description className="mt-2 text-sm text-[var(--color-text-secondary)]">
                 {translate(locale, "products.editPriceDescription")}
               </Dialog.Description>
             </div>
@@ -96,7 +96,7 @@ export function PriceDialog({
           </div>
           {product && (
             <div className="mt-5 space-y-4">
-              <label className="grid gap-1 text-sm font-medium text-stone-700">
+              <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
                 {translate(locale, "products.priceLabel")}
                 <input
                   className="control w-full"
@@ -111,17 +111,17 @@ export function PriceDialog({
                 />
               </label>
               {invalid && (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-[var(--color-danger)]">
                   {translate(locale, "errors.validation")}
                 </p>
               )}
               {normalizePrice(price) === "0.00" && (
-                <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <p className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
                   {translate(locale, "products.zeroPriceWarning")}
                 </p>
               )}
               {conflict && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
                   <p>{translate(locale, "products.conflict")}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
@@ -149,10 +149,11 @@ export function PriceDialog({
                 </div>
               )}
               <FormError locale={locale} error={error} />
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
+                  fullWidth="mobile"
                   disabled={pending}
                   onClick={() => changeOpen(false)}
                 >
@@ -160,6 +161,7 @@ export function PriceDialog({
                 </Button>
                 <Button
                   type="button"
+                  fullWidth="mobile"
                   disabled={pending || disabled || invalid || unchanged || conflict}
                   onClick={() => submit()}
                 >

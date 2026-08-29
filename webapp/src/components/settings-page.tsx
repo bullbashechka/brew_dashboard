@@ -11,6 +11,7 @@ import { saveTourState } from "@/api/tour";
 import { FeedbackForm } from "@/components/feedback";
 import { ResetDemoDialog } from "@/components/reset-demo-dialog";
 import { Button } from "@/components/ui/button";
+import { PageHeader, Surface } from "@/components/ui/layout";
 import {
   CachedSnapshotWarning,
   ErrorState,
@@ -172,13 +173,16 @@ export function SettingsPage({
   };
 
   return (
-    <section className="space-y-6" aria-labelledby="settings-title" data-testid="page-settings">
-      <div className="space-y-2">
-        <h1 id="settings-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "navigation.settings")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "settings.description")}</p>
-      </div>
+    <section
+      className="max-w-[var(--container-reading)] space-y-6"
+      aria-labelledby="settings-title"
+      data-testid="page-settings"
+    >
+      <PageHeader
+        id="settings-title"
+        title={translate(locale, "navigation.settings")}
+        description={translate(locale, "settings.description")}
+      />
 
       <SettingsCard title={translate(locale, "settings.networkTitle")}>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -197,7 +201,7 @@ export function SettingsPage({
 
       <SettingsCard title={translate(locale, "settings.preferencesTitle")}>
         <div className="space-y-6">
-          <label className="grid max-w-sm gap-1 text-sm font-medium text-stone-700">
+          <label className="grid max-w-sm gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
             {translate(locale, "settings.language")}
             <select
               className="control"
@@ -237,7 +241,7 @@ export function SettingsPage({
                 goalMutation.mutate({ monthlyGoal: normalizedGoal, snapshot });
             }}
           >
-            <label className="grid gap-1 text-sm font-medium text-stone-700">
+            <label className="grid gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
               {translate(locale, "settings.monthlyGoal")}
               <input
                 className="control"
@@ -255,15 +259,17 @@ export function SettingsPage({
                 aria-invalid={!normalizedGoal || undefined}
               />
             </label>
-            <p className="text-xs text-stone-600">{translate(locale, "settings.goalHint")}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {translate(locale, "settings.goalHint")}
+            </p>
             {!normalizedGoal && (
-              <p role="alert" className="text-sm text-red-800">
+              <p role="alert" className="text-sm text-[var(--color-danger)]">
                 {translate(locale, "errors.validation")}
               </p>
             )}
             <FormError locale={locale} error={goalMutation.error} />
             {goalConflict && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+              <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
                 <p>{translate(locale, "settings.goalConflict")}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
@@ -297,10 +303,10 @@ export function SettingsPage({
           </form>
 
           <div>
-            <h3 className="text-sm font-semibold text-stone-950">
+            <h3 className="text-sm font-semibold text-[var(--color-text)]">
               {translate(locale, "tour.title")}
             </h3>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               {translate(locale, "tour.restartDescription")}
             </p>
             <div className="mt-3">
@@ -327,7 +333,9 @@ export function SettingsPage({
       </SettingsCard>
 
       <SettingsCard title={translate(locale, "settings.demoTitle")}>
-        <p className="text-sm text-stone-600">{translate(locale, "settings.demoDescription")}</p>
+        <p className="text-sm text-[var(--color-text-muted)]">
+          {translate(locale, "settings.demoDescription")}
+        </p>
         <div className="mt-4">
           <Button type="button" disabled={mutationDisabled} onClick={() => setResetOpen(true)}>
             {translate(locale, "reset.open")}
@@ -375,19 +383,21 @@ function SettingsCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-5" aria-label={title}>
-      <h2 className="text-lg font-semibold text-stone-950">{title}</h2>
-      {description && <p className="mt-1 text-sm text-stone-600">{description}</p>}
+    <Surface label={title}>
+      <h2 className="text-lg font-semibold text-[var(--color-text)]">{title}</h2>
+      {description && (
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{description}</p>
+      )}
       <div className="mt-4">{children}</div>
-    </section>
+    </Surface>
   );
 }
 
 function ReadOnlyValue({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-stone-600">{label}</dt>
-      <dd className="mt-1 font-medium text-stone-950">{value ?? "—"}</dd>
+      <dt className="text-[var(--color-text-muted)]">{label}</dt>
+      <dd className="mt-1 font-medium text-[var(--color-text)]">{value ?? "—"}</dd>
     </div>
   );
 }

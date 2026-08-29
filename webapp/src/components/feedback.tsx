@@ -33,6 +33,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
   const feedback = useQuery(feedbackQuery(profile.networkId));
   const [values, setValues] = useState(() => initialValues(undefined));
   const [dirty, setDirty] = useState(false);
+  const [desiredFeaturesTouched, setDesiredFeaturesTouched] = useState(false);
   const key = useRef<string | null>(null);
   const version = useRef<number | null>(null);
   const appliedVersion = useRef<number | null | undefined>(undefined);
@@ -54,6 +55,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
       key.current = null;
       setValues(initialValues(response.data));
       setDirty(false);
+      setDesiredFeaturesTouched(false);
       queryClient.setQueryData(feedbackQueryKey(profile.networkId), response);
       onSubmitted?.();
     },
@@ -91,13 +93,18 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
     if (mode === "latest") {
       setValues(initialValues(latest.data?.data));
       setDirty(false);
+      setDesiredFeaturesTouched(false);
       return;
     }
     mutation.mutate({ values: draft, expectedVersion: latestVersion });
   };
 
   if (feedback.isPending) {
-    return <p className="text-sm text-stone-600">{translate(locale, "states.loading")}</p>;
+    return (
+      <p className="text-sm text-[var(--color-text-muted)]">
+        {translate(locale, "states.loading")}
+      </p>
+    );
   }
   if (feedback.isError && !feedback.data) {
     return (
@@ -113,7 +120,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
         submit({ ...values }, version.current);
       }}
     >
-      <label className="grid gap-1 text-sm font-medium text-stone-700">
+      <label className="grid gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
         {translate(locale, "feedback.rating")}
         <select
           className="control w-full"
@@ -133,7 +140,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
           ))}
         </select>
       </label>
-      <label className="grid gap-1 text-sm font-medium text-stone-700">
+      <label className="grid gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
         {translate(locale, "feedback.desiredFeatures")}
         <textarea
           className="control min-h-28 w-full"
@@ -145,15 +152,16 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
             key.current = null;
             mutation.reset();
             setDirty(true);
+            setDesiredFeaturesTouched(true);
             setValues((current) => ({ ...current, desiredFeatures: event.target.value }));
           }}
-          aria-invalid={values.desiredFeatures.length < 1 || undefined}
+          aria-invalid={(desiredFeaturesTouched && values.desiredFeatures.length < 1) || undefined}
         />
-        <span className="text-xs font-normal text-stone-600">
+        <span className="text-xs font-normal text-[var(--color-text-muted)]">
           {translate(locale, "feedback.requiredHint")}
         </span>
       </label>
-      <label className="grid gap-1 text-sm font-medium text-stone-700">
+      <label className="grid gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
         {translate(locale, "feedback.comment")}
         <textarea
           className="control min-h-24 w-full"
@@ -168,12 +176,12 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
             setValues((current) => ({ ...current, comment: event.target.value }));
           }}
         />
-        <span className="text-xs font-normal text-stone-600">
+        <span className="text-xs font-normal text-[var(--color-text-muted)]">
           {translate(locale, "feedback.optionalHint")}
         </span>
       </label>
-      {invalid && (
-        <p role="alert" className="text-sm text-red-800">
+      {desiredFeaturesTouched && invalid && (
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
           {translate(locale, "errors.validation")}
         </p>
       )}
@@ -185,7 +193,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
         />
       )}
       {conflict && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
           <p>{translate(locale, "feedback.conflict")}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
@@ -212,6 +220,7 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
       <div className="flex justify-end">
         <PendingButton
           type="submit"
+          fullWidth="mobile"
           pending={mutation.isPending}
           pendingLabel={translate(locale, "feedback.pending")}
           disabled={invalid || conflict}
@@ -233,14 +242,14 @@ export function FeedbackDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-stone-950/35" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(34rem,calc(100vw-2rem))] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-5 shadow-xl focus:outline-none">
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--color-overlay)]" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(var(--dialog-md),calc(100vw-2rem))] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-dialog)] focus:outline-none">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <Dialog.Title className="text-xl font-semibold text-stone-950">
+              <Dialog.Title className="text-xl font-semibold text-[var(--color-text)]">
                 {translate(locale, "feedback.title")}
               </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm text-stone-600">
+              <Dialog.Description className="mt-2 text-sm text-[var(--color-text-secondary)]">
                 {translate(locale, "feedback.description")}
               </Dialog.Description>
             </div>

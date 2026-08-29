@@ -15,6 +15,8 @@ import { sessionQueryOptions } from "@/api/session";
 import { InventoryMovementDialog } from "@/components/inventory-movement-dialog";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/layout";
+import { Badge } from "@/components/ui/badge";
 import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatDate,
@@ -147,10 +149,10 @@ export function InventoryPage({
   return (
     <InventoryFrame profile={profile} updatedAt={first.meta.asOf}>
       <section
-        className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+        className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)]"
         aria-label={translate(locale, "inventory.statusFilter")}
       >
-        <label className="grid max-w-xs gap-1 text-sm font-medium text-stone-700">
+        <label className="grid max-w-xs gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
           {translate(locale, "inventory.statusFilter")}
           <select
             className="control"
@@ -181,7 +183,7 @@ export function InventoryPage({
         />
       )}
       {analytics.isFetching && (
-        <p className="text-sm text-stone-600" role="status">
+        <p className="text-sm text-[var(--color-text-muted)]" role="status">
           {translate(locale, "states.loading")}
         </p>
       )}
@@ -244,17 +246,18 @@ function InventoryFrame({
   const locale = localeFromProfile(profile);
   return (
     <section className="space-y-6" aria-labelledby="inventory-title" data-testid="page-inventory">
-      <div className="space-y-2">
-        <h1 id="inventory-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "inventory.title")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "inventory.description")}</p>
-        {updatedAt && (
-          <p className="text-sm text-stone-600">
-            {translate(locale, "inventory.updatedAt", { value: formatDate(updatedAt, profile) })}
-          </p>
-        )}
-      </div>
+      <PageHeader
+        id="inventory-title"
+        title={translate(locale, "inventory.title")}
+        description={translate(locale, "inventory.description")}
+        meta={
+          updatedAt
+            ? translate(locale, "inventory.updatedAt", {
+                value: formatDate(updatedAt, profile),
+              })
+            : undefined
+        }
+      />
       {children}
     </section>
   );
@@ -274,10 +277,10 @@ function Balances({
   const locale = localeFromProfile(profile);
   return (
     <section className="space-y-3" aria-labelledby="inventory-balances-title">
-      <h2 id="inventory-balances-title" className="text-xl font-semibold text-stone-950">
+      <h2 id="inventory-balances-title" className="text-xl font-semibold text-[var(--color-text)]">
         {translate(locale, "products.balances")}
       </h2>
-      <div className="grid gap-4 xl:hidden">
+      <div className="grid gap-4 md:hidden">
         {balances.map((balance) => (
           <BalanceCard
             key={`${balance.locationId}-${balance.inventoryItemId}`}
@@ -288,9 +291,9 @@ function Balances({
           />
         ))}
       </div>
-      <div className="hidden overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm xl:block">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-stone-50 text-stone-600">
+      <div className="hidden overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-card)] md:block">
+        <table className="w-full min-w-[50rem] border-collapse text-left text-sm">
+          <thead className="bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]">
             <tr>
               {[
                 "inventory.item",
@@ -310,17 +313,19 @@ function Balances({
             {balances.map((balance) => (
               <tr
                 key={`${balance.locationId}-${balance.inventoryItemId}`}
-                className="border-t border-stone-100"
+                className="border-t border-[var(--color-border-subtle)]"
               >
-                <td className="px-4 py-3 font-medium text-stone-950">
+                <td className="px-4 py-3 font-medium text-[var(--color-text)]">
                   {balance.inventoryItemName}
-                  <span className="ml-2 text-stone-600">{balance.unit}</span>
+                  <span className="ml-2 text-[var(--color-text-muted)]">{balance.unit}</span>
                 </td>
-                <td className="px-4 py-3 text-stone-700">{balance.locationName}</td>
-                <td className="px-4 py-3 text-stone-700">
+                <td className="px-4 py-3 text-[var(--color-text-secondary)]">
+                  {balance.locationName}
+                </td>
+                <td className="px-4 py-3 text-[var(--color-text-secondary)]">
                   {formatNumber(balance.onHand, profile)}
                 </td>
-                <td className="px-4 py-3 text-stone-700">
+                <td className="px-4 py-3 text-[var(--color-text-secondary)]">
                   {formatNumber(balance.minThreshold, profile)}
                 </td>
                 <td className="px-4 py-3">
@@ -356,11 +361,13 @@ function BalanceCard({
 }) {
   const locale = localeFromProfile(profile);
   return (
-    <article className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+    <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-stone-950">{balance.inventoryItemName}</h3>
-          <p className="mt-1 text-sm text-stone-600">
+          <h3 className="text-lg font-semibold text-[var(--color-text)]">
+            {balance.inventoryItemName}
+          </h3>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
             {balance.locationName} · {balance.unit}
           </p>
         </div>
@@ -368,14 +375,18 @@ function BalanceCard({
       </div>
       <dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
         <div>
-          <dt className="text-stone-600">{translate(locale, "inventory.onHand")}</dt>
-          <dd className="mt-1 font-semibold text-stone-950">
+          <dt className="text-[var(--color-text-muted)]">
+            {translate(locale, "inventory.onHand")}
+          </dt>
+          <dd className="mt-1 font-semibold text-[var(--color-text)]">
             {formatNumber(balance.onHand, profile)}
           </dd>
         </div>
         <div>
-          <dt className="text-stone-600">{translate(locale, "inventory.threshold")}</dt>
-          <dd className="mt-1 font-semibold text-stone-950">
+          <dt className="text-[var(--color-text-muted)]">
+            {translate(locale, "inventory.threshold")}
+          </dt>
+          <dd className="mt-1 font-semibold text-[var(--color-text)]">
             {formatNumber(balance.minThreshold, profile)}
           </dd>
         </div>
@@ -443,30 +454,32 @@ function RecentMovements({
   const locale = localeFromProfile(profile);
   return (
     <section className="space-y-3" aria-labelledby="recent-movements-title">
-      <h2 id="recent-movements-title" className="text-xl font-semibold text-stone-950">
+      <h2 id="recent-movements-title" className="text-xl font-semibold text-[var(--color-text)]">
         {translate(locale, "inventory.recentMovements")}
       </h2>
       {!movements.length ? (
         <EmptyState locale={locale}>{translate(locale, "inventory.noMovements")}</EmptyState>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-          <div className="divide-y divide-stone-100">
+        <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-card)]">
+          <div className="divide-y divide-[var(--color-border-subtle)]">
             {movements.map((movement) => (
               <article
                 key={movement.movementId}
                 className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm"
               >
                 <div>
-                  <p className="font-medium text-stone-950">{movement.inventoryItemName}</p>
-                  <p className="mt-1 text-stone-600">
+                  <p className="font-medium text-[var(--color-text)]">
+                    {movement.inventoryItemName}
+                  </p>
+                  <p className="mt-1 text-[var(--color-text-muted)]">
                     {movement.locationName} · {formatDate(movement.occurredAt, profile)}
                   </p>
                 </div>
                 <p
                   className={
                     movement.type === "receipt"
-                      ? "font-semibold text-emerald-800"
-                      : "font-semibold text-red-800"
+                      ? "font-semibold text-[var(--color-success)]"
+                      : "font-semibold text-[var(--color-danger)]"
                   }
                 >
                   {movement.type === "receipt" ? "+" : "−"}
@@ -480,7 +493,7 @@ function RecentMovements({
             ))}
           </div>
           {hasNext && (
-            <div className="border-t border-stone-100 p-3">
+            <div className="border-t border-[var(--color-border-subtle)] p-3">
               <Button type="button" variant="outline" disabled={pending} onClick={onLoadMore}>
                 {pending
                   ? translate(locale, "states.loading")
@@ -501,18 +514,12 @@ function RecentMovements({
 
 function StatusBadge({ status, profile }: { status: Balance["status"]; profile: Profile }) {
   const locale = localeFromProfile(profile);
-  const styles = {
-    in_stock: "bg-emerald-50 text-emerald-800",
-    low_stock: "bg-amber-50 text-amber-900",
-    out_of_stock: "bg-red-50 text-red-800",
+  const tones = {
+    in_stock: "success",
+    low_stock: "warning",
+    out_of_stock: "danger",
   } as const;
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status]}`}
-    >
-      {translate(locale, statusKey(status))}
-    </span>
-  );
+  return <Badge tone={tones[status]}>{translate(locale, statusKey(status))}</Badge>;
 }
 
 const statusKey = (status: Balance["status"]): TranslationKey =>
