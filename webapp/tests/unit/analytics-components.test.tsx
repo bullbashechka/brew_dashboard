@@ -5,6 +5,7 @@ import type { OverviewData, Profile } from "@brew-dashboard/contracts";
 import { LocationsPerformanceBadge } from "../../src/components/locations-page";
 import { MetricComparison } from "../../src/components/metric-comparison";
 import { OverviewMetricCard } from "../../src/components/overview-page";
+import { ChartAccessibility } from "../../src/components/ui/chart-accessibility";
 
 const profile: Profile = {
   userId: "123e4567-e89b-12d3-a456-426614174000",
@@ -55,5 +56,25 @@ describe("analytics cards", () => {
       />,
     );
     expect(screen.getByLabelText("Н/Д")).toBeDefined();
+  });
+
+  it("exposes chart summaries and exact values in an accessible table", () => {
+    render(
+      <ChartAccessibility
+        summary="Revenue trend versus the previous period"
+        caption="Revenue trend data"
+        rows={[{ period: "Today", revenue: "KZT 12,500.00" }]}
+        rowKey={(row) => row.period}
+        columns={[
+          { key: "period", header: "Period", render: (row) => row.period },
+          { key: "revenue", header: "Revenue", render: (row) => row.revenue },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Revenue trend versus the previous period")).toBeDefined();
+    expect(screen.getByRole("table", { name: "Revenue trend data" })).toBeDefined();
+    expect(screen.getByRole("rowheader", { name: "Today" })).toBeDefined();
+    expect(screen.getByRole("cell", { name: "KZT 12,500.00" })).toBeDefined();
   });
 });

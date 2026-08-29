@@ -34,6 +34,39 @@ afterEach(() => {
 });
 
 describe("feedback form", () => {
+  it("does not show required-field errors before the user interacts", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: null,
+            meta: {},
+            requestId,
+          }),
+          { status: 200 },
+        ),
+      ),
+    ) as unknown as typeof fetch;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackForm profile={profile} />
+      </QueryClientProvider>,
+    );
+
+    const requiredField = await screen.findByLabelText(
+      "What should we add for you to adopt this product?",
+    );
+    expect(requiredField.getAttribute("aria-invalid")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    await user.type(requiredField, "Inventory import");
+    await user.clear(requiredField);
+    expect(requiredField.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("alert")).toBeDefined();
+  });
+
   it("loads saved values and submits only the contract fields", async () => {
     const requests: Array<{ path: string; body?: Record<string, unknown> }> = [];
     globalThis.fetch = mock((path: string, init?: RequestInit) => {

@@ -3,7 +3,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ApiClientError } from "../../src/api/client";
-import { LanguageForm, LoginForm, OnboardingForm } from "../../src/components/first-run-forms";
+import {
+  LanguageForm,
+  LoginForm,
+  OnboardingForm,
+  type OnboardingFormValues,
+} from "../../src/components/first-run-forms";
 
 afterEach(cleanup);
 
@@ -120,6 +125,63 @@ describe("Stage 7 first-run forms", () => {
     await waitFor(() => expect(submissions).toBe(1));
     expect((screen.getByLabelText("Network name") as HTMLInputElement).value).toBe("Roast House");
     expect(screen.getByRole("alert").textContent).toContain("Something went wrong");
+  });
+
+  it("renders the selected location count and submits the matching array", async () => {
+    const user = userEvent.setup();
+    let submitted: OnboardingFormValues | undefined;
+    render(
+      <OnboardingForm
+        locale="en"
+        onSubmit={async (value) => {
+          submitted = value;
+        }}
+      />,
+    );
+
+    const count = screen.getByLabelText("Number of locations") as HTMLSelectElement;
+    expect(count.value).toBe("3");
+
+    await user.selectOptions(count, "1");
+    expect(count.value).toBe("1");
+    expect(screen.queryByLabelText("Location 2 name")).toBeNull();
+
+    await user.selectOptions(count, "5");
+    expect(count.value).toBe("5");
+    expect(screen.getByLabelText("Location 5 name")).toBeTruthy();
+    await user.type(screen.getByLabelText("Location 1 name"), "Central");
+    await user.type(screen.getByLabelText("Location 2 name"), "Airport");
+    await user.type(screen.getByLabelText("Location 3 name"), "Riverside");
+
+    await user.selectOptions(count, "2");
+    expect(count.value).toBe("2");
+    expect((screen.getByLabelText("Location 1 name") as HTMLInputElement).value).toBe("Central");
+    expect((screen.getByLabelText("Location 2 name") as HTMLInputElement).value).toBe("Airport");
+    expect(screen.queryByLabelText("Location 3 name")).toBeNull();
+
+    await user.selectOptions(count, "5");
+    expect((screen.getByLabelText("Location 3 name") as HTMLInputElement).value).toBe("");
+
+    await user.type(screen.getByLabelText("Network name"), "Roast House");
+    await user.type(screen.getByLabelText("Owner name"), "Alex Owner");
+    await user.type(screen.getByRole("textbox", { name: /^Country code/ }), "KZ");
+    await user.type(screen.getByLabelText("Currency"), "KZT");
+    const timeZone = screen.getByLabelText("Timezone");
+    await user.clear(timeZone);
+    await user.type(timeZone, "Asia/Almaty");
+    await user.selectOptions(count, "2");
+    await user.click(screen.getByRole("button", { name: "Create my dashboard" }));
+
+    await waitFor(() => {
+      expect(submitted).toMatchObject({
+        networkName: "Roast House",
+        ownerName: "Alex Owner",
+        locations: [{ name: "Central" }, { name: "Airport" }],
+        country: "KZ",
+        currency: "KZT",
+        timeZone: "Asia/Almaty",
+      });
+    });
   });
 
   it("suggests country defaults without overwriting manual values", async () => {

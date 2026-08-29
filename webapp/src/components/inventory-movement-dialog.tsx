@@ -128,15 +128,15 @@ export function InventoryMovementDialog({
   return (
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-stone-950/35" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-5 shadow-xl focus:outline-none">
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--color-overlay)]" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(var(--dialog-sm),calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-dialog)] focus:outline-none">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <Dialog.Title className="text-xl font-semibold text-stone-950">
+              <Dialog.Title className="text-xl font-semibold text-[var(--color-text)]">
                 {translate(locale, title)}
               </Dialog.Title>
               {balance && type && (
-                <Dialog.Description className="mt-2 text-sm text-stone-600">
+                <Dialog.Description className="mt-2 text-sm text-[var(--color-text-secondary)]">
                   {translate(locale, description, {
                     item: balance.inventoryItemName,
                     location: balance.locationName,
@@ -157,8 +157,8 @@ export function InventoryMovementDialog({
           </div>
           {balance && type && (
             <div className="mt-5 space-y-4">
-              <div className="rounded-lg bg-stone-50 p-3 text-sm text-stone-700">
-                <p className="font-medium text-stone-950">{balance.inventoryItemName}</p>
+              <div className="rounded-lg bg-[var(--color-surface-subtle)] p-3 text-sm text-[var(--color-text-secondary)]">
+                <p className="font-medium text-[var(--color-text)]">{balance.inventoryItemName}</p>
                 <p className="mt-1">
                   {translate(locale, "inventory.currentBalance", {
                     value: formatNumber(balance.onHand, profile),
@@ -170,7 +170,7 @@ export function InventoryMovementDialog({
                   {formatNumber(balance.minThreshold, profile)} {balance.unit}
                 </p>
               </div>
-              <label className="grid gap-1 text-sm font-medium text-stone-700">
+              <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
                 {translate(locale, "inventory.quantity")}
                 <input
                   className="control w-full"
@@ -185,16 +185,16 @@ export function InventoryMovementDialog({
                   disabled={pending || disabled}
                 />
               </label>
-              <p className="text-sm text-stone-600">
+              <p className="text-sm text-[var(--color-text-secondary)]">
                 {translate(locale, "inventory.quantityHint", { unit: balance.unit })}
               </p>
               {balance.unit === "pcs" && (
-                <p className="text-sm text-stone-600">
+                <p className="text-sm text-[var(--color-text-secondary)]">
                   {translate(locale, "inventory.quantityWholeHint")}
                 </p>
               )}
               {afterWriteoff && (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                <p className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
                   {translate(locale, "inventory.afterWriteoff", {
                     value: formatNumber(afterWriteoff, profile),
                     unit: balance.unit,
@@ -202,22 +202,22 @@ export function InventoryMovementDialog({
                 </p>
               )}
               {exceedsBalance && (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-[var(--color-danger)]">
                   {translate(locale, "inventory.exceedsBalance")}
                 </p>
               )}
               {normalized === null && quantity && (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-[var(--color-danger)]">
                   {translate(locale, "errors.validation")}
                 </p>
               )}
               {balance.unit === "pcs" && normalized && !wholePieces && (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-[var(--color-danger)]">
                   {translate(locale, "inventory.quantityWholeHint")}
                 </p>
               )}
               {conflict && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
                   <p>
                     {translate(
                       locale,
@@ -254,10 +254,11 @@ export function InventoryMovementDialog({
                 </div>
               )}
               <FormError locale={locale} error={error} />
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
+                  fullWidth="mobile"
                   disabled={pending}
                   onClick={() => changeOpen(false)}
                 >
@@ -265,6 +266,7 @@ export function InventoryMovementDialog({
                 </Button>
                 <Button
                   type="button"
+                  fullWidth="mobile"
                   disabled={pending || disabled || invalid || conflict}
                   onClick={() => submit()}
                 >

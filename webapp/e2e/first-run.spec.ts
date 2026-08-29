@@ -171,9 +171,11 @@ test("completes Login → Language → Onboarding → Overview → Tour and can 
   await expect(page.getByRole("heading", { name: "Set up your coffee network" })).toBeVisible();
   await page.getByLabel("Network name").fill("Roast Lab");
   await page.getByLabel("Owner name").fill("Alex Owner");
+  await page.getByLabel("Number of locations").selectOption("2");
+  await expect(page.getByLabel("Number of locations")).toHaveValue("2");
+  await expect(page.getByLabel("Location 3 name")).toHaveCount(0);
   await page.getByLabel("Location 1 name").fill("Central");
   await page.getByLabel("Location 2 name").fill("Airport");
-  await page.getByLabel("Location 3 name").fill("Riverside");
   await page.locator('input[name="country"]').fill("KZ");
   await page.locator('input[name="currency"]').fill("KZT");
   await page.getByLabel("Timezone").fill("Asia/Almaty");

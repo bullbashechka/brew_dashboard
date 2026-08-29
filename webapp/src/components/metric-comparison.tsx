@@ -7,10 +7,12 @@ export function MetricComparison({
   change,
   profile,
   variant = "card",
+  effect = "direct",
 }: {
   change: string | number | null;
   profile: Profile;
   variant?: "card" | "compact";
+  effect?: "direct" | "inverse" | "neutral";
 }) {
   const locale = localeFromProfile(profile);
   const numericChange = change === null ? null : Number(change);
@@ -26,8 +28,19 @@ export function MetricComparison({
         : state === "down"
           ? translate(locale, "comparison.decrease", { value: magnitude! })
           : translate(locale, "comparison.unchanged");
-  const color =
-    state === "up" ? "text-emerald-700" : state === "down" ? "text-red-700" : "text-stone-600";
+  const beneficial =
+    effect === "neutral"
+      ? null
+      : (state === "up" && effect === "direct") || (state === "down" && effect === "inverse");
+  const harmful =
+    effect === "neutral"
+      ? null
+      : (state === "down" && effect === "direct") || (state === "up" && effect === "inverse");
+  const color = beneficial
+    ? "text-[var(--color-success)]"
+    : harmful
+      ? "text-[var(--color-danger)]"
+      : "text-[var(--color-text-muted)]";
   const compact = variant === "compact";
 
   return (
@@ -38,7 +51,9 @@ export function MetricComparison({
       <Icon className={compact ? "size-3.5" : "size-4"} aria-hidden="true" />
       <span>{state === "na" ? label : magnitude}</span>
       {!compact && (
-        <span className="text-stone-600">{translate(locale, "comparison.versusPrevious")}</span>
+        <span className="text-[var(--color-text-muted)]">
+          {translate(locale, "comparison.versusPrevious")}
+        </span>
       )}
     </span>
   );

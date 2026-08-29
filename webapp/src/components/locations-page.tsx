@@ -6,6 +6,8 @@ import { type AnalyticsFilters, type LocationSorting, locationsQuery } from "@/a
 import { MetricComparison } from "@/components/metric-comparison";
 import { sessionQueryOptions } from "@/api/session";
 import { CachedSnapshotWarning, ErrorState, Skeleton } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/layout";
+import { Badge } from "@/components/ui/badge";
 import {
   formatCurrency,
   formatDate,
@@ -55,12 +57,11 @@ export function LocationsPage({
   if (analytics.isLoadingError || !analytics.data)
     return (
       <section className="space-y-6" aria-labelledby="locations-title" data-testid="page-locations">
-        <div className="space-y-2">
-          <h1 id="locations-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-            {translate(locale, "locations.title")}
-          </h1>
-          <p className="text-stone-600">{translate(locale, "locations.description")}</p>
-        </div>
+        <PageHeader
+          id="locations-title"
+          title={translate(locale, "locations.title")}
+          description={translate(locale, "locations.description")}
+        />
         <ErrorState
           locale={locale}
           error={analytics.error}
@@ -72,13 +73,12 @@ export function LocationsPage({
   const data = analytics.data.data;
   return (
     <section className="space-y-6" aria-labelledby="locations-title" data-testid="page-locations">
-      <div className="space-y-2">
-        <h1 id="locations-title" className="text-3xl font-semibold tracking-tight text-stone-950">
-          {translate(locale, "locations.title")}
-        </h1>
-        <p className="text-stone-600">{translate(locale, "locations.description")}</p>
-        <p className="text-sm text-stone-600">{formatDate(analytics.data.meta.asOf, profile)}</p>
-      </div>
+      <PageHeader
+        id="locations-title"
+        title={translate(locale, "locations.title")}
+        description={translate(locale, "locations.description")}
+        meta={formatDate(analytics.data.meta.asOf, profile)}
+      />
 
       {analytics.isRefetchError && (
         <CachedSnapshotWarning
@@ -90,10 +90,10 @@ export function LocationsPage({
       )}
 
       <section
-        className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-end"
         aria-label={translate(locale, "locations.sortBy")}
       >
-        <label className="grid min-w-48 gap-1 text-sm font-medium text-stone-700">
+        <label className="grid min-w-48 gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
           {translate(locale, "locations.sortBy")}
           <select
             className="control"
@@ -114,7 +114,7 @@ export function LocationsPage({
             ))}
           </select>
         </label>
-        <label className="grid min-w-44 gap-1 text-sm font-medium text-stone-700">
+        <label className="grid min-w-44 gap-1 text-sm font-medium text-[var(--color-text-secondary)]">
           {translate(locale, "locations.direction")}
           <select
             className="control"
@@ -130,12 +130,12 @@ export function LocationsPage({
       </section>
 
       {!data.locations.length ? (
-        <p className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center text-stone-700">
+        <p className="rounded-xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] p-8 text-center text-[var(--color-text-secondary)]">
           {translate(locale, "states.empty")}
         </p>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:hidden">
+          <div className="grid gap-4 sm:grid-cols-2 md:hidden">
             {data.locations.map((location) => (
               <LocationCard key={location.locationId} location={location} profile={profile} />
             ))}
@@ -156,18 +156,18 @@ export function LocationsPerformanceBadge({
 }) {
   const locale = localeFromProfile(profile);
   const details = {
-    best: { icon: Trophy, color: "bg-emerald-50 text-emerald-800", label: "locations.best" },
-    weak: { icon: Award, color: "bg-amber-50 text-amber-900", label: "locations.weak" },
-    standard: { icon: Circle, color: "bg-stone-100 text-stone-700", label: "locations.standard" },
+    best: { icon: Trophy, tone: "success", label: "locations.best" },
+    weak: { icon: Award, tone: "warning", label: "locations.weak" },
+    standard: { icon: Circle, tone: "neutral", label: "locations.standard" },
   } as const;
-  const { icon: Icon, color, label } = details[performance];
+  const { icon: Icon, tone, label } = details[performance];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}
-    >
-      <Icon className="size-3.5" aria-hidden="true" />
-      {translate(locale, label)}
-    </span>
+    <Badge tone={tone}>
+      <span className="inline-flex items-center gap-1.5">
+        <Icon className="size-3.5" aria-hidden="true" />
+        {translate(locale, label)}
+      </span>
+    </Badge>
   );
 }
 
@@ -179,9 +179,9 @@ function LocationCard({
   profile: Profile;
 }) {
   return (
-    <article className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+    <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-card)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-lg font-semibold text-stone-950">{location.name}</h2>
+        <h2 className="text-lg font-semibold text-[var(--color-text)]">{location.name}</h2>
         <LocationsPerformanceBadge performance={location.performance} profile={profile} />
       </div>
       <dl className="mt-5 grid grid-cols-2 gap-4">
@@ -202,11 +202,11 @@ function LocationsTable({
 }) {
   const locale = localeFromProfile(profile);
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm xl:block">
-      <table className="w-full border-collapse text-left text-sm">
-        <thead className="bg-stone-50 text-stone-600">
+    <div className="hidden overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-card)] md:block">
+      <table className="w-full min-w-[58rem] border-collapse text-left text-sm">
+        <thead className="bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]">
           <tr>
-            <th className="px-4 py-3 font-semibold">
+            <th className="sticky left-0 bg-[var(--color-surface-subtle)] px-4 py-3 font-semibold">
               {translate(locale, "locations.locationName")}
             </th>
             {metrics.map((metric) => (
@@ -216,11 +216,16 @@ function LocationsTable({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-200">
+        <tbody className="divide-y divide-[var(--color-border)]">
           {locations.map((location) => (
             <tr key={location.locationId}>
-              <th scope="row" className="px-4 py-4 align-top">
-                <span className="block font-semibold text-stone-950">{location.name}</span>
+              <th
+                scope="row"
+                className="sticky left-0 border-r border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-4 py-4 align-top"
+              >
+                <span className="block font-semibold text-[var(--color-text)]">
+                  {location.name}
+                </span>
                 <span className="mt-2 block">
                   <LocationsPerformanceBadge performance={location.performance} profile={profile} />
                 </span>
@@ -250,7 +255,7 @@ function MetricCell({
   const locale = localeFromProfile(profile);
   return (
     <div>
-      <dt className="text-xs font-medium text-stone-600">
+      <dt className="text-xs font-medium text-[var(--color-text-muted)]">
         {translate(locale, `metrics.${name}` as TranslationKey)}
       </dt>
       <dd className="mt-1">
@@ -279,10 +284,11 @@ function MetricValue({
         : metricValue === null
           ? translate(locale, "comparison.notAvailable")
           : formatCurrency(metricValue, profile);
-  if (name === "activeAlerts") return <span className="font-semibold text-stone-950">{value}</span>;
+  if (name === "activeAlerts")
+    return <span className="font-semibold text-[var(--color-text)]">{value}</span>;
   return (
     <span>
-      <span className="block font-semibold text-stone-950">{value}</span>
+      <span className="block font-semibold text-[var(--color-text)]">{value}</span>
       <MetricComparison
         change={metric.changePercent as string | number | null}
         profile={profile}

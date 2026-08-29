@@ -320,7 +320,7 @@ test("keeps heatmap, matrix, and data views accessible across desktop and mobile
   for (const group of ["Stars", "Workhorses", "Puzzles", "Dogs"]) {
     await expect(matrix.getByRole("heading", { name: group })).toBeVisible();
   }
-  const productTable = productsPage.locator("table");
+  const productTable = productsPage.getByRole("table", { name: "Coffee" });
   await expect(productTable).toBeVisible();
   await expect(productTable.getByRole("columnheader", { name: "Current price" })).toBeVisible();
   await expect(productTable.getByRole("cell", { name: /House Latte/ })).toBeVisible();
