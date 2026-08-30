@@ -14,7 +14,7 @@ import {
 import { appUsers, authAccounts, authSessions, authUsers, networks } from "../db/schema.ts";
 import { parseLogin, parsePassword } from "../auth/login.ts";
 
-export const MAX_ACTIVE_DEMO_ACCOUNTS = 15;
+export const MAX_ACTIVE_DEMO_ACCOUNTS = 25;
 const credentialIssuer = createLocalAccountIssuer("credential");
 
 export type AccountKind = "demo" | "e2e";
@@ -98,7 +98,9 @@ export const createAccount = async (
           ),
         );
       if ((active[0]?.value ?? 0) >= MAX_ACTIVE_DEMO_ACCOUNTS) {
-        throw new AdminAccountError("The limit of 15 active demo accounts has been reached");
+        throw new AdminAccountError(
+          `The limit of ${MAX_ACTIVE_DEMO_ACCOUNTS} active demo accounts has been reached`,
+        );
       }
     }
 

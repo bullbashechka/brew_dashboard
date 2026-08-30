@@ -1,0 +1,2 @@
+CREATE INDEX "order_items_network_order_idx" ON "app"."order_items" USING btree ("network_id","order_id");--> statement-breakpoint
+CREATE INDEX "order_items_network_product_order_idx" ON "app"."order_items" USING btree ("network_id","product_id","order_id");

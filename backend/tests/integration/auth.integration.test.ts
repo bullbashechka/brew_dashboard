@@ -370,7 +370,7 @@ describeIntegration("Stage 3 authentication and account administration", () => {
     expect(afterReset.every((response) => response.status === 401)).toBe(true);
   });
 
-  it("serializes the fifteen-active-demo cap while excluding e2e accounts", async () => {
+  it("serializes the active-demo cap while excluding e2e accounts", async () => {
     const current = await activeDemoCount();
     expect(current).toBeLessThan(MAX_ACTIVE_DEMO_ACCOUNTS);
     const fillers: TestAccount[] = [];
