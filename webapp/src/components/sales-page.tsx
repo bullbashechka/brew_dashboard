@@ -1,16 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Profile, SalesData } from "@brew-dashboard/contracts";
 import type { ReactNode } from "react";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 
 import { salesInfiniteQuery, type AnalyticsFilters } from "@/api/analytics";
 import { MetricComparison } from "@/components/metric-comparison";
@@ -20,6 +11,7 @@ import { PageHeader } from "@/components/ui/layout";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Badge } from "@/components/ui/badge";
 import { ChartAccessibility } from "@/components/ui/chart-accessibility";
+import { ChartViewport } from "@/components/ui/chart-viewport";
 import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
@@ -193,72 +185,70 @@ function SalesTrend({ data, profile }: { data: SalesData; profile: Profile }) {
         {translate(locale, "sales.dailyTrend")}
       </figcaption>
       {data.dailySeries.length ? (
-        <div className="h-[264px] min-w-0 md:h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
-              <XAxis
-                dataKey="bucket"
-                tickFormatter={formatBucket}
-                minTickGap={28}
-                tick={{ fontSize: 12 }}
-              />
-              <YAxis
-                tickFormatter={(value) => formatNumber(value, profile)}
-                width={54}
-                tick={{ fontSize: 12 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-md)",
-                  boxShadow: "var(--shadow-popover)",
-                }}
-                labelStyle={{ color: "var(--color-text)", fontWeight: 600 }}
-                itemStyle={{ color: "var(--color-text-secondary)" }}
-                labelFormatter={(label) => formatBucket(String(label ?? ""))}
-                formatter={(value, name) => [
-                  formatCurrency(String(value ?? 0), profile),
-                  labels[String(name) as keyof typeof labels] ?? String(name),
-                ]}
-              />
-              <Legend
-                formatter={(value) => labels[String(value) as keyof typeof labels] ?? String(value)}
-              />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="var(--color-chart-1)"
-                strokeWidth={2.5}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="grossProfit"
-                stroke="var(--color-chart-2)"
-                strokeWidth={2.5}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="comparisonRevenue"
-                stroke="var(--color-chart-1)"
-                strokeDasharray="6 4"
-                strokeOpacity={0.55}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="comparisonGrossProfit"
-                stroke="var(--color-chart-2)"
-                strokeDasharray="6 4"
-                strokeOpacity={0.55}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <ChartViewport size="trend">
+          <LineChart data={data.dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
+            <XAxis
+              dataKey="bucket"
+              tickFormatter={formatBucket}
+              minTickGap={28}
+              tick={{ fontSize: 12 }}
+            />
+            <YAxis
+              tickFormatter={(value) => formatNumber(value, profile)}
+              width={54}
+              tick={{ fontSize: 12 }}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-popover)",
+              }}
+              labelStyle={{ color: "var(--color-text)", fontWeight: 600 }}
+              itemStyle={{ color: "var(--color-text-secondary)" }}
+              labelFormatter={(label) => formatBucket(String(label ?? ""))}
+              formatter={(value, name) => [
+                formatCurrency(String(value ?? 0), profile),
+                labels[String(name) as keyof typeof labels] ?? String(name),
+              ]}
+            />
+            <Legend
+              formatter={(value) => labels[String(value) as keyof typeof labels] ?? String(value)}
+            />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke="var(--color-chart-1)"
+              strokeWidth={2.5}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="grossProfit"
+              stroke="var(--color-chart-2)"
+              strokeWidth={2.5}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="comparisonRevenue"
+              stroke="var(--color-chart-1)"
+              strokeDasharray="6 4"
+              strokeOpacity={0.55}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="comparisonGrossProfit"
+              stroke="var(--color-chart-2)"
+              strokeDasharray="6 4"
+              strokeOpacity={0.55}
+              dot={false}
+            />
+          </LineChart>
+        </ChartViewport>
       ) : (
         <EmptyState locale={locale} />
       )}

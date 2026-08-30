@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import { ApiClientError } from "../../src/api/client";
-import { EmptyState, ErrorState, FormError, LoadingState } from "../../src/components/ui/states";
+import {
+  ConflictState,
+  EmptyState,
+  ErrorState,
+  FormError,
+  LoadingState,
+} from "../../src/components/ui/states";
 
 afterEach(cleanup);
 
@@ -37,5 +43,25 @@ describe("shared loading, empty and error states", () => {
     expect(screen.getAllByText(/Something went wrong/).length).toBe(2);
     expect(screen.getAllByText(/123e4567-e89b-12d3-a456-426614174099/).length).toBe(2);
     expect(screen.queryByText(/secret feedback/)).toBeNull();
+  });
+
+  it("keeps a handled conflict to one alert with its recovery action", () => {
+    const error = new ApiClientError(
+      "secret conflict details",
+      409,
+      "CONFLICT",
+      {},
+      "123e4567-e89b-12d3-a456-426614174099",
+    );
+    render(
+      <ConflictState locale="en" error={error} message="This record changed in another tab.">
+        <button type="button">Use latest</button>
+      </ConflictState>,
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getByRole("alert").textContent).toContain("This record changed in another tab.");
+    expect(screen.getByRole("alert").textContent).toContain("Support ID");
+    expect(screen.getByRole("button", { name: "Use latest" })).toBeDefined();
+    expect(screen.queryByText(/secret conflict details/)).toBeNull();
   });
 });

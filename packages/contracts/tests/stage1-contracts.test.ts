@@ -64,6 +64,21 @@ describe("Stage 1 shared contracts", () => {
         locations: [{ name: "Central" }, { name: " cEnTrAl " }],
       }).success,
     ).toBe(false);
+    const blankLocations = onboardingRequestSchema.safeParse({
+      ...valid,
+      locations: [{ name: "" }, { name: "" }],
+    });
+    expect(blankLocations.success).toBe(false);
+    if (!blankLocations.success) {
+      expect(
+        blankLocations.error.issues.some(
+          (issue) => issue.message === "Location names must be unique",
+        ),
+      ).toBe(false);
+      expect(
+        blankLocations.error.issues.filter((issue) => issue.path.at(-1) === "name"),
+      ).toHaveLength(2);
+    }
     expect(
       onboardingRequestSchema.safeParse({
         ...valid,

@@ -96,6 +96,34 @@ export function FormError({ locale, error }: { locale: AppLocale; error?: unknow
   );
 }
 
+export function ConflictState({
+  locale,
+  message,
+  error,
+  children,
+}: {
+  locale: AppLocale;
+  message: ReactNode;
+  error?: unknown;
+  children?: ReactNode;
+}) {
+  const apiError = error instanceof ApiClientError ? error : undefined;
+  return (
+    <div
+      role="alert"
+      className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]"
+    >
+      <p>{message}</p>
+      {apiError?.requestId && (
+        <p className="mt-1">
+          {translate(locale, "errors.requestId", { requestId: apiError.requestId })}
+        </p>
+      )}
+      {children && <div className="mt-3 flex flex-wrap gap-2">{children}</div>}
+    </div>
+  );
+}
+
 export function EmptyState({ locale, children }: { locale: AppLocale; children?: ReactNode }) {
   return (
     <div className="rounded-xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] p-8 text-center text-[var(--color-text-secondary)]">

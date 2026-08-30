@@ -173,6 +173,7 @@ export const onboardingRequestSchema = z
   .superRefine(({ locations }, context) => {
     const names = new Set<string>();
     for (const [index, location] of locations.entries()) {
+      if (!displayNameSchema.safeParse(location.name).success) continue;
       const key = normalizedNameKey(location.name);
       if (names.has(key)) {
         context.addIssue({
