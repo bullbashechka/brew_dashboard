@@ -52,9 +52,12 @@ const loadNetworkForUpdate = async (transaction: RequestTransaction, networkId: 
 
 export const setSettingsLanguage = async (
   transaction: RequestTransaction,
-  input: { networkId: string; language: "en" | "ru"; idempotencyKey: string },
+  input: {
+    networkId: string;
+    request: { language: "en" | "ru"; idempotencyKey: string };
+  },
 ) => {
-  const request = languageRequestSchema.parse(input);
+  const request = languageRequestSchema.parse(input.request);
   await lockNetwork(transaction, input.networkId);
   const requestHash = await hashOperationPayload(SETTINGS_LANGUAGE_OPERATION, {
     language: request.language,

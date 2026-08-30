@@ -15,7 +15,7 @@ export const settingsLanguageHandler = async (context: Context<AppEnvironment>) 
   const request = validatedJson<{ language: "en" | "ru"; idempotencyKey: string }>(context);
   const result = await setSettingsLanguage(context.get("database"), {
     networkId: context.get("auth").networkId,
-    ...request,
+    request,
   });
   return context.json({ data: result, meta: {}, requestId: context.get("requestId") }, 200);
 };
