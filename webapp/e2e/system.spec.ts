@@ -46,7 +46,7 @@ test.describe("@system Stage 12 real Worker system journeys", () => {
     await page.getByLabel("Number of locations").selectOption("2");
     await page.getByLabel("Location 1 name").fill(SYSTEM_E2E_CANARIES.locationName);
     await page.getByLabel("Location 2 name").fill("Airport");
-    await page.locator('input[name="country"]').fill("KZ");
+    await page.locator('select[name="country-selection"]').selectOption("KZ");
     await page.locator('input[name="currency"]').fill("KZT");
     await page.getByLabel("Timezone").fill("Asia/Almaty");
     await page.getByRole("button", { name: "Create my dashboard" }).click();

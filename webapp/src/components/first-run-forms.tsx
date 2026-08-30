@@ -276,12 +276,68 @@ const defaultValues: OnboardingFormValues = {
 
 type SuggestedField = "currency" | "timeZone";
 
-const countrySuggestions: Record<string, Record<SuggestedField, string>> = {
-  KZ: { currency: "KZT", timeZone: "Asia/Almaty" },
-  RU: { currency: "RUB", timeZone: "Europe/Moscow" },
-  US: { currency: "USD", timeZone: "America/New_York" },
-  GB: { currency: "GBP", timeZone: "Europe/London" },
-};
+const customCountryValue = "custom";
+
+const countryOptions = [
+  {
+    code: "KZ",
+    currency: "KZT",
+    timeZone: "Asia/Almaty",
+    name: { en: "Kazakhstan", ru: "Казахстан" },
+  },
+  {
+    code: "RU",
+    currency: "RUB",
+    timeZone: "Europe/Moscow",
+    name: { en: "Russia", ru: "Россия" },
+  },
+  {
+    code: "US",
+    currency: "USD",
+    timeZone: "America/New_York",
+    name: { en: "United States", ru: "США" },
+  },
+  {
+    code: "GB",
+    currency: "GBP",
+    timeZone: "Europe/London",
+    name: { en: "United Kingdom", ru: "Великобритания" },
+  },
+  {
+    code: "BE",
+    currency: "EUR",
+    timeZone: "Europe/Brussels",
+    name: { en: "Belgium", ru: "Бельгия" },
+  },
+  {
+    code: "DE",
+    currency: "EUR",
+    timeZone: "Europe/Berlin",
+    name: { en: "Germany", ru: "Германия" },
+  },
+  {
+    code: "NL",
+    currency: "EUR",
+    timeZone: "Europe/Amsterdam",
+    name: { en: "Netherlands", ru: "Нидерланды" },
+  },
+  {
+    code: "DK",
+    currency: "DKK",
+    timeZone: "Europe/Copenhagen",
+    name: { en: "Denmark", ru: "Дания" },
+  },
+  {
+    code: "ES",
+    currency: "EUR",
+    timeZone: "Europe/Madrid",
+    name: { en: "Spain", ru: "Испания" },
+  },
+] as const;
+
+const countrySuggestions: Record<string, Record<SuggestedField, string>> = Object.fromEntries(
+  countryOptions.map(({ code, currency, timeZone }) => [code, { currency, timeZone }]),
+);
 
 export function OnboardingForm({
   locale,
@@ -291,6 +347,7 @@ export function OnboardingForm({
   onSubmit: (value: OnboardingFormValues) => Promise<void>;
 }) {
   const [submitError, setSubmitError] = useState<unknown>(null);
+  const [isCustomCountry, setIsCustomCountry] = useState(false);
   const autoSuggestedFields = useRef<Set<SuggestedField>>(
     new Set(defaultValues.timeZone ? ["timeZone"] : []),
   );
@@ -438,27 +495,67 @@ export function OnboardingForm({
             </form.Field>
             <div className="grid gap-5 sm:grid-cols-2">
               <form.Field name="country">
-                {(field) => (
-                  <label className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
-                    {translate(locale, "onboarding.country")}
-                    <input
-                      className="control w-full uppercase"
-                      maxLength={2}
-                      name={field.name}
-                      onBlur={field.handleBlur}
-                      onChange={(event) => {
-                        const country = event.target.value.toUpperCase();
-                        field.handleChange(country);
-                        applyCountrySuggestion(country);
-                      }}
-                      value={field.state.value ?? ""}
-                    />
-                    <span className="text-xs font-normal text-[var(--color-text-muted)]">
-                      {translate(locale, "onboarding.countryHint")}
-                    </span>
-                    <ValidationMessage errors={field.state.meta.errors} />
-                  </label>
-                )}
+                {(field) => {
+                  const updateCountry = (country: string) => {
+                    field.handleChange(country);
+                    applyCountrySuggestion(country);
+                  };
+
+                  return (
+                    <div className="grid gap-1 text-sm font-medium text-[var(--color-text)]">
+                      <label className="grid gap-1">
+                        {translate(locale, "onboarding.country")}
+                        <select
+                          className="control w-full"
+                          name={`${field.name}-selection`}
+                          onBlur={field.handleBlur}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            const custom = value === customCountryValue;
+                            setIsCustomCountry(custom);
+                            updateCountry(custom ? "" : value);
+                          }}
+                          value={isCustomCountry ? customCountryValue : (field.state.value ?? "")}
+                        >
+                          <option disabled value="">
+                            {translate(locale, "onboarding.countryPlaceholder")}
+                          </option>
+                          {countryOptions.map((country) => (
+                            <option key={country.code} value={country.code}>
+                              {country.name[locale]}
+                            </option>
+                          ))}
+                          <option value={customCountryValue}>
+                            {translate(locale, "onboarding.otherCountry")}
+                          </option>
+                        </select>
+                      </label>
+                      {isCustomCountry && (
+                        <>
+                          <label className="grid gap-1">
+                            {translate(locale, "onboarding.countryCode")}
+                            <input
+                              aria-describedby={`${field.name}-hint`}
+                              className="control w-full uppercase"
+                              maxLength={2}
+                              name={field.name}
+                              onBlur={field.handleBlur}
+                              onChange={(event) => updateCountry(event.target.value.toUpperCase())}
+                              value={field.state.value ?? ""}
+                            />
+                          </label>
+                          <span
+                            id={`${field.name}-hint`}
+                            className="text-xs font-normal text-[var(--color-text-muted)]"
+                          >
+                            {translate(locale, "onboarding.countryHint")}
+                          </span>
+                        </>
+                      )}
+                      <ValidationMessage errors={field.state.meta.errors} />
+                    </div>
+                  );
+                }}
               </form.Field>
               <form.Field name="currency">
                 {(field) => (
