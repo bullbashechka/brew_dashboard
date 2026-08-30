@@ -5,7 +5,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   CartesianGrid,
   ReferenceLine,
-  ResponsiveContainer,
   Scatter,
   ScatterChart,
   Tooltip,
@@ -19,9 +18,11 @@ import { ApiClientError } from "@/api/client";
 import { sessionQueryOptions } from "@/api/session";
 import { PriceDialog } from "@/components/product-price-dialog";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/layout";
 import { ChartAccessibility } from "@/components/ui/chart-accessibility";
+import { ChartViewport } from "@/components/ui/chart-viewport";
 import { CachedSnapshotWarning, EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import {
   formatCurrency,
@@ -166,6 +167,7 @@ function ProductsFrame({
 
 function MenuMatrix({ data, profile }: { data: ProductsData; profile: Profile }) {
   const locale = localeFromProfile(profile);
+  const desktop = useMediaQuery("(min-width: 768px)");
   const grouped = useMemo(
     () =>
       Object.fromEntries(
@@ -195,71 +197,73 @@ function MenuMatrix({ data, profile }: { data: ProductsData; profile: Profile })
           {translate(locale, "products.matrixDescription")}
         </p>
       </div>
-      <div className="mt-5 hidden h-96 min-w-0 md:block">
-        <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 16, right: 24, bottom: 24, left: 10 }}>
-            <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
-            <XAxis
-              type="number"
-              dataKey="units"
-              name={translate(locale, "sales.unitsSold")}
-              tickFormatter={(value) => formatNumber(value, profile)}
-              label={{
-                value: translate(locale, "sales.unitsSold"),
-                position: "insideBottom",
-                offset: -10,
-              }}
-            />
-            <YAxis
-              type="number"
-              dataKey="contribution"
-              name={translate(locale, "products.unitContribution")}
-              tickFormatter={(value) => formatCurrency(value, profile)}
-              width={72}
-              label={{
-                value: translate(locale, "products.unitContribution"),
-                angle: -90,
-                position: "insideLeft",
-              }}
-            />
-            <Tooltip
-              cursor={{ strokeDasharray: "3 3" }}
-              contentStyle={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-md)",
-                boxShadow: "var(--shadow-popover)",
-              }}
-              labelStyle={{ color: "var(--color-text)", fontWeight: 600 }}
-              itemStyle={{ color: "var(--color-text-secondary)" }}
-              formatter={(value, name, item) => [
-                name === translate(locale, "sales.unitsSold")
-                  ? formatNumber(value as number, profile)
-                  : formatCurrency(value as number, profile),
-                `${item.payload?.name ?? ""} · ${String(name)}`,
-              ]}
-            />
-            <ReferenceLine
-              x={Number(data.medians.unitsSold)}
-              stroke="var(--color-chart-neutral)"
-              strokeDasharray="6 4"
-            />
-            <ReferenceLine
-              y={Number(data.medians.unitContribution)}
-              stroke="var(--color-chart-neutral)"
-              strokeDasharray="6 4"
-            />
-            {menuGroups.map((group) => (
-              <Scatter
-                key={group}
-                name={translate(locale, `products.${group}`)}
-                data={points(group)}
-                fill={groupColors[group]}
+      {desktop && (
+        <div className="mt-5">
+          <ChartViewport size="matrix">
+            <ScatterChart margin={{ top: 16, right: 24, bottom: 24, left: 10 }}>
+              <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
+              <XAxis
+                type="number"
+                dataKey="units"
+                name={translate(locale, "sales.unitsSold")}
+                tickFormatter={(value) => formatNumber(value, profile)}
+                label={{
+                  value: translate(locale, "sales.unitsSold"),
+                  position: "insideBottom",
+                  offset: -10,
+                }}
               />
-            ))}
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
+              <YAxis
+                type="number"
+                dataKey="contribution"
+                name={translate(locale, "products.unitContribution")}
+                tickFormatter={(value) => formatCurrency(value, profile)}
+                width={72}
+                label={{
+                  value: translate(locale, "products.unitContribution"),
+                  angle: -90,
+                  position: "insideLeft",
+                }}
+              />
+              <Tooltip
+                cursor={{ strokeDasharray: "3 3" }}
+                contentStyle={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-popover)",
+                }}
+                labelStyle={{ color: "var(--color-text)", fontWeight: 600 }}
+                itemStyle={{ color: "var(--color-text-secondary)" }}
+                formatter={(value, name, item) => [
+                  name === translate(locale, "sales.unitsSold")
+                    ? formatNumber(value as number, profile)
+                    : formatCurrency(value as number, profile),
+                  `${item.payload?.name ?? ""} · ${String(name)}`,
+                ]}
+              />
+              <ReferenceLine
+                x={Number(data.medians.unitsSold)}
+                stroke="var(--color-chart-neutral)"
+                strokeDasharray="6 4"
+              />
+              <ReferenceLine
+                y={Number(data.medians.unitContribution)}
+                stroke="var(--color-chart-neutral)"
+                strokeDasharray="6 4"
+              />
+              {menuGroups.map((group) => (
+                <Scatter
+                  key={group}
+                  name={translate(locale, `products.${group}`)}
+                  data={points(group)}
+                  fill={groupColors[group]}
+                />
+              ))}
+            </ScatterChart>
+          </ChartViewport>
+        </div>
+      )}
       <div className="mt-5 grid gap-3 sm:grid-cols-2 md:hidden">
         {menuGroups.map((group) => (
           <MenuGroupCard key={group} group={group} products={grouped[group]} profile={profile} />

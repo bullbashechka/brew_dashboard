@@ -127,6 +127,22 @@ describe("Stage 7 first-run forms", () => {
     expect(screen.getByRole("alert").textContent).toContain("Something went wrong");
   });
 
+  it("keeps empty location errors separate from duplicate-name validation", async () => {
+    const user = userEvent.setup();
+    render(<OnboardingForm locale="en" onSubmit={async () => undefined} />);
+
+    await user.type(screen.getByLabelText("Network name"), "Roast House");
+    await user.type(screen.getByLabelText("Owner name"), "Alex Owner");
+    await user.type(screen.getByRole("textbox", { name: /^Country code/ }), "KZ");
+    const timeZone = screen.getByLabelText("Timezone");
+    await user.clear(timeZone);
+    await user.type(timeZone, "Asia/Almaty");
+    await user.click(screen.getByRole("button", { name: "Create my dashboard" }));
+
+    expect(screen.getAllByText("This field is required.")).toHaveLength(3);
+    expect(screen.queryByText("Location names must be unique")).toBeNull();
+  });
+
   it("renders the selected location count and submits the matching array", async () => {
     const user = userEvent.setup();
     let submitted: OnboardingFormValues | undefined;

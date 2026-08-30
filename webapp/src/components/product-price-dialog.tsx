@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ApiClientError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/states";
+import { ConflictState, FormError } from "@/components/ui/states";
 import { localeFromProfile, translate } from "@/lib/i18n";
 
 export function normalizePrice(value: string) {
@@ -121,34 +121,35 @@ export function PriceDialog({
                 </p>
               )}
               {conflict && (
-                <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
-                  <p>{translate(locale, "products.conflict")}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={pending || disabled}
-                      onClick={() => {
-                        setPrice(product.currentPrice);
-                        key.current = null;
-                        onClearError();
-                      }}
-                    >
-                      {translate(locale, "actions.useLatest")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={pending || disabled || invalid || unchanged}
-                      onClick={() => submit(true)}
-                    >
-                      {translate(locale, "actions.overwrite")}
-                    </Button>
-                  </div>
-                </div>
+                <ConflictState
+                  locale={locale}
+                  error={error}
+                  message={translate(locale, "products.conflict")}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pending || disabled}
+                    onClick={() => {
+                      setPrice(product.currentPrice);
+                      key.current = null;
+                      onClearError();
+                    }}
+                  >
+                    {translate(locale, "actions.useLatest")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending || disabled || invalid || unchanged}
+                    onClick={() => submit(true)}
+                  >
+                    {translate(locale, "actions.overwrite")}
+                  </Button>
+                </ConflictState>
               )}
-              <FormError locale={locale} error={error} />
+              {!conflict && <FormError locale={locale} error={error} />}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <Button
                   type="button"

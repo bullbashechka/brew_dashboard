@@ -220,13 +220,16 @@ test("updates a goal, reloads feedback and preserves it through Reset", async ({
   });
 
   await page.goto("/app/settings?period=today");
+  const saveGoal = page.getByRole("button", { name: "Save goal" });
+  await expect(saveGoal).toBeDisabled();
+  await page.getByLabel("Monthly revenue goal").fill("10000.0");
+  await expect(saveGoal).toBeDisabled();
   await page.getByLabel("Monthly revenue goal").fill("12000");
-  await Promise.all([
-    page.waitForResponse("**/api/v1/settings/revenue-goal"),
-    page.getByRole("button", { name: "Save goal" }).click(),
-  ]);
+  await expect(saveGoal).toBeEnabled();
+  await Promise.all([page.waitForResponse("**/api/v1/settings/revenue-goal"), saveGoal.click()]);
   await expect(page.getByText("Monthly goal saved.")).toBeVisible();
   await expect(page.getByLabel("Monthly revenue goal")).toHaveValue("12000.00");
+  await expect(saveGoal).toBeDisabled();
 
   const feedbackButton = page.getByRole("button", { name: "Feedback", exact: true });
   if (!(await feedbackButton.isVisible())) {

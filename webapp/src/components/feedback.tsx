@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiClientError } from "@/api/client";
 import { feedbackQuery, feedbackQueryKey, saveFeedback } from "@/api/settings";
 import { Button } from "@/components/ui/button";
-import { ErrorState, FormError, PendingButton } from "@/components/ui/states";
+import { ConflictState, ErrorState, FormError, PendingButton } from "@/components/ui/states";
 import { localeFromProfile, translate } from "@/lib/i18n";
 
 type FeedbackFormProps = {
@@ -193,30 +193,31 @@ export function FeedbackForm({ profile, onSubmitted }: FeedbackFormProps) {
         />
       )}
       {conflict && (
-        <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
-          <p>{translate(locale, "feedback.conflict")}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={mutation.isPending}
-              onClick={() => void refreshFeedback("latest")}
-            >
-              {translate(locale, "actions.useLatest")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={mutation.isPending || invalid}
-              onClick={() => void refreshFeedback("overwrite")}
-            >
-              {translate(locale, "actions.overwrite")}
-            </Button>
-          </div>
-        </div>
+        <ConflictState
+          locale={locale}
+          error={mutation.error}
+          message={translate(locale, "feedback.conflict")}
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={mutation.isPending}
+            onClick={() => void refreshFeedback("latest")}
+          >
+            {translate(locale, "actions.useLatest")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={mutation.isPending || invalid}
+            onClick={() => void refreshFeedback("overwrite")}
+          >
+            {translate(locale, "actions.overwrite")}
+          </Button>
+        </ConflictState>
       )}
-      <FormError locale={locale} error={mutation.error} />
+      {!conflict && <FormError locale={locale} error={mutation.error} />}
       <div className="flex justify-end">
         <PendingButton
           type="submit"

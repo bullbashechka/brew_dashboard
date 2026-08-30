@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ApiClientError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/states";
+import { ConflictState, FormError } from "@/components/ui/states";
 import { formatNumber, localeFromProfile, translate } from "@/lib/i18n";
 
 type Balance = InventoryData["balances"][number];
@@ -217,43 +217,42 @@ export function InventoryMovementDialog({
                 </p>
               )}
               {conflict && (
-                <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
-                  <p>
-                    {translate(
-                      locale,
-                      conflictState === "unavailable"
-                        ? "inventory.conflictUnavailable"
-                        : conflictState === "refresh_failed"
-                          ? "inventory.conflictRefreshFailed"
-                          : "inventory.conflict",
-                    )}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {conflictState === "ready" && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={pending || disabled || invalid}
-                        onClick={() => submit(true)}
-                      >
-                        {translate(locale, "inventory.retryLatest")}
-                      </Button>
-                    )}
-                    {conflictState === "refresh_failed" && onRefreshConflict && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={pending || disabled}
-                        onClick={onRefreshConflict}
-                      >
-                        {translate(locale, "actions.retry")}
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                <ConflictState
+                  locale={locale}
+                  error={error}
+                  message={translate(
+                    locale,
+                    conflictState === "unavailable"
+                      ? "inventory.conflictUnavailable"
+                      : conflictState === "refresh_failed"
+                        ? "inventory.conflictRefreshFailed"
+                        : "inventory.conflict",
+                  )}
+                >
+                  {conflictState === "ready" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={pending || disabled || invalid}
+                      onClick={() => submit(true)}
+                    >
+                      {translate(locale, "inventory.retryLatest")}
+                    </Button>
+                  )}
+                  {conflictState === "refresh_failed" && onRefreshConflict && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={pending || disabled}
+                      onClick={onRefreshConflict}
+                    >
+                      {translate(locale, "actions.retry")}
+                    </Button>
+                  )}
+                </ConflictState>
               )}
-              <FormError locale={locale} error={error} />
+              {!conflict && <FormError locale={locale} error={error} />}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <Button
                   type="button"

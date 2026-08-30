@@ -276,7 +276,9 @@ test("keeps a conflicted form available outside its status filter and retries wi
   expect((await conflictResponse).status()).toBe(409);
 
   await expect(
-    page.getByText("This information changed. Please refresh and try again."),
+    page.getByText(
+      "The balance changed. Review the latest value before trying again; your quantity is kept.",
+    ),
   ).toBeVisible();
   await expect(page.getByLabel("Quantity")).toHaveValue("2");
   await expect(page.getByText("Current balance: 2 kg")).toBeVisible();

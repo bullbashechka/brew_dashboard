@@ -303,6 +303,12 @@ test("updates current product pricing without changing mocked historical sales",
 test("keeps heatmap, matrix, and data views accessible across desktop and mobile", async ({
   page,
 }) => {
+  const chartWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("width(0) and height(0) of chart")) {
+      chartWarnings.push(message.text());
+    }
+  });
   await installRoutes(page);
   await page.setViewportSize({ width: 1280, height: 900 });
 
@@ -340,7 +346,7 @@ test("keeps heatmap, matrix, and data views accessible across desktop and mobile
 
   await page.setViewportSize({ width: 320, height: 900 });
   await page.goto("/app/products?period=7d");
-  await expect(matrix.locator(".recharts-responsive-container")).toBeHidden();
+  await expect(matrix.locator(".recharts-responsive-container")).toHaveCount(0);
   for (const group of ["Stars", "Workhorses", "Puzzles", "Dogs"]) {
     await expect(matrix.getByRole("heading", { name: group })).toBeVisible();
   }
@@ -368,4 +374,5 @@ test("keeps heatmap, matrix, and data views accessible across desktop and mobile
   await expect(recentOrdersTable).toBeHidden();
   await expect(recentOrders.getByRole("article").filter({ hasText: "House Latte" })).toBeVisible();
   await expectNoPageOverflow(page);
+  expect(chartWarnings).toEqual([]);
 });

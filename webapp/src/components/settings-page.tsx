@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, Surface } from "@/components/ui/layout";
 import {
   CachedSnapshotWarning,
+  ConflictState,
   ErrorState,
   FormError,
   PendingButton,
@@ -132,6 +133,7 @@ export function SettingsPage({
   const serverGoal = currentGoal?.target ?? "0.00";
   const displayedGoal = goalDirty ? goal : serverGoal;
   const normalizedGoal = normalizeGoal(displayedGoal);
+  const goalChanged = goalDirty && normalizedGoal !== serverGoal;
   const goalConflict =
     goalMutation.error instanceof ApiClientError && goalMutation.error.code === "CONFLICT";
   const goalRevision = overview.data?.meta.demoDataRevision;
@@ -237,7 +239,7 @@ export function SettingsPage({
             onSubmit={(event) => {
               event.preventDefault();
               const snapshot = goalSnapshot ?? serverSnapshot;
-              if (normalizedGoal && snapshot && !goalConflict)
+              if (normalizedGoal && snapshot && !goalConflict && goalChanged)
                 goalMutation.mutate({ monthlyGoal: normalizedGoal, snapshot });
             }}
           >
@@ -267,36 +269,37 @@ export function SettingsPage({
                 {translate(locale, "errors.validation")}
               </p>
             )}
-            <FormError locale={locale} error={goalMutation.error} />
+            {!goalConflict && <FormError locale={locale} error={goalMutation.error} />}
             {goalConflict && (
-              <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-surface)] p-3 text-sm text-[var(--color-warning)]">
-                <p>{translate(locale, "settings.goalConflict")}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={mutationDisabled}
-                    onClick={() => void refreshGoal("latest")}
-                  >
-                    {translate(locale, "actions.useLatest")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={mutationDisabled || !normalizedGoal || goalMutation.isPending}
-                    onClick={() => void refreshGoal("overwrite")}
-                  >
-                    {translate(locale, "actions.overwrite")}
-                  </Button>
-                </div>
-              </div>
+              <ConflictState
+                locale={locale}
+                error={goalMutation.error}
+                message={translate(locale, "settings.goalConflict")}
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={mutationDisabled}
+                  onClick={() => void refreshGoal("latest")}
+                >
+                  {translate(locale, "actions.useLatest")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={mutationDisabled || !normalizedGoal || goalMutation.isPending}
+                  onClick={() => void refreshGoal("overwrite")}
+                >
+                  {translate(locale, "actions.overwrite")}
+                </Button>
+              </ConflictState>
             )}
             <PendingButton
               type="submit"
               pending={goalMutation.isPending}
               pendingLabel={translate(locale, "settings.goalPending")}
-              disabled={!normalizedGoal || goalConflict || goalUnavailable}
+              disabled={!normalizedGoal || !goalChanged || goalConflict || goalUnavailable}
             >
               {translate(locale, "settings.saveGoal")}
             </PendingButton>
