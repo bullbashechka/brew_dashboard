@@ -1,0 +1,2522 @@
+{
+  "id": "b20a454f-96e7-4cfc-a1c3-831fdf7375af",
+  "prevId": "7fbe4e32-c3b1-4292-851e-f567362ca8b2",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "app.app_users": {
+      "name": "app_users",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "auth_user_id": {
+          "name": "auth_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "login_normalized": {
+          "name": "login_normalized",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "account_status",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "account_kind": {
+          "name": "account_kind",
+          "type": "account_kind",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'demo'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tour_completed_at": {
+          "name": "tour_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tour_skipped_at": {
+          "name": "tour_skipped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "app_users_status_expiry_idx": {
+          "name": "app_users_status_expiry_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "app_users_auth_user_id_users_id_fk": {
+          "name": "app_users_auth_user_id_users_id_fk",
+          "tableFrom": "app_users",
+          "columnsFrom": ["auth_user_id"],
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "app_users_network_id_networks_id_fk": {
+          "name": "app_users_network_id_networks_id_fk",
+          "tableFrom": "app_users",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "app_users_auth_user_id_unique": {
+          "name": "app_users_auth_user_id_unique",
+          "columns": ["auth_user_id"],
+          "nullsNotDistinct": false
+        },
+        "app_users_login_normalized_unique": {
+          "name": "app_users_login_normalized_unique",
+          "columns": ["login_normalized"],
+          "nullsNotDistinct": false
+        },
+        "app_users_network_id_unique": {
+          "name": "app_users_network_id_unique",
+          "columns": ["network_id"],
+          "nullsNotDistinct": false
+        },
+        "app_users_network_id_id_unique": {
+          "name": "app_users_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "app_users_login_format_check": {
+          "name": "app_users_login_format_check",
+          "value": "\"app\".\"app_users\".\"login_normalized\" ~ '^[a-z0-9._-]{3,64}$'"
+        },
+        "app_users_tour_terminal_state_check": {
+          "name": "app_users_tour_terminal_state_check",
+          "value": "not (\"app\".\"app_users\".\"tour_completed_at\" is not null and \"app\".\"app_users\".\"tour_skipped_at\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "auth.accounts": {
+      "name": "accounts",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "issuer": {
+          "name": "issuer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auth_accounts_issuer_account_id_uidx": {
+          "name": "auth_accounts_issuer_account_id_uidx",
+          "columns": [
+            {
+              "expression": "issuer",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "auth_accounts_user_id_idx": {
+          "name": "auth_accounts_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "accounts_user_id_users_id_fk": {
+          "name": "accounts_user_id_users_id_fk",
+          "tableFrom": "accounts",
+          "columnsFrom": ["user_id"],
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.rate_limits": {
+      "name": "rate_limits",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_request": {
+          "name": "last_request",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "auth_rate_limits_last_request_idx": {
+          "name": "auth_rate_limits_last_request_idx",
+          "columns": [
+            {
+              "expression": "last_request",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rate_limits_key_unique": {
+          "name": "rate_limits_key_unique",
+          "columns": ["key"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.sessions": {
+      "name": "sessions",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auth_sessions_user_id_idx": {
+          "name": "auth_sessions_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "auth_sessions_expires_at_idx": {
+          "name": "auth_sessions_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "columnsFrom": ["user_id"],
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_token_unique": {
+          "name": "sessions_token_unique",
+          "columns": ["token"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.users": {
+      "name": "users",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_username": {
+          "name": "display_username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": ["email"],
+          "nullsNotDistinct": false
+        },
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "columns": ["username"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.verifications": {
+      "name": "verifications",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auth_verifications_identifier_idx": {
+          "name": "auth_verifications_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "auth_verifications_expires_at_idx": {
+          "name": "auth_verifications_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.categories": {
+      "name": "categories",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "categories_network_id_idx": {
+          "name": "categories_network_id_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "categories_network_id_networks_id_fk": {
+          "name": "categories_network_id_networks_id_fk",
+          "tableFrom": "categories",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "categories_network_id_id_unique": {
+          "name": "categories_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "categories_tenant_isolation": {
+          "name": "categories_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "app.demo_generations": {
+      "name": "demo_generations",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generated_for_date": {
+          "name": "generated_for_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seed": {
+          "name": "seed",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "demo_generations_network_date_idx": {
+          "name": "demo_generations_network_date_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "generated_for_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "demo_generations_network_id_networks_id_fk": {
+          "name": "demo_generations_network_id_networks_id_fk",
+          "tableFrom": "demo_generations",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "demo_generations_network_id_id_unique": {
+          "name": "demo_generations_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        },
+        "demo_generations_network_date_unique": {
+          "name": "demo_generations_network_date_unique",
+          "columns": ["network_id", "generated_for_date"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "demo_generations_tenant_isolation": {
+          "name": "demo_generations_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "app.feedback_responses": {
+      "name": "feedback_responses",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating": {
+          "name": "rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comment": {
+          "name": "comment",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "desired_features": {
+          "name": "desired_features",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feedback_responses_network_id_networks_id_fk": {
+          "name": "feedback_responses_network_id_networks_id_fk",
+          "tableFrom": "feedback_responses",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "feedback_responses_network_id_unique": {
+          "name": "feedback_responses_network_id_unique",
+          "columns": ["network_id"],
+          "nullsNotDistinct": false
+        },
+        "feedback_responses_network_id_id_unique": {
+          "name": "feedback_responses_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "feedback_responses_tenant_isolation": {
+          "name": "feedback_responses_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "feedback_responses_rating_check": {
+          "name": "feedback_responses_rating_check",
+          "value": "\"app\".\"feedback_responses\".\"rating\" between 1 and 5"
+        },
+        "feedback_responses_desired_features_check": {
+          "name": "feedback_responses_desired_features_check",
+          "value": "char_length(\"app\".\"feedback_responses\".\"desired_features\") between 1 and 2000"
+        },
+        "feedback_responses_version_positive_check": {
+          "name": "feedback_responses_version_positive_check",
+          "value": "\"app\".\"feedback_responses\".\"version\" > 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.idempotency_keys": {
+      "name": "idempotency_keys",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation": {
+          "name": "operation",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_hash": {
+          "name": "request_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resource_id": {
+          "name": "resource_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idempotency_keys_completed_at_idx": {
+          "name": "idempotency_keys_completed_at_idx",
+          "columns": [
+            {
+              "expression": "completed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "idempotency_keys_network_id_networks_id_fk": {
+          "name": "idempotency_keys_network_id_networks_id_fk",
+          "tableFrom": "idempotency_keys",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "idempotency_keys_network_key_unique": {
+          "name": "idempotency_keys_network_key_unique",
+          "columns": ["network_id", "key"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "idempotency_keys_tenant_isolation": {
+          "name": "idempotency_keys_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "idempotency_keys_hash_format_check": {
+          "name": "idempotency_keys_hash_format_check",
+          "value": "\"app\".\"idempotency_keys\".\"request_hash\" ~ '^[a-f0-9]{64}$'"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.inventory_balances": {
+      "name": "inventory_balances",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inventory_item_id": {
+          "name": "inventory_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "on_hand": {
+          "name": "on_hand",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_threshold": {
+          "name": "min_threshold",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "inventory_balances_network_id_idx": {
+          "name": "inventory_balances_network_id_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "inventory_balances_network_id_networks_id_fk": {
+          "name": "inventory_balances_network_id_networks_id_fk",
+          "tableFrom": "inventory_balances",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "inventory_balances_network_location_fk": {
+          "name": "inventory_balances_network_location_fk",
+          "tableFrom": "inventory_balances",
+          "columnsFrom": ["network_id", "location_id"],
+          "tableTo": "locations",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "inventory_balances_network_item_fk": {
+          "name": "inventory_balances_network_item_fk",
+          "tableFrom": "inventory_balances",
+          "columnsFrom": ["network_id", "inventory_item_id"],
+          "tableTo": "inventory_items",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "inventory_balances_network_id_id_unique": {
+          "name": "inventory_balances_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        },
+        "inventory_balances_location_item_unique": {
+          "name": "inventory_balances_location_item_unique",
+          "columns": ["network_id", "location_id", "inventory_item_id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "inventory_balances_tenant_isolation": {
+          "name": "inventory_balances_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "inventory_balances_on_hand_format_check": {
+          "name": "inventory_balances_on_hand_format_check",
+          "value": "\"app\".\"inventory_balances\".\"on_hand\" >= 0 and \"app\".\"inventory_balances\".\"on_hand\" < 100000000000 and \"app\".\"inventory_balances\".\"on_hand\" = trunc(\"app\".\"inventory_balances\".\"on_hand\", 3)"
+        },
+        "inventory_balances_min_threshold_format_check": {
+          "name": "inventory_balances_min_threshold_format_check",
+          "value": "\"app\".\"inventory_balances\".\"min_threshold\" >= 0 and \"app\".\"inventory_balances\".\"min_threshold\" < 100000000000 and \"app\".\"inventory_balances\".\"min_threshold\" = trunc(\"app\".\"inventory_balances\".\"min_threshold\", 3)"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.inventory_items": {
+      "name": "inventory_items",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit": {
+          "name": "unit",
+          "type": "inventory_unit",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "inventory_items_network_id_idx": {
+          "name": "inventory_items_network_id_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "inventory_items_network_id_networks_id_fk": {
+          "name": "inventory_items_network_id_networks_id_fk",
+          "tableFrom": "inventory_items",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "inventory_items_network_product_fk": {
+          "name": "inventory_items_network_product_fk",
+          "tableFrom": "inventory_items",
+          "columnsFrom": ["network_id", "product_id"],
+          "tableTo": "products",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "inventory_items_network_id_id_unique": {
+          "name": "inventory_items_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "inventory_items_tenant_isolation": {
+          "name": "inventory_items_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "app.inventory_movements": {
+      "name": "inventory_movements",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inventory_item_id": {
+          "name": "inventory_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "movement_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "inventory_movements_network_occurred_idx": {
+          "name": "inventory_movements_network_occurred_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "inventory_movements_network_location_occurred_idx": {
+          "name": "inventory_movements_network_location_occurred_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "inventory_movements_network_id_networks_id_fk": {
+          "name": "inventory_movements_network_id_networks_id_fk",
+          "tableFrom": "inventory_movements",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "inventory_movements_network_location_fk": {
+          "name": "inventory_movements_network_location_fk",
+          "tableFrom": "inventory_movements",
+          "columnsFrom": ["network_id", "location_id"],
+          "tableTo": "locations",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "inventory_movements_network_item_fk": {
+          "name": "inventory_movements_network_item_fk",
+          "tableFrom": "inventory_movements",
+          "columnsFrom": ["network_id", "inventory_item_id"],
+          "tableTo": "inventory_items",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "inventory_movements_network_id_id_unique": {
+          "name": "inventory_movements_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "inventory_movements_tenant_isolation": {
+          "name": "inventory_movements_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "inventory_movements_quantity_format_check": {
+          "name": "inventory_movements_quantity_format_check",
+          "value": "\"app\".\"inventory_movements\".\"quantity\" > 0 and \"app\".\"inventory_movements\".\"quantity\" < 100000000000 and \"app\".\"inventory_movements\".\"quantity\" = trunc(\"app\".\"inventory_movements\".\"quantity\", 3)"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.locations": {
+      "name": "locations",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_normalized": {
+          "name": "name_normalized",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "locations_network_id_idx": {
+          "name": "locations_network_id_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "locations_network_id_networks_id_fk": {
+          "name": "locations_network_id_networks_id_fk",
+          "tableFrom": "locations",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "locations_network_id_id_unique": {
+          "name": "locations_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        },
+        "locations_network_name_normalized_unique": {
+          "name": "locations_network_name_normalized_unique",
+          "columns": ["network_id", "name_normalized"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "locations_tenant_isolation": {
+          "name": "locations_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "app.networks": {
+      "name": "networks",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_name": {
+          "name": "owner_name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country_code": {
+          "name": "country_code",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency_code": {
+          "name": "currency_code",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "language",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "onboarding_completed_at": {
+          "name": "onboarding_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "demo_generator_version": {
+          "name": "demo_generator_version",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "demo_generated_for_date": {
+          "name": "demo_generated_for_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "demo_data_revision": {
+          "name": "demo_data_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "networks_tenant_isolation": {
+          "name": "networks_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "networks_country_code_format_check": {
+          "name": "networks_country_code_format_check",
+          "value": "\"app\".\"networks\".\"country_code\" is null or \"app\".\"networks\".\"country_code\" ~ '^[A-Z]{2}$'"
+        },
+        "networks_currency_code_format_check": {
+          "name": "networks_currency_code_format_check",
+          "value": "\"app\".\"networks\".\"currency_code\" is null or \"app\".\"networks\".\"currency_code\" ~ '^[A-Z]{3}$'"
+        },
+        "networks_name_length_check": {
+          "name": "networks_name_length_check",
+          "value": "\"app\".\"networks\".\"name\" is null or char_length(btrim(\"app\".\"networks\".\"name\")) between 2 and 80"
+        },
+        "networks_owner_name_length_check": {
+          "name": "networks_owner_name_length_check",
+          "value": "\"app\".\"networks\".\"owner_name\" is null or char_length(btrim(\"app\".\"networks\".\"owner_name\")) between 2 and 80"
+        },
+        "networks_demo_data_revision_check": {
+          "name": "networks_demo_data_revision_check",
+          "value": "\"app\".\"networks\".\"demo_data_revision\" >= 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.order_items": {
+      "name": "order_items",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_price_at_sale": {
+          "name": "unit_price_at_sale",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_cost_at_sale": {
+          "name": "unit_cost_at_sale",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "order_items_network_id_idx": {
+          "name": "order_items_network_id_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "order_items_network_order_idx": {
+          "name": "order_items_network_order_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "order_items_network_product_order_idx": {
+          "name": "order_items_network_product_order_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "product_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "order_items_network_id_networks_id_fk": {
+          "name": "order_items_network_id_networks_id_fk",
+          "tableFrom": "order_items",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "order_items_network_order_fk": {
+          "name": "order_items_network_order_fk",
+          "tableFrom": "order_items",
+          "columnsFrom": ["network_id", "order_id"],
+          "tableTo": "orders",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "order_items_network_product_fk": {
+          "name": "order_items_network_product_fk",
+          "tableFrom": "order_items",
+          "columnsFrom": ["network_id", "product_id"],
+          "tableTo": "products",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "order_items_network_id_id_unique": {
+          "name": "order_items_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "order_items_tenant_isolation": {
+          "name": "order_items_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "order_items_quantity_format_check": {
+          "name": "order_items_quantity_format_check",
+          "value": "\"app\".\"order_items\".\"quantity\" > 0 and \"app\".\"order_items\".\"quantity\" < 100000000000 and \"app\".\"order_items\".\"quantity\" = trunc(\"app\".\"order_items\".\"quantity\", 3)"
+        },
+        "order_items_unit_price_format_check": {
+          "name": "order_items_unit_price_format_check",
+          "value": "\"app\".\"order_items\".\"unit_price_at_sale\" >= 0 and \"app\".\"order_items\".\"unit_price_at_sale\" < 1000000000000 and \"app\".\"order_items\".\"unit_price_at_sale\" = trunc(\"app\".\"order_items\".\"unit_price_at_sale\", 2)"
+        },
+        "order_items_unit_cost_format_check": {
+          "name": "order_items_unit_cost_format_check",
+          "value": "\"app\".\"order_items\".\"unit_cost_at_sale\" >= 0 and \"app\".\"order_items\".\"unit_cost_at_sale\" < 1000000000000 and \"app\".\"order_items\".\"unit_cost_at_sale\" = trunc(\"app\".\"order_items\".\"unit_cost_at_sale\", 2)"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.orders": {
+      "name": "orders",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordered_at": {
+          "name": "ordered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "order_status",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "orders_network_occurred_idx": {
+          "name": "orders_network_occurred_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ordered_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "orders_network_location_occurred_idx": {
+          "name": "orders_network_location_occurred_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ordered_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "orders_network_id_networks_id_fk": {
+          "name": "orders_network_id_networks_id_fk",
+          "tableFrom": "orders",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "orders_network_location_fk": {
+          "name": "orders_network_location_fk",
+          "tableFrom": "orders",
+          "columnsFrom": ["network_id", "location_id"],
+          "tableTo": "locations",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "orders_network_id_id_unique": {
+          "name": "orders_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "orders_tenant_isolation": {
+          "name": "orders_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "app.product_events": {
+      "name": "product_events",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "product_event_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route": {
+          "name": "route",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "product_events_network_occurred_idx": {
+          "name": "product_events_network_occurred_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "product_events_occurred_idx": {
+          "name": "product_events_occurred_idx",
+          "columns": [
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "product_events_network_id_networks_id_fk": {
+          "name": "product_events_network_id_networks_id_fk",
+          "tableFrom": "product_events",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "product_events_network_user_fk": {
+          "name": "product_events_network_user_fk",
+          "tableFrom": "product_events",
+          "columnsFrom": ["network_id", "user_id"],
+          "tableTo": "app_users",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "product_events_network_id_id_unique": {
+          "name": "product_events_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "product_events_tenant_isolation": {
+          "name": "product_events_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "app.products": {
+      "name": "products",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_price": {
+          "name": "current_price",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_unit_cost": {
+          "name": "current_unit_cost",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "products_network_id_idx": {
+          "name": "products_network_id_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "products_network_id_networks_id_fk": {
+          "name": "products_network_id_networks_id_fk",
+          "tableFrom": "products",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "products_network_category_fk": {
+          "name": "products_network_category_fk",
+          "tableFrom": "products",
+          "columnsFrom": ["network_id", "category_id"],
+          "tableTo": "categories",
+          "schemaTo": "app",
+          "columnsTo": ["network_id", "id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "products_network_id_id_unique": {
+          "name": "products_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "products_tenant_isolation": {
+          "name": "products_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "products_current_price_format_check": {
+          "name": "products_current_price_format_check",
+          "value": "\"app\".\"products\".\"current_price\" >= 0 and \"app\".\"products\".\"current_price\" < 1000000000000 and \"app\".\"products\".\"current_price\" = trunc(\"app\".\"products\".\"current_price\", 2)"
+        },
+        "products_current_unit_cost_format_check": {
+          "name": "products_current_unit_cost_format_check",
+          "value": "\"app\".\"products\".\"current_unit_cost\" >= 0 and \"app\".\"products\".\"current_unit_cost\" < 1000000000000 and \"app\".\"products\".\"current_unit_cost\" = trunc(\"app\".\"products\".\"current_unit_cost\", 2)"
+        },
+        "products_version_positive_check": {
+          "name": "products_version_positive_check",
+          "value": "\"app\".\"products\".\"version\" > 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "app.revenue_targets": {
+      "name": "revenue_targets",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "revenue_targets_network_id_networks_id_fk": {
+          "name": "revenue_targets_network_id_networks_id_fk",
+          "tableFrom": "revenue_targets",
+          "columnsFrom": ["network_id"],
+          "tableTo": "networks",
+          "schemaTo": "app",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "revenue_targets_network_id_id_unique": {
+          "name": "revenue_targets_network_id_id_unique",
+          "columns": ["network_id", "id"],
+          "nullsNotDistinct": false
+        },
+        "revenue_targets_network_month_unique": {
+          "name": "revenue_targets_network_month_unique",
+          "columns": ["network_id", "month"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "revenue_targets_tenant_isolation": {
+          "name": "revenue_targets_tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid",
+          "withCheck": "\"network_id\" = nullif(current_setting('app.network_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "revenue_targets_month_start_check": {
+          "name": "revenue_targets_month_start_check",
+          "value": "\"app\".\"revenue_targets\".\"month\" = date_trunc('month', \"app\".\"revenue_targets\".\"month\")::date"
+        },
+        "revenue_targets_amount_format_check": {
+          "name": "revenue_targets_amount_format_check",
+          "value": "\"app\".\"revenue_targets\".\"amount\" > 0 and \"app\".\"revenue_targets\".\"amount\" < 1000000000000 and \"app\".\"revenue_targets\".\"amount\" = trunc(\"app\".\"revenue_targets\".\"amount\", 2)"
+        },
+        "revenue_targets_version_positive_check": {
+          "name": "revenue_targets_version_positive_check",
+          "value": "\"app\".\"revenue_targets\".\"version\" > 0"
+        }
+      },
+      "isRLSEnabled": true
+    }
+  },
+  "enums": {
+    "app.account_kind": {
+      "name": "account_kind",
+      "schema": "app",
+      "values": ["demo", "e2e"]
+    },
+    "app.account_status": {
+      "name": "account_status",
+      "schema": "app",
+      "values": ["active", "disabled"]
+    },
+    "app.inventory_unit": {
+      "name": "inventory_unit",
+      "schema": "app",
+      "values": ["pcs", "kg", "l"]
+    },
+    "app.language": {
+      "name": "language",
+      "schema": "app",
+      "values": ["en", "ru"]
+    },
+    "app.movement_type": {
+      "name": "movement_type",
+      "schema": "app",
+      "values": ["receipt", "writeoff"]
+    },
+    "app.order_status": {
+      "name": "order_status",
+      "schema": "app",
+      "values": ["completed", "cancelled"]
+    },
+    "app.product_event_type": {
+      "name": "product_event_type",
+      "schema": "app",
+      "values": [
+        "login_succeeded",
+        "onboarding_completed",
+        "section_viewed",
+        "filter_changed",
+        "product_price_changed",
+        "inventory_movement_created",
+        "revenue_goal_changed",
+        "demo_reset",
+        "feedback_submitted"
+      ]
+    }
+  },
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

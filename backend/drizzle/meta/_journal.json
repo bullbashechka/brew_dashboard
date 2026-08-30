@@ -92,6 +92,13 @@
       "when": 1788071904528,
       "tag": "0012_bouncy_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788093317064,
+      "tag": "0013_disable-runtime-jit",
+      "breakpoints": true
     }
   ]
 }

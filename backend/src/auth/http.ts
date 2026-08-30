@@ -185,27 +185,39 @@ export const loadActiveProfile = async (
   now = new Date(),
   options: { lock?: boolean } = {},
 ): Promise<LoadedProfile | null> => {
-  const profileQuery = transaction
-    .select()
-    .from(appUsers)
-    .where(
-      and(
-        eq(appUsers.authUserId, authUserId),
-        eq(appUsers.status, "active"),
-        or(isNull(appUsers.expiresAt), gt(appUsers.expiresAt, now)),
-      ),
-    );
-  const rows = options.lock === false ? await profileQuery : await profileQuery.for("update");
-  const appUser = rows[0];
-  if (!appUser) return null;
-
-  const userRows = await transaction
-    .select({ displayUsername: authUsers.displayUsername })
-    .from(authUsers)
-    .where(eq(authUsers.id, appUser.authUserId))
-    .limit(1);
-  const user = userRows[0];
-  if (!user) return null;
+  const accountFilter = and(
+    eq(appUsers.authUserId, authUserId),
+    eq(appUsers.status, "active"),
+    or(isNull(appUsers.expiresAt), gt(appUsers.expiresAt, now)),
+  );
+  let appUser: typeof appUsers.$inferSelect | undefined;
+  let displayUsername: string | null | undefined;
+  if (options.lock === false) {
+    const account = (
+      await transaction
+        .select({
+          appUser: appUsers,
+          displayUsername: authUsers.displayUsername,
+        })
+        .from(appUsers)
+        .innerJoin(authUsers, eq(authUsers.id, appUsers.authUserId))
+        .where(accountFilter)
+    )[0];
+    appUser = account?.appUser;
+    displayUsername = account?.displayUsername;
+  } else {
+    appUser = (await transaction.select().from(appUsers).where(accountFilter).for("update"))[0];
+    if (appUser) {
+      displayUsername = (
+        await transaction
+          .select({ displayUsername: authUsers.displayUsername })
+          .from(authUsers)
+          .where(eq(authUsers.id, appUser.authUserId))
+          .limit(1)
+      )[0]?.displayUsername;
+    }
+  }
+  if (!appUser || displayUsername === undefined) return null;
 
   await setTenantContext(transaction, appUser.networkId);
   const network = await transaction
@@ -218,7 +230,7 @@ export const loadActiveProfile = async (
 
   const profile = profileSchema.parse({
     userId: appUser.authUserId,
-    login: user.displayUsername || appUser.loginNormalized,
+    login: displayUsername || appUser.loginNormalized,
     networkId: appUser.networkId,
     networkName: currentNetwork.name,
     ownerName: currentNetwork.ownerName,
@@ -401,22 +413,9 @@ export const requireAuthentication = async (
 
       const isReadRequest = context.req.method === "GET" || context.req.method === "HEAD";
       if (!isReadRequest) await lockAuthUser(transaction, payload.user.id);
-      const authoritativeSession = await transaction
-        .select({ id: authSessions.id })
-        .from(authSessions)
-        .where(
-          and(
-            eq(authSessions.id, payload.session.id),
-            eq(authSessions.token, payload.session.token),
-            eq(authSessions.userId, payload.user.id),
-          ),
-        )
-        .limit(1);
-      const profile = authoritativeSession[0]
-        ? await loadActiveProfile(transaction, payload.user.id, new Date(), {
-            lock: !isReadRequest,
-          })
-        : null;
+      const profile = await loadActiveProfile(transaction, payload.user.id, new Date(), {
+        lock: !isReadRequest,
+      });
       if (!profile) {
         await revokeUserSessions(transaction, payload.user.id);
         clearSessionCookie(context);

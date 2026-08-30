@@ -18,13 +18,12 @@ import {
   buildSalesAnalyticsSnapshot,
   buildAnalyticsMeta,
   buildInventory,
-  buildLocations,
-  buildOverview,
   buildProducts,
   buildSales,
   paginationDefaults,
   type AnalyticsContext,
 } from "./service.ts";
+import { buildLocationsSummary, buildOverviewSummary } from "./summary-service.ts";
 
 type ContinuationPayload = {
   version: 1;
@@ -247,11 +246,10 @@ const lineRevenue = (quantity: string, price: string) =>
 
 export const overviewHandler = async (context: Context<AppEnvironment>) => {
   const request = query<{ locationId?: string; period: AnalyticsPeriod }>(context);
-  const analytics = await buildAnalyticsSnapshot(
+  const result = await buildOverviewSummary(
     context.get("database"),
     authOptions(context, request.period, request.locationId),
   );
-  const result = await buildOverview(analytics);
   const response = { data: result.data, meta: result.meta, requestId: context.get("requestId") };
   overviewResponseSchema.parse(response);
   context.header("cache-control", "private, no-store");
@@ -268,8 +266,7 @@ export const locationsHandler = async (context: Context<AppEnvironment>) => {
   const locationOptions = authOptions(context, request.period, request.locationId);
   if (request.sortBy !== null) locationOptions.sortBy = request.sortBy;
   if (request.sortDir !== null) locationOptions.sortDir = request.sortDir;
-  const analytics = await buildAnalyticsSnapshot(context.get("database"), locationOptions);
-  const result = await buildLocations(analytics);
+  const result = await buildLocationsSummary(context.get("database"), locationOptions);
   const response = { data: result.data, meta: result.meta, requestId: context.get("requestId") };
   locationsResponseSchema.parse(response);
   context.header("cache-control", "private, no-store");

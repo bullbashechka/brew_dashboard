@@ -275,11 +275,19 @@ Demo MVP on Railway Hobby; the real Hyperdrive binding remains environment confi
 than a checked-in secret.
 
 For the release load gate, run `bun run test:load:release` only against localhost or a staging host
-explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL` and provide 15
-dedicated session-cookie headers as JSON in `RELEASE_LOAD_SESSION_COOKIES` to exercise the 20 RPS
-authenticated-read phase without exceeding the per-account limiter. It rotates `/auth/me`,
-`/overview` and `/locations`, reports p95 per route, and fails on any unexpected HTTP response,
-network failure, aggregate p95 above 750 ms, or per-route p95 above 750 ms.
+explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL` and provide at least
+10 session-cookie headers from distinct demo accounts as JSON in `RELEASE_LOAD_SESSION_COOKIES`.
+The gate first sends
+10 simultaneous authenticated Overview requests, then exercises the default 10 RPS authenticated
+read phase without exceeding the per-account limiter. It rotates `/auth/me`, `/overview` and
+`/locations`, reports p95 per route, and fails on any unexpected HTTP response, network failure,
+aggregate p95 above 750 ms, or per-route p95 above 750 ms. Override the concurrency with
+`RELEASE_LOAD_CONCURRENT_AUTHENTICATED_USERS` when testing a larger cohort.
+
+Migration `0013_disable-runtime-jit.sql` disables PostgreSQL JIT for `brew_runtime`. Keep this role
+setting for the request-scoped Worker workload: the dashboard aggregates finish faster than their
+per-connection compilation cost, and enabling JIT caused concurrent Overview reads to hit the
+statement timeout. Apply the migration before deploying this Worker change.
 
 Manual release procedure (there is deliberately no hosted CI/Actions) is documented in
 [`docs/production-release.md`](docs/production-release.md). Run `bun run release:verify`, apply

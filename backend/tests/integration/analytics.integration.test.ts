@@ -201,6 +201,56 @@ describeIntegration("Stage 5 analytics API", () => {
     expect(after.rows[0]).toEqual(before.rows[0]);
   }, 60_000);
 
+  it("serves dashboard reads for ten concurrent authenticated sessions", async () => {
+    const first = await createOnboarded(
+      `stage5-concurrency-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Five Concurrency",
+    );
+    const additionalCookies = await Promise.all(
+      Array.from({ length: 9 }, async (_, index) => {
+        const loginResponse = await app.request(
+          new URL("/api/v1/auth/login", baseUrl),
+          {
+            method: "POST",
+            headers: new Headers({
+              origin: baseUrl,
+              "content-type": "application/json",
+              "cf-connecting-ip": `203.0.113.${index + 20}`,
+            }),
+            body: JSON.stringify({
+              login: first.account.login,
+              password: first.account.password,
+            }),
+          },
+          environment,
+        );
+        expect(loginResponse.status).toBe(200);
+        const cookie = cookieFrom(loginResponse);
+        if (!cookie) throw new Error("Expected concurrent analytics session cookie");
+        return cookie;
+      }),
+    );
+    const cookies = [first.cookie, ...additionalCookies];
+
+    const responses = await Promise.all(
+      cookies.map(async (cookie, index) => {
+        const ip = `203.0.113.${index + 40}`;
+        const [overview, locations] = await Promise.all([
+          request("/api/v1/overview?period=today", cookie, {}, ip),
+          request("/api/v1/locations?period=today", cookie, {}, ip),
+        ]);
+        return { overview, locations };
+      }),
+    );
+
+    for (const response of responses) {
+      expect(response.overview.status).toBe(200);
+      expect(response.locations.status).toBe(200);
+      overviewResponseSchema.parse(await response.overview.json());
+      locationsResponseSchema.parse(await response.locations.json());
+    }
+  }, 120_000);
+
   it("keeps cursor continuation stable and rejects a tampered token", async () => {
     const first = await createOnboarded(
       `stage5-page-${crypto.randomUUID().slice(0, 8)}`,

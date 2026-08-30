@@ -370,6 +370,12 @@ export const orderItems = app
         sql`${table.unitCostAtSale} >= 0 and ${table.unitCostAtSale} < 1000000000000 and ${table.unitCostAtSale} = trunc(${table.unitCostAtSale}, 2)`,
       ),
       index("order_items_network_id_idx").on(table.networkId),
+      index("order_items_network_order_idx").on(table.networkId, table.orderId),
+      index("order_items_network_product_order_idx").on(
+        table.networkId,
+        table.productId,
+        table.orderId,
+      ),
       tenantPolicy("order_items"),
     ],
   )

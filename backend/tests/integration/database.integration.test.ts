@@ -69,16 +69,18 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
       rolcreaterole: boolean;
       rolcreatedb: boolean;
       rolbypassrls: boolean;
+      rolconfig: string[] | null;
     }>(
-      `SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls
+      `SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolconfig
        FROM pg_roles WHERE rolname = 'brew_runtime'`,
     );
-    expect(role.rows[0]).toEqual({
+    expect(role.rows[0]).toMatchObject({
       rolsuper: false,
       rolcreaterole: false,
       rolcreatedb: false,
       rolbypassrls: false,
     });
+    expect(role.rows[0]?.rolconfig).toContain("jit=off");
 
     await client.query("BEGIN");
     try {
