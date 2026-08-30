@@ -104,7 +104,7 @@ describe("Stage 7 first-run forms", () => {
     await user.type(screen.getByLabelText("Location 1 name"), "Downtown");
     await user.type(screen.getByLabelText("Location 2 name"), " downtown ");
     await user.type(screen.getByLabelText("Location 3 name"), "Airport");
-    await user.type(screen.getByRole("textbox", { name: /^Country code/ }), "KZ");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Country" }), "KZ");
     expect((screen.getByLabelText("Currency") as HTMLInputElement).value).toBe("KZT");
     const timeZone = screen.getByLabelText("Timezone");
     await user.clear(timeZone);
@@ -133,7 +133,7 @@ describe("Stage 7 first-run forms", () => {
 
     await user.type(screen.getByLabelText("Network name"), "Roast House");
     await user.type(screen.getByLabelText("Owner name"), "Alex Owner");
-    await user.type(screen.getByRole("textbox", { name: /^Country code/ }), "KZ");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Country" }), "KZ");
     const timeZone = screen.getByLabelText("Timezone");
     await user.clear(timeZone);
     await user.type(timeZone, "Asia/Almaty");
@@ -180,7 +180,7 @@ describe("Stage 7 first-run forms", () => {
 
     await user.type(screen.getByLabelText("Network name"), "Roast House");
     await user.type(screen.getByLabelText("Owner name"), "Alex Owner");
-    await user.type(screen.getByRole("textbox", { name: /^Country code/ }), "KZ");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Country" }), "KZ");
     await user.type(screen.getByLabelText("Currency"), "KZT");
     const timeZone = screen.getByLabelText("Timezone");
     await user.clear(timeZone);
@@ -204,29 +204,92 @@ describe("Stage 7 first-run forms", () => {
     const user = userEvent.setup();
     render(<OnboardingForm locale="en" onSubmit={async () => undefined} />);
 
-    const country = screen.getByRole("textbox", { name: /^Country code/ });
+    const country = screen.getByRole("combobox", { name: "Country" });
     const currency = screen.getByLabelText("Currency") as HTMLInputElement;
     const timeZone = screen.getByLabelText("Timezone") as HTMLInputElement;
 
-    await user.type(country, "KZ");
+    await user.selectOptions(country, "KZ");
     expect(currency.value).toBe("KZT");
     expect(timeZone.value).toBe("Asia/Almaty");
 
     await user.clear(currency);
     await user.type(currency, "JPY");
-    await user.clear(country);
-    await user.type(country, "RU");
+    await user.selectOptions(country, "RU");
     expect(currency.value).toBe("JPY");
     expect(timeZone.value).toBe("Europe/Moscow");
 
     await user.clear(timeZone);
-    await user.clear(country);
-    await user.type(country, "US");
+    await user.selectOptions(country, "US");
     expect(timeZone.value).toBe("");
 
-    await user.clear(country);
-    await user.type(country, "ZZ");
+    await user.selectOptions(country, "custom");
+    await user.type(screen.getByRole("textbox", { name: "Country code" }), "ZZ");
     expect(currency.value).toBe("JPY");
     expect(timeZone.value).toBe("");
+  });
+
+  it("suggests defaults for the expanded registration regions", async () => {
+    const user = userEvent.setup();
+    render(<OnboardingForm locale="en" onSubmit={async () => undefined} />);
+
+    const country = screen.getByRole("combobox", { name: "Country" });
+    const currency = screen.getByLabelText("Currency") as HTMLInputElement;
+    const timeZone = screen.getByLabelText("Timezone") as HTMLInputElement;
+    const suggestions = [
+      ["BE", "EUR", "Europe/Brussels"],
+      ["DE", "EUR", "Europe/Berlin"],
+      ["NL", "EUR", "Europe/Amsterdam"],
+      ["DK", "DKK", "Europe/Copenhagen"],
+      ["ES", "EUR", "Europe/Madrid"],
+    ] as const;
+
+    for (const [countryCode, expectedCurrency, expectedTimeZone] of suggestions) {
+      await user.selectOptions(country, countryCode);
+
+      expect((country as HTMLSelectElement).value).toBe(countryCode);
+      expect(currency.value).toBe(expectedCurrency);
+      expect(timeZone.value).toBe(expectedTimeZone);
+    }
+  });
+
+  it("localizes country options and accepts a manual ISO country code", async () => {
+    const user = userEvent.setup();
+    render(<OnboardingForm locale="ru" onSubmit={async () => undefined} />);
+
+    const country = screen.getByRole("combobox", { name: "Страна" });
+    expect(screen.getByRole("option", { name: "Германия" })).toBeTruthy();
+
+    await user.selectOptions(country, "custom");
+    const countryCode = screen.getByRole("textbox", { name: "Код страны" });
+    await user.type(countryCode, "fr");
+
+    expect((countryCode as HTMLInputElement).value).toBe("FR");
+    expect((country as HTMLSelectElement).value).toBe("custom");
+  });
+
+  it("submits the manual ISO country code instead of the custom option value", async () => {
+    const user = userEvent.setup();
+    let submitted: OnboardingFormValues | undefined;
+    render(
+      <OnboardingForm
+        locale="en"
+        onSubmit={async (value) => {
+          submitted = value;
+        }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Network name"), "Roast House");
+    await user.type(screen.getByLabelText("Owner name"), "Alex Owner");
+    await user.type(screen.getByLabelText("Location 1 name"), "Central");
+    await user.type(screen.getByLabelText("Location 2 name"), "Airport");
+    await user.type(screen.getByLabelText("Location 3 name"), "Riverside");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Country" }), "custom");
+    await user.type(screen.getByRole("textbox", { name: "Country code" }), "fr");
+    await user.type(screen.getByLabelText("Currency"), "EUR");
+    await user.type(screen.getByLabelText("Timezone"), "Europe/Paris");
+    await user.click(screen.getByRole("button", { name: "Create my dashboard" }));
+
+    await waitFor(() => expect(submitted?.country).toBe("FR"));
   });
 });

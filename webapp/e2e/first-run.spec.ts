@@ -176,9 +176,9 @@ test("completes Login → Language → Onboarding → Overview → Tour and can 
   await expect(page.getByLabel("Location 3 name")).toHaveCount(0);
   await page.getByLabel("Location 1 name").fill("Central");
   await page.getByLabel("Location 2 name").fill("Airport");
-  await page.locator('input[name="country"]').fill("KZ");
-  await page.locator('input[name="currency"]').fill("KZT");
-  await page.getByLabel("Timezone").fill("Asia/Almaty");
+  await page.getByLabel("Country").selectOption("KZ");
+  await expect(page.getByLabel("Currency")).toHaveValue("KZT");
+  await expect(page.getByLabel("Timezone")).toHaveValue("Asia/Almaty");
   await page.getByRole("button", { name: "Create my dashboard" }).click();
 
   await expect(page).toHaveURL(/\/app\/overview/);
