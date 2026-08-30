@@ -772,6 +772,83 @@ describeIntegration("Stage 4 onboarding and deterministic demo data", () => {
     ]);
   }, 120_000);
 
+  it("persists Settings language idempotently and isolates tenants", async () => {
+    const account = await createE2eAccount(
+      `stage11-settings-language-${crypto.randomUUID().slice(0, 8)}`,
+    );
+    const otherAccount = await createE2eAccount(
+      `stage11-settings-language-other-${crypto.randomUUID().slice(0, 8)}`,
+    );
+    const cookie = await login(account, "198.51.100.64");
+    await request("/api/v1/onboarding/language", {
+      method: "PUT",
+      body: { language: "en", idempotencyKey: crypto.randomUUID() },
+      cookie,
+    });
+    await request("/api/v1/onboarding/complete", {
+      method: "POST",
+      body: onboardingPayload(crypto.randomUUID()),
+      cookie,
+    });
+
+    const idempotencyKey = crypto.randomUUID();
+    const language = await request("/api/v1/settings/language", {
+      method: "PUT",
+      cookie,
+      body: { language: "ru", idempotencyKey },
+    });
+    expect(language.status).toBe(200);
+    expect(onboardingLanguageResponseSchema.parse(await language.json()).data).toEqual({
+      language: "ru",
+      effectiveLanguage: "ru",
+    });
+
+    const replay = await request("/api/v1/settings/language", {
+      method: "PUT",
+      cookie,
+      body: { language: "ru", idempotencyKey },
+    });
+    expect(replay.status).toBe(200);
+    expect(onboardingLanguageResponseSchema.parse(await replay.json()).data).toEqual({
+      language: "ru",
+      effectiveLanguage: "ru",
+    });
+
+    const conflict = await request("/api/v1/settings/language", {
+      method: "PUT",
+      cookie,
+      body: { language: "en", idempotencyKey },
+    });
+    expect(conflict.status).toBe(409);
+    expect(apiErrorResponseSchema.parse(await conflict.json()).error.code).toBe("CONFLICT");
+
+    const invalid = await request("/api/v1/settings/language", {
+      method: "PUT",
+      cookie,
+      body: { language: "de", idempotencyKey: crypto.randomUUID() },
+    });
+    expect(invalid.status).toBe(400);
+    expect(apiErrorResponseSchema.parse(await invalid.json()).error.code).toBe("VALIDATION_ERROR");
+
+    const session = sessionResponseSchema.parse(
+      await (await request("/api/v1/auth/me", { cookie })).json(),
+    );
+    expect(session.data.profile.language).toBe("ru");
+    expect(session.data.profile.effectiveLanguage).toBe("ru");
+
+    const tenantLanguages = await ownerClient.query<{ id: string; language: string | null }>(
+      `SELECT id::text AS id, language
+       FROM app.networks
+       WHERE id IN ($1, $2)
+       ORDER BY id`,
+      [account.networkId, otherAccount.networkId],
+    );
+    expect(tenantLanguages.rows.find((row) => row.id === account.networkId)?.language).toBe("ru");
+    expect(
+      tenantLanguages.rows.find((row) => row.id === otherAccount.networkId)?.language,
+    ).toBeNull();
+  }, 120_000);
+
   it("keeps server events private and rate-limits client telemetry", async () => {
     const first = await completeAccount("stage11-event-limit", "198.51.100.62");
     const serverOnlyEvents = [
