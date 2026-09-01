@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { generateStableTotp } from "./totp";
 
 const login = process.env.E2E_PRODUCTION_LOGIN;
 const password = process.env.E2E_PRODUCTION_PASSWORD;
@@ -32,6 +33,25 @@ test.describe("@production Demo MVP acceptance", () => {
     await page.getByLabel("Login alias").fill(login!);
     await page.getByLabel("Password").fill(password!);
     await page.getByRole("button", { name: "Sign in" }).click();
+
+    // The guarded acceptance account is expected to be fresh (or MFA-reset) for every run. A
+    // previously enrolled account would show the challenge screen, which cannot be completed
+    // without a separately provisioned TOTP/backup secret; fail at that boundary instead of
+    // continuing into a misleading onboarding timeout.
+    await expect(page.getByRole("heading", { name: "Secure your account" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByRole("button", { name: "Start setup" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByLabel("Password").fill(password!);
+    await page.getByRole("button", { name: "Start setup" }).click();
+    const secret = await page.getByLabel("Manual secret").inputValue();
+    const code = await generateStableTotp(secret, (milliseconds) =>
+      page.waitForTimeout(milliseconds),
+    );
+    await page.getByLabel("Authenticator code").fill(code);
+    await page.getByRole("button", { name: "Verify code" }).click();
 
     await expect(page.getByRole("heading", { name: "Choose your language" })).toBeVisible();
     await page.getByRole("button", { name: "Continue" }).click();

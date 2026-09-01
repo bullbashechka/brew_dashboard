@@ -7,3 +7,7 @@ node_modules
 playwright-report
 test-results
 bun.lock
+
+# Drizzle snapshots are generated artifacts and are intentionally not hand-formatted.
+backend/drizzle/meta/*.json
+webapp/dist/

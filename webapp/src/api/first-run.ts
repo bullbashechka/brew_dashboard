@@ -1,10 +1,10 @@
 import {
   languageRequestSchema,
   loginRequestSchema,
+  loginResponseSchema,
   onboardingCompleteResponseSchema,
   onboardingLanguageResponseSchema,
   onboardingRequestSchema,
-  sessionResponseSchema,
   type OnboardingRequest,
 } from "@brew-dashboard/contracts";
 
@@ -17,7 +17,7 @@ export const login = (request: { login: string; password: string }) =>
     path: "/api/v1/auth/login",
     method: "POST",
     body: loginRequestSchema.parse(request),
-    schema: sessionResponseSchema,
+    schema: loginResponseSchema,
     unauthorized: "ignore",
   });
 

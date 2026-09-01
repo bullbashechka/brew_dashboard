@@ -2,7 +2,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 
 import { parseLogin } from "../src/auth/login.ts";
-import { isLoopbackHostname } from "../src/security/hosts.ts";
+import {
+  isProductionDatabaseTarget,
+  parsePostgresUrl,
+  postgresClientConfiguration,
+} from "./postgres-cli.ts";
 import * as schema from "../src/db/schema.ts";
 import type { RequestDatabase } from "../src/db/client.ts";
 import type { AccountKind } from "../src/admin/accounts.ts";
@@ -15,8 +19,7 @@ export const readAdminDatabaseUrl = () => {
 };
 
 export const requireProductionAdmin = (databaseUrl: string, confirmation?: string) => {
-  const hostname = new URL(databaseUrl).hostname;
-  if (isLoopbackHostname(hostname)) return;
+  if (!isProductionDatabaseTarget(new URL(databaseUrl))) return;
   if (process.env.ALLOW_PRODUCTION_ADMIN !== "1" || confirmation !== "production") {
     throw new Error(
       "Non-local admin commands require ALLOW_PRODUCTION_ADMIN=1 and --confirm-production production",
@@ -24,9 +27,17 @@ export const requireProductionAdmin = (databaseUrl: string, confirmation?: strin
   }
 };
 
+export const assertInteractivePasswordAllowed = (databaseUrl: string, requested: boolean) => {
+  if (requested && isProductionDatabaseTarget(new URL(databaseUrl))) {
+    throw new Error("--interactive-password is allowed only for a loopback PostgreSQL target");
+  }
+};
+
 export const withAdminDatabase = async <T>(callback: (db: RequestDatabase) => Promise<T>) => {
   const databaseUrl = readAdminDatabaseUrl();
-  const client = new Client({ connectionString: databaseUrl });
+  const client = new Client(
+    await postgresClientConfiguration(parsePostgresUrl(databaseUrl, "admin database URL")),
+  );
   try {
     await client.connect();
     return await callback(drizzle(client, { schema }));

@@ -4,7 +4,12 @@ const unsafeLogKeys =
   /(?:^|[,{\s"'])(?:authorization|cookie|set-cookie|password|feedback|desiredfeatures|comment)\s*[:=]/iu;
 
 export type SystemE2eLogCanaryCategory =
-  "auth secret" | "database credential" | "fixture credential" | "fixture identity" | "form canary";
+  | "auth secret"
+  | "database credential"
+  | "fixture credential"
+  | "fixture identity"
+  | "form canary"
+  | "unknown inherited secret";
 
 export type SystemE2eLogCanary = {
   category: SystemE2eLogCanaryCategory;

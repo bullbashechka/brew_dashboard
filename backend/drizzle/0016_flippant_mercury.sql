@@ -1,0 +1,2 @@
+ALTER TABLE "app"."app_users" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE POLICY "app_users_auth_user_isolation" ON "app"."app_users" AS PERMISSIVE FOR ALL TO public USING ("auth_user_id" = nullif(current_setting('app.auth_user_id', true), '')) WITH CHECK ("auth_user_id" = nullif(current_setting('app.auth_user_id', true), ''));

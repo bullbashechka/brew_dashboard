@@ -21,9 +21,18 @@ if (jsonLine) {
 const advisories = Object.entries(findings).flatMap(([packageName, entries]) =>
   entries.map((entry) => ({ packageName, ...entry })),
 );
-const blocking = advisories.filter((advisory) =>
-  ["high", "critical"].includes(String(advisory.severity).toLowerCase()),
-);
+const reviewedDevelopmentExceptions = new Map([
+  ["esbuild:1102341", { severity: "moderate", expiresOn: "2026-09-30" }],
+]);
+const exceptionFor = (advisory) =>
+  reviewedDevelopmentExceptions.get(`${advisory.packageName}:${String(advisory.id)}`);
+const blocking = advisories.filter((advisory) => {
+  const severity = String(advisory.severity).toLowerCase();
+  if (["high", "critical"].includes(severity)) return true;
+  const exception = exceptionFor(advisory);
+  if (!exception || exception.severity !== severity) return true;
+  return Date.now() > Date.parse(`${exception.expiresOn}T23:59:59.999Z`);
+});
 if (advisories.length) {
   console.warn(
     `bun audit found ${advisories.length} advisory(s): ${advisories
@@ -32,7 +41,9 @@ if (advisories.length) {
   );
 }
 if (blocking.length) {
-  console.error("High or critical dependency advisories block the release gate");
+  console.error(
+    "Unreviewed, expired, high or critical dependency advisories block the release gate",
+  );
   process.exit(1);
 }
 

@@ -24,6 +24,7 @@ import {
 } from "@/lib/feedback-prompt";
 import { useQueryClient } from "@tanstack/react-query";
 import { productEventDispatcher } from "@/lib/product-events";
+import { acquireLogoutLock, announceLogout, releaseLogoutLock } from "@/lib/session-boundary";
 
 const sections = ["overview", "locations", "sales", "products", "inventory", "settings"] as const;
 type Section = (typeof sections)[number];
@@ -147,12 +148,19 @@ export function AppShell() {
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
-    onSuccess: async () => {
+    onSettled: async () => {
+      releaseLogoutLock();
       await queryClient.cancelQueries();
       queryClient.clear();
       await navigate({ to: "/login", search: { redirect: undefined }, replace: true });
     },
   });
+
+  const startLogout = () => {
+    if (!acquireLogoutLock()) return;
+    announceLogout();
+    logoutMutation.mutate();
+  };
 
   if (!profile) return <LoadingState locale={locale} />;
 
@@ -244,7 +252,7 @@ export function AppShell() {
         <ShellActions
           locale={locale}
           onFeedback={() => setFeedbackOpen(true)}
-          onLogout={() => logoutMutation.mutate()}
+          onLogout={startLogout}
           pending={logoutMutation.isPending}
         />
       </aside>
@@ -284,7 +292,7 @@ export function AppShell() {
                     setDrawerOpen(false);
                     setFeedbackOpen(true);
                   }}
-                  onLogout={() => logoutMutation.mutate()}
+                  onLogout={startLogout}
                   pending={logoutMutation.isPending}
                 />
               </Dialog.Content>

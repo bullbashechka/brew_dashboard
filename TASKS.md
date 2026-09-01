@@ -84,7 +84,7 @@
 
 ### Задачи
 
-- [x] **S2.1.** Создать один Railway Hobby PostgreSQL service и cache-disabled Hyperdrive configuration; привязать `HYPERDRIVE`, затем подключить Drizzle ORM/Kit, создать server-only schema source и каталог `backend/drizzle` для versioned SQL migrations.
+- [x] **S2.1.** Создать один Railway Hobby PostgreSQL service и две cache-disabled Hyperdrive configurations: `AUTH_HYPERDRIVE` для Better Auth и `APP_HYPERDRIVE` для tenant/application tables; сохранить временную legacy-совместимость только для staged rollout, затем подключить Drizzle ORM/Kit, создать server-only schema source и каталог `backend/drizzle` для versioned SQL migrations.
 - [x] **S2.2.** Подготовить server-only Better Auth tables, `networks` и `app_users` с nullable onboarding-полями, уникальными `login_normalized` и `network_id`, status, `account_kind`, expiry, login/tour timestamps и связью с Better Auth user.
 - [x] **S2.3.** Создать `locations`, `categories`, `products`, `orders`, `order_items`, `inventory_items`, `inventory_balances`, `inventory_movements`, `revenue_targets`, `feedback_responses`, `product_events` и `demo_generations`.
 - [x] **S2.4.** Применить UUID, `timestamptz` и exact-scale `numeric` для money/quantity: money ограничены диапазоном `numeric(14,2)`, quantity — `numeric(14,3)`, но scale проверяется constraint до записи, чтобы PostgreSQL не выполнял silent rounding; также добавить необходимые `created_at`/`updated_at`.
@@ -92,7 +92,7 @@
 - [x] **S2.6.** Добавить tenant и time-series индексы, включая `network_id`, `(network_id, occurred_at)` и `(network_id, location_id, occurred_at)` там, где они применимы.
 - [x] **S2.7.** Включить RLS на tenant business tables; создать owner/runtime roles, запретить runtime role ownership/`BYPASSRLS` и задавать transaction-local `app.network_id` только из server session.
 - [x] **S2.8.** Использовать Drizzle schema как источник server-side database types; проверить соответствие schema и сгенерированных migrations.
-- [x] **S2.9.** Подготовить безопасный migration workflow для локальной isolated PostgreSQL и единственного production Railway PostgreSQL service; migrations применяются прямым unpooled connection до Worker release.
+- [x] **S2.9.** Подготовить безопасный migration workflow для локальной isolated PostgreSQL и единственного production Railway PostgreSQL service; migrations применяются прямым unpooled owner connection до Worker release, после чего runtime roles проверяются smoke-командой.
 
 ### Критерии приёмки
 
@@ -129,11 +129,14 @@ Onboarding показывает review перед генерацией; при �
 отключаются, формы сохраняют введённые значения. Demo-stale banner не сбрасывает данные
 автоматически. Product analytics best-effort и не откатывает пользовательское действие.
 Feedback хранится одной текущей строкой, переживает Reset, а удаление аккаунта удаляет его.
-Backups, disaster recovery и per-account restore находятся за пределами MVP.
+Полноценные SLA/PITR и per-account restore находятся за пределами MVP, но минимальный encrypted
+backup/recovery runbook является обязательным production-контролем.
 
-S2.1 завершён: миграции применены к единственному Railway PostgreSQL service, роль `brew_runtime`
-подключена через cache-disabled Hyperdrive, а binding добавлен в `wrangler.jsonc`. Railway-native
-backup schedules не являются частью MVP и не требуются для закрытия этапа.
+S2.1 завершён на уровне кода и rollout-процедуры: миграции содержат role split, runtime roles
+проверяются через exact-grant Hyperdrive smoke, `release:deploy-stage-b` сначала переводит живой
+Worker на split bindings при доступном rollback, а `release:deploy` принимает только stage C после
+отзыва legacy role. Внешнее создание двух distinct Hyperdrive configurations и отзыв legacy role
+остаются операционными шагами S12.22/S13.
 
 ---
 
@@ -431,6 +434,15 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [x] **S12.15.** Выполнить `bun audit`, разобрать findings и не ослаблять security controls ради прохождения тестов.
 - [x] **S12.16.** Определить и реализовать retention/cleanup policy для `product_events` до production rollout; проверить storage budget и admin analytics history.
 
+### P0–P1 security hardening addendum
+
+- [x] **S12.17.** Включить mandatory verified TOTP MFA для production, запретить trust-device bypass, добавить encrypted backup codes и bounded verification lockout.
+- [x] **S12.18.** Вынести login/authenticated/mutation rate limits в strongly-consistent Durable Object; оставить только bounded local fallback для development/read-only outage и fail-closed production auth/mutations.
+- [x] **S12.19.** Разделить runtime database privileges между `brew_auth_runtime` и `brew_app_runtime`, включить RLS checks и добавить migration grants для каждой используемой database function.
+- [x] **S12.20.** Усилить release gate: exact production origin, real distinct Hyperdrive IDs, staged A→B→C rollout, secret scan, audit и запрет deploy до отзыва legacy runtime role.
+- [x] **S12.21.** Добавить encrypted AES-256-GCM backup dump/verify/restore tooling, идемпотентное восстановление runtime grants и локальный clean-database restore drill; production monthly restore proof остаётся в S12.22.
+- [ ] **S12.22.** Выполнить на production Railway/Cloudflare внешний provisioning: две distinct cache-disabled Hyperdrive configurations, runtime passwords, stage C revoke, latest backup upload и monthly restore drill.
+
 ### Критерии приёмки
 
 - [x] Все root validation commands проходят; non-zero exit, timeout, unhandled rejection и console/runtime error считаются провалом.
@@ -439,9 +451,9 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 - [x] Performance budgets либо подтверждены измерениями, либо явно зафиксирован блокирующий gap до release.
 - [x] В логах и telemetry нет secrets, tokens, cookies, feedback contents и произвольных form texts.
 
-> Статус локальной проверки 28.08.2026: Docker integration, mock и system E2E, performance, Worker-artifact
-> и log-safety проверки включены в `bun run validate:stage12`. Результат final gate фиксируется запуском
-> этой команды перед закрытием этапа.
+> Кодовые hardening checks добавлены в unit/contract/integration suites и release gate. Final
+> production gate фиксируется только после запуска `bun run validate:stage12`, реального
+> Hyperdrive smoke, stage C revoke и подтверждённого encrypted backup/restore drill.
 
 ---
 
@@ -453,12 +465,12 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Задачи
 
-- [ ] **S13.1.** Зафиксировать Cloudflare compatibility date и production config для Worker, assets, SPA fallback, `/api/*` и Observability; не добавлять Cron, staging и preview.
-- [ ] **S13.2.** Проверить существующие Railway Hobby PostgreSQL service и cache-disabled Hyperdrive configuration; создать один `*.workers.dev` deployment.
-- [ ] **S13.3.** Проверить существующий `HYPERDRIVE` binding, сохранить `BETTER_AUTH_SECRET` в Cloudflare Secrets и non-secret base URL в Worker environment; повторно проверить отсутствие database/auth secrets в bundle и git.
-- [ ] **S13.4.** Задокументировать порядок релиза: вручную применить совместимые migrations, затем развернуть Worker.
-- [ ] **S13.5.** Выполнить release gate на чистом worktree: lint, typecheck, unit tests, production build и `bun audit`.
-- [ ] **S13.6.** Выполнить smoke checks `/api/v1/health`, login, Overview и feedback на отдельном e2e account.
+- [x] **S13.1.** Зафиксировать Cloudflare compatibility date и production config для Worker, assets, SPA fallback, `/api/*` и Observability; не добавлять Cron, staging и preview.
+- [ ] **S13.2.** Проверить существующие Railway Hobby PostgreSQL service, создать две distinct cache-disabled Hyperdrive configurations и подготовить один exact `*.workers.dev` deployment.
+- [x] **S13.3.** Зафиксировать `AUTH_HYPERDRIVE`/`APP_HYPERDRIVE`, сохранить `BETTER_AUTH_SECRET` в Cloudflare Secrets и non-secret base URL в Worker environment; release/audit gates проверяют отсутствие database/auth secrets в bundle и git.
+- [x] **S13.4.** Задокументировать staged порядок релиза: вручную применить migrations, provision roles, smoke-test bindings, отозвать legacy role и только затем развернуть Worker.
+- [x] **S13.5.** Реализовать release gate: lint, typecheck, format, unit/contract tests, production build, `bun audit`, `bun run security:scan` и exact-origin/role-split checks.
+- [ ] **S13.6.** Выполнить внешние smoke checks `/api/v1/health`, login, mandatory MFA, Overview и feedback на отдельном e2e account после stage C.
 - [ ] **S13.7.** Пройти полный чек-лист раздела 22 `PRD.md`, включая RU/EN, filters/comparison, три группы mutations, reset, tenancy и responsive flow.
 - [ ] **S13.8.** Проверить UI/API на отсутствие out-of-scope функций и текстов, создающих впечатление реальных данных.
 - [ ] **S13.9.** Проверить admin workflow создания до 15 demo accounts и однократной безопасной передачи credentials.
@@ -467,9 +479,10 @@ Reset operation. Клиентский redirect `/app/*` на первый нез
 
 ### Критерии приёмки
 
-- [ ] Production работает на одном Worker, одном Railway PostgreSQL service и одной Hyperdrive configuration; staging/preview/remote test database отсутствуют.
+- [ ] Production работает на одном Worker, одном Railway PostgreSQL service и двух distinct role-scoped Hyperdrive configurations; staging/preview/remote test database отсутствуют, legacy `brew_runtime` отозван.
 - [ ] Миграции применены до совместимой версии Worker, health и критические smoke checks зелёные.
 - [ ] Можно безопасно создать и выдать 15 независимых demo accounts без хранения открытых паролей.
+- [ ] Последний encrypted backup проверен, а monthly restore drill выполнен в изолированной БД.
 - [ ] Все критерии готовности Demo MVP из PRD подтверждены фактическим UI/API/E2E сигналом.
 
 ---

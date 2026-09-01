@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import {
   apiErrorResponseSchema,
   inventoryMovementMutationResponseSchema,
@@ -21,12 +21,13 @@ import { createInventoryMovement } from "../../src/inventory/service.ts";
 
 const ownerUrl = process.env.DATABASE_TEST_URL;
 const runtimeUrl = process.env.DATABASE_TEST_RUNTIME_URL;
-const baseUrl = process.env.BETTER_AUTH_URL ?? "https://brew-dashboard.test";
+const baseUrl = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:4173";
 const secret = process.env.BETTER_AUTH_SECRET ?? "stage5-integration-secret-".padEnd(32, "x");
 const environment = {
   HYPERDRIVE: { connectionString: runtimeUrl ?? "" } as Hyperdrive,
   BETTER_AUTH_SECRET: secret,
   BETTER_AUTH_URL: baseUrl,
+  MFA_REQUIRED: "0",
 };
 
 type TestAccount = Awaited<ReturnType<typeof createAccount>>;
@@ -108,8 +109,8 @@ describeIntegration("Stage 5 analytics API", () => {
     await ownerClient.connect();
   });
 
-  afterAll(async () => {
-    for (const account of accounts.reverse()) {
+  afterEach(async () => {
+    for (const account of accounts.splice(0).reverse()) {
       try {
         await withRequestDatabase(ownerUrl!, (db) =>
           deleteAccount(db, {
@@ -121,6 +122,9 @@ describeIntegration("Stage 5 analytics API", () => {
         // Cleanup must remain best-effort if a preceding assertion failed.
       }
     }
+  }, 60_000);
+
+  afterAll(async () => {
     await ownerClient.end();
   }, 60_000);
 

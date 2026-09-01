@@ -39,6 +39,12 @@ const tenantPolicy = (name: string, column = "network_id") =>
     withCheck: tenantExpression(column),
   });
 
+const authUserExpression = sql.raw(
+  `"auth_user_id" = nullif(current_setting('app.auth_user_id', true), '') and
+   (nullif(current_setting('app.network_id', true), '') is null or
+    "network_id" = nullif(current_setting('app.network_id', true), '')::uuid)`,
+);
+
 export const authUsers = auth.table("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -47,8 +53,26 @@ export const authUsers = auth.table("users", {
   image: text("image"),
   username: text("username").unique(),
   displayUsername: text("display_username"),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
   ...timestampColumns,
 });
+
+export const authTwoFactors = auth.table(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    verified: boolean("verified").default(false).notNull(),
+    failedVerificationCount: integer("failed_verification_count").default(0).notNull(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+    ...timestampColumns,
+  },
+  (table) => [uniqueIndex("auth_two_factor_user_id_uidx").on(table.userId)],
+);
 
 export const authSessions = auth.table(
   "sessions",
@@ -187,37 +211,46 @@ export const networks = app
   )
   .enableRLS();
 
-export const appUsers = app.table(
-  "app_users",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    authUserId: text("auth_user_id")
-      .notNull()
-      .unique()
-      .references(() => authUsers.id, { onDelete: "cascade" }),
-    loginNormalized: varchar("login_normalized", { length: 64 }).notNull().unique(),
-    networkId: uuid("network_id")
-      .notNull()
-      .unique()
-      .references(() => networks.id, { onDelete: "cascade" }),
-    status: accountStatus("status").default("active").notNull(),
-    accountKind: accountKind("account_kind").default("demo").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
-    lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
-    tourCompletedAt: timestamp("tour_completed_at", { withTimezone: true, mode: "date" }),
-    tourSkippedAt: timestamp("tour_skipped_at", { withTimezone: true, mode: "date" }),
-    ...timestampColumns,
-  },
-  (table) => [
-    check("app_users_login_format_check", sql`${table.loginNormalized} ~ '^[a-z0-9._-]{3,64}$'`),
-    check(
-      "app_users_tour_terminal_state_check",
-      sql`not (${table.tourCompletedAt} is not null and ${table.tourSkippedAt} is not null)`,
-    ),
-    unique("app_users_network_id_id_unique").on(table.networkId, table.id),
-    index("app_users_status_expiry_idx").on(table.status, table.expiresAt),
-  ],
-);
+export const appUsers = app
+  .table(
+    "app_users",
+    {
+      id: uuid("id").defaultRandom().primaryKey(),
+      authUserId: text("auth_user_id")
+        .notNull()
+        .unique()
+        .references(() => authUsers.id, { onDelete: "cascade" }),
+      loginNormalized: varchar("login_normalized", { length: 64 }).notNull().unique(),
+      networkId: uuid("network_id")
+        .notNull()
+        .unique()
+        .references(() => networks.id, { onDelete: "cascade" }),
+      status: accountStatus("status").default("active").notNull(),
+      accountKind: accountKind("account_kind").default("demo").notNull(),
+      expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
+      lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
+      tourCompletedAt: timestamp("tour_completed_at", { withTimezone: true, mode: "date" }),
+      tourSkippedAt: timestamp("tour_skipped_at", { withTimezone: true, mode: "date" }),
+      ...timestampColumns,
+    },
+    (table) => [
+      check("app_users_login_format_check", sql`${table.loginNormalized} ~ '^[a-z0-9._-]{3,64}$'`),
+      check(
+        "app_users_tour_terminal_state_check",
+        sql`not (${table.tourCompletedAt} is not null and ${table.tourSkippedAt} is not null)`,
+      ),
+      unique("app_users_network_id_id_unique").on(table.networkId, table.id),
+      index("app_users_status_expiry_idx").on(table.status, table.expiresAt),
+      pgPolicy("app_users_auth_user_isolation", {
+        as: "permissive",
+        for: "all",
+        to: "public",
+        using: authUserExpression,
+        withCheck: authUserExpression,
+      }),
+    ],
+  )
+  .enableRLS();
 
 export const locations = app
   .table(

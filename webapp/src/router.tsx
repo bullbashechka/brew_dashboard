@@ -16,12 +16,19 @@ import {
   stockStatusSchema,
   type Profile,
 } from "@brew-dashboard/contracts";
-import { sessionQueryKey, sessionQueryOptions } from "@/api/session";
+import {
+  authStateQueryOptions,
+  isMfaSetupState,
+  profileFromAuthState,
+  sessionQueryKey,
+  sessionQueryOptions,
+  type AuthState,
+} from "@/api/session";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { AppShell } from "@/components/app-shell";
 import { NotFoundPage } from "@/components/not-found-page";
 import { localeFromProfile, translate } from "@/lib/i18n";
-import { LanguagePage, LoginPage, OnboardingPage } from "@/pages/first-run";
+import { LanguagePage, LoginPage, MfaSetupPage, OnboardingPage } from "@/pages/first-run";
 
 export type AppRouterContext = { queryClient: QueryClient };
 
@@ -32,9 +39,12 @@ const rootRoute = createRootRouteWithContext<AppRouterContext>()({
   notFoundComponent: NotFoundPage,
 });
 
-const getSession = (queryClient: QueryClient) => queryClient.ensureQueryData(sessionQueryOptions());
+const getAuthState = (queryClient: QueryClient) =>
+  queryClient.ensureQueryData(authStateQueryOptions());
 
-const destinationFor = (profile: Profile | null) => {
+export const destinationFor = (state: AuthState) => {
+  if (isMfaSetupState(state)) return { to: "/mfa/setup" as const };
+  const profile = profileFromAuthState(state);
   if (!profile) return { to: "/login" as const };
   if (!profile.language) return { to: "/first-run/language" as const };
   if (!profile.onboardingCompletedAt) return { to: "/first-run/onboarding" as const };
@@ -47,14 +57,14 @@ const assertCompleteProfileConfiguration = (profile: Profile | null) => {
   }
 };
 
-const redirectToDestination = (profile: Profile | null) => {
-  throw redirect(destinationFor(profile));
+const redirectToDestination = (state: AuthState) => {
+  throw redirect(destinationFor(state));
 };
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: async ({ context }) => redirectToDestination(await getSession(context.queryClient)),
+  beforeLoad: async ({ context }) => redirectToDestination(await getAuthState(context.queryClient)),
 });
 
 const loginRoute = createRoute({
@@ -67,8 +77,8 @@ const loginRoute = createRoute({
         : undefined,
   }),
   beforeLoad: async ({ context }) => {
-    const profile = await getSession(context.queryClient);
-    if (profile) redirectToDestination(profile);
+    const state = await getAuthState(context.queryClient);
+    if (state) redirectToDestination(state);
   },
   component: LoginPage,
 });
@@ -77,8 +87,9 @@ const languageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/first-run/language",
   beforeLoad: async ({ context }) => {
-    const profile = await getSession(context.queryClient);
-    if (!profile || profile.language) redirectToDestination(profile);
+    const state = await getAuthState(context.queryClient);
+    const profile = profileFromAuthState(state);
+    if (!profile || profile.language) redirectToDestination(state);
   },
   component: LanguagePage,
 });
@@ -87,11 +98,22 @@ const onboardingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/first-run/onboarding",
   beforeLoad: async ({ context }) => {
-    const profile = await getSession(context.queryClient);
+    const state = await getAuthState(context.queryClient);
+    const profile = profileFromAuthState(state);
     if (!profile || !profile.language || profile.onboardingCompletedAt)
-      redirectToDestination(profile);
+      redirectToDestination(state);
   },
   component: OnboardingPage,
+});
+
+const mfaSetupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mfa/setup",
+  beforeLoad: async ({ context }) => {
+    const state = await getAuthState(context.queryClient);
+    if (!isMfaSetupState(state)) redirectToDestination(state);
+  },
+  component: MfaSetupPage,
 });
 
 const appSearch = (search: Record<string, unknown>) => ({
@@ -107,10 +129,11 @@ const appRoute = createRoute({
   path: "/app",
   validateSearch: appSearch,
   beforeLoad: async ({ context }) => {
-    const profile = await getSession(context.queryClient);
+    const state = await getAuthState(context.queryClient);
+    const profile = profileFromAuthState(state);
     assertCompleteProfileConfiguration(profile);
     if (!profile || !profile.language || !profile.onboardingCompletedAt)
-      redirectToDestination(profile);
+      redirectToDestination(state);
   },
   component: AppShell,
 });
@@ -148,6 +171,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   languageRoute,
   onboardingRoute,
+  mfaSetupRoute,
   appRoute.addChildren([
     overviewRoute,
     locationsRoute,
@@ -186,14 +210,18 @@ function RootLayout() {
 
 function RootPending() {
   const queryClient = useQueryClient();
-  const profile = queryClient.getQueryData<Profile | null>(sessionQueryKey);
+  const profile = profileFromAuthState(
+    queryClient.getQueryData<AuthState>(sessionQueryKey) ?? null,
+  );
   return <LoadingState locale={localeFromProfile(profile)} />;
 }
 
 function RootError({ error }: { error: unknown }) {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const profile = queryClient.getQueryData<Profile | null>(sessionQueryKey);
+  const profile = profileFromAuthState(
+    queryClient.getQueryData<AuthState>(sessionQueryKey) ?? null,
+  );
   const locale = localeFromProfile(profile);
 
   const retry = () => {

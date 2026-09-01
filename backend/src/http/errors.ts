@@ -3,7 +3,7 @@ import type { Context } from "hono";
 
 import type { AppEnvironment } from "./types.ts";
 
-export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 500;
+export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 500 | 503;
 
 export class ApiProblem extends Error {
   constructor(

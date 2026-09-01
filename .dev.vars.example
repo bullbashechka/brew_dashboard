@@ -1,5 +1,12 @@
 # Cloudflare Worker local variables. Keep real values in an untracked .dev.vars file.
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:5173
-# Optional local-only Hyperdrive override; keep the real connection string out of git.
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=
+MFA_REQUIRED=0
+# Leave unset for local development. Production uses A, B, then C during the runtime-role rollout.
+RUNTIME_ROLE_SPLIT_STAGE=
+# Optional key for stable, non-reversible observability pseudonyms in local development.
+LOG_PSEUDONYM_SECRET=
+# Optional local-only Hyperdrive overrides; keep the real connection string out of git.
+# For local Worker development both named bindings may point at the same disposable database.
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_AUTH_HYPERDRIVE=
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE=

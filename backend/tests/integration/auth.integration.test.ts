@@ -21,12 +21,13 @@ import { withRequestDatabase } from "../../src/db/client.ts";
 
 const ownerUrl = process.env.DATABASE_TEST_URL;
 const runtimeUrl = process.env.DATABASE_TEST_RUNTIME_URL;
-const baseUrl = process.env.BETTER_AUTH_URL ?? "https://brew-dashboard.test";
+const baseUrl = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:4173";
 const secret = process.env.BETTER_AUTH_SECRET ?? "stage3-integration-secret-".padEnd(32, "x");
 const integrationEnvironment = {
   HYPERDRIVE: { connectionString: runtimeUrl ?? "" } as Hyperdrive,
   BETTER_AUTH_SECRET: secret,
   BETTER_AUTH_URL: baseUrl,
+  MFA_REQUIRED: "0",
 };
 
 type TestAccount = Awaited<ReturnType<typeof createAccount>>;
@@ -358,15 +359,16 @@ describeIntegration("Stage 3 authentication and account administration", () => {
     }
     expect((await login(account, "198.51.101.3")).response.status).toBe(200);
 
-    const afterReset = await Promise.all(
-      Array.from({ length: 10 }, (_, index) =>
-        request("/api/v1/auth/login", {
+    const afterReset: Response[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      afterReset.push(
+        await request("/api/v1/auth/login", {
           method: "POST",
           body: { login: account.login, password: "wrong-password-123" },
           ip: `198.51.101.${index + 10}`,
         }),
-      ),
-    );
+      );
+    }
     expect(afterReset.every((response) => response.status === 401)).toBe(true);
   });
 

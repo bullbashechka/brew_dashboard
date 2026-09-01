@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { join, relative } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createChildEnvironment } from "./child-environment.ts";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const webappDirectory = join(repositoryRoot, "webapp");
@@ -17,15 +18,23 @@ const cleanupTimeoutMs = 5_000;
 export type HyperdriveSmokePayload = {
   ok: boolean;
   queryOk: boolean;
+  authRuntimeRole: boolean;
+  authRuntimeRoleSafe: boolean;
+  authRuntimeGrantsValid: boolean;
   runtimeRole: boolean;
   runtimeRoleSafe: boolean;
   runtimeGrantsValid: boolean;
   tenantContextUnset: boolean;
   tenantRowsHidden: boolean;
   tenantTablesRlsEnabled: boolean;
+  appUsersRlsEnabled: boolean;
+  appUsersPolicyPresent: boolean;
   runtimeOwnsNoTenantTables: boolean;
   tenantPoliciesPresent: boolean;
+  baselineFunctionsGranted: boolean;
   migrationHeadApplied: boolean;
+  legacyRuntimeRevoked: boolean;
+  legacyRuntimeActive: boolean;
 };
 
 type RootWranglerConfig = {
@@ -40,15 +49,20 @@ type HyperdriveBinding = {
   id: string;
 };
 
+const isRealHyperdriveId = (value: string) => /^[a-f0-9]{32}$/iu.test(value);
+
 export type SmokeWranglerConfig = {
   name: string;
   main: string;
   compatibility_date: string;
   compatibility_flags: string[];
-  hyperdrive: [HyperdriveBinding];
+  hyperdrive: [HyperdriveBinding, HyperdriveBinding];
 };
 
-export const isValidSmokePayload = (payload: unknown): payload is HyperdriveSmokePayload => {
+export const isValidSmokePayload = (
+  payload: unknown,
+  expectedLegacyRevoked = true,
+): payload is HyperdriveSmokePayload => {
   if (!payload || typeof payload !== "object") {
     return false;
   }
@@ -57,18 +71,28 @@ export const isValidSmokePayload = (payload: unknown): payload is HyperdriveSmok
   const keys = Object.keys(candidate).sort().join(",");
   return (
     keys ===
-      "migrationHeadApplied,ok,queryOk,runtimeGrantsValid,runtimeOwnsNoTenantTables,runtimeRole,runtimeRoleSafe,tenantContextUnset,tenantPoliciesPresent,tenantRowsHidden,tenantTablesRlsEnabled" &&
+      "appUsersPolicyPresent,appUsersRlsEnabled,authRuntimeGrantsValid,authRuntimeRole,authRuntimeRoleSafe,baselineFunctionsGranted,legacyRuntimeActive,legacyRuntimeRevoked,migrationHeadApplied,ok,queryOk,runtimeGrantsValid,runtimeOwnsNoTenantTables,runtimeRole,runtimeRoleSafe,tenantContextUnset,tenantPoliciesPresent,tenantRowsHidden,tenantTablesRlsEnabled" &&
     candidate.ok === true &&
     candidate.queryOk === true &&
+    candidate.authRuntimeRole === true &&
+    candidate.authRuntimeRoleSafe === true &&
+    candidate.authRuntimeGrantsValid === true &&
     candidate.runtimeRole === true &&
     candidate.runtimeRoleSafe === true &&
     candidate.runtimeGrantsValid === true &&
     candidate.tenantContextUnset === true &&
     candidate.tenantRowsHidden === true &&
     candidate.tenantTablesRlsEnabled === true &&
+    candidate.appUsersRlsEnabled === true &&
+    candidate.appUsersPolicyPresent === true &&
     candidate.runtimeOwnsNoTenantTables === true &&
     candidate.tenantPoliciesPresent === true &&
-    candidate.migrationHeadApplied === true
+    candidate.baselineFunctionsGranted === true &&
+    candidate.migrationHeadApplied === true &&
+    candidate.legacyRuntimeRevoked === expectedLegacyRevoked &&
+    (expectedLegacyRevoked
+      ? candidate.legacyRuntimeActive === false
+      : candidate.legacyRuntimeActive === true)
   );
 };
 
@@ -83,18 +107,26 @@ export const createSmokeConfig = (rootConfig: unknown, smokeMain: string): Smoke
   }
 
   if (!Array.isArray(config.hyperdrive)) {
-    throw new Error("A real HYPERDRIVE binding ID is required before running the smoke");
+    throw new Error(
+      "Real AUTH_HYPERDRIVE and APP_HYPERDRIVE binding IDs are required before running the smoke",
+    );
   }
 
   const hyperdriveBindings = config.hyperdrive.filter(
     (binding): binding is { binding: unknown; id: unknown } =>
       Boolean(binding) && typeof binding === "object" && "binding" in binding && "id" in binding,
   );
-  const appBindings = hyperdriveBindings.filter((binding) => binding.binding === "HYPERDRIVE");
-  const binding = appBindings[0];
-  const bindingId = typeof binding?.id === "string" ? binding.id.trim() : undefined;
-  if (appBindings.length !== 1 || !bindingId || /^<.*>$/.test(bindingId)) {
-    throw new Error("A real HYPERDRIVE binding ID is required before running the smoke");
+  const requiredBindings = ["AUTH_HYPERDRIVE", "APP_HYPERDRIVE"] as const;
+  const selected = requiredBindings.map((bindingName) => {
+    const matches = hyperdriveBindings.filter((binding) => binding.binding === bindingName);
+    const id = typeof matches[0]?.id === "string" ? matches[0].id.trim() : "";
+    if (matches.length !== 1 || !isRealHyperdriveId(id)) {
+      throw new Error(`A real ${bindingName} binding ID is required before running the smoke`);
+    }
+    return { binding: bindingName, id };
+  }) as [HyperdriveBinding, HyperdriveBinding];
+  if (new Set(selected.map((binding) => binding.id)).size !== selected.length) {
+    throw new Error("AUTH_HYPERDRIVE and APP_HYPERDRIVE must use distinct configuration IDs");
   }
 
   const compatibilityFlags = Array.isArray(config.compatibility_flags)
@@ -107,7 +139,7 @@ export const createSmokeConfig = (rootConfig: unknown, smokeMain: string): Smoke
     main: smokeMain,
     compatibility_date: config.compatibility_date,
     compatibility_flags: compatibilityFlags,
-    hyperdrive: [{ binding: "HYPERDRIVE", id: bindingId }],
+    hyperdrive: selected,
   };
 };
 
@@ -115,6 +147,7 @@ export const buildWranglerCommand = (options: {
   configPath: string;
   port: number;
   token: string;
+  expectedLegacyRevoked?: boolean;
 }) => [
   "bun",
   "run",
@@ -136,7 +169,35 @@ export const buildWranglerCommand = (options: {
   "false",
   "--var",
   `HYPERDRIVE_SMOKE_TOKEN:${options.token}`,
+  "--var",
+  `EXPECTED_LEGACY_REVOKED:${options.expectedLegacyRevoked === false ? "0" : "1"}`,
 ];
+
+export const parseSmokeArguments = (argumentsList: string[]) => {
+  let expectedLegacyRevoked = true;
+  let configPath = rootWranglerConfigPath;
+  for (let index = 0; index < argumentsList.length; index += 1) {
+    const argument = argumentsList[index];
+    const value = argumentsList[index + 1];
+    if (argument === "--expect-legacy" && (value === "active" || value === "revoked")) {
+      expectedLegacyRevoked = value === "revoked";
+      index += 1;
+      continue;
+    }
+    if (argument === "--config" && value && isAbsolute(value)) {
+      configPath = resolve(value);
+      index += 1;
+      continue;
+    }
+    throw new Error(
+      "Usage: db:smoke:hyperdrive [--config <absolute>] [--expect-legacy active|revoked]",
+    );
+  }
+  return { expectedLegacyRevoked, configPath };
+};
+
+export const parseLegacyExpectation = (argumentsList: string[]) =>
+  parseSmokeArguments(argumentsList).expectedLegacyRevoked;
 
 const findFreePort = async () => {
   const server = createServer();
@@ -221,6 +282,9 @@ const stopChild = async (child: ReturnType<typeof Bun.spawn>) => {
 };
 
 const run = async () => {
+  const { expectedLegacyRevoked, configPath: inputConfigPath } = parseSmokeArguments(
+    process.argv.slice(2),
+  );
   const token = randomUUID();
   const port = await findFreePort();
   const smokeConfigPath = join(temporaryDirectory, `hyperdrive-smoke-${token}.json`);
@@ -229,7 +293,7 @@ const run = async () => {
   await mkdir(temporaryDirectory, { recursive: true });
 
   try {
-    const rootConfig = Bun.JSON5.parse(await readFile(rootWranglerConfigPath, "utf8"));
+    const rootConfig = Bun.JSON5.parse(await readFile(inputConfigPath, "utf8"));
     const smokeConfig = createSmokeConfig(
       rootConfig,
       relative(temporaryDirectory, smokeEntrypointPath),
@@ -238,22 +302,26 @@ const run = async () => {
       mode: 0o600,
     });
 
-    const childEnvironment: Record<string, string> = {};
-    for (const [key, value] of Object.entries(process.env)) {
-      if (typeof value === "string") {
-        childEnvironment[key] = value;
-      }
-    }
-    delete childEnvironment.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE;
-    childEnvironment.WRANGLER_WRITE_LOGS = "false";
-
-    child = Bun.spawn(buildWranglerCommand({ configPath: smokeConfigPath, port, token }), {
-      cwd: repositoryRoot,
-      detached: true,
-      env: childEnvironment,
-      stdout: "ignore",
-      stderr: "ignore",
+    const childEnvironment = createChildEnvironment(process.env, {
+      WRANGLER_WRITE_LOGS: "false",
+      ...(process.env.CLOUDFLARE_API_TOKEN
+        ? { CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN }
+        : {}),
+      ...(process.env.CLOUDFLARE_ACCOUNT_ID
+        ? { CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID }
+        : {}),
     });
+
+    child = Bun.spawn(
+      buildWranglerCommand({ configPath: smokeConfigPath, port, token, expectedLegacyRevoked }),
+      {
+        cwd: repositoryRoot,
+        detached: true,
+        env: childEnvironment,
+        stdout: "ignore",
+        stderr: "ignore",
+      },
+    );
 
     const url = smokeUrl(port);
     await waitForLocalWorker(url, child);
@@ -264,7 +332,7 @@ const run = async () => {
     });
     const payload: unknown = await response.json().catch(() => undefined);
 
-    if (response.status !== 200 || !isValidSmokePayload(payload)) {
+    if (response.status !== 200 || !isValidSmokePayload(payload, expectedLegacyRevoked)) {
       const safeResult =
         payload && typeof payload === "object"
           ? Object.fromEntries(

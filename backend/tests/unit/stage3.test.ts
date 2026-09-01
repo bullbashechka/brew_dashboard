@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  assertInteractivePasswordAllowed,
   parseAccountKind,
   parseExpiry,
   requireExactConfirmation,
@@ -32,6 +33,22 @@ describe("Stage 3 login and admin boundaries", () => {
     expect(() => assertE2eAccountKind("demo")).toThrow();
     expect(() => assertE2eAccountKind(undefined)).toThrow();
     expect(() => assertE2eAccountKind("e2e")).not.toThrow();
+    expect(() =>
+      assertInteractivePasswordAllowed("postgresql://localhost/brew", true),
+    ).not.toThrow();
+    expect(() => assertInteractivePasswordAllowed("postgresql://db.example/brew", true)).toThrow(
+      "loopback",
+    );
+    const previousTarget = process.env.DATABASE_TARGET_ENVIRONMENT;
+    process.env.DATABASE_TARGET_ENVIRONMENT = "production";
+    try {
+      expect(() => assertInteractivePasswordAllowed("postgresql://localhost/brew", true)).toThrow(
+        "loopback",
+      );
+    } finally {
+      if (previousTarget === undefined) delete process.env.DATABASE_TARGET_ENVIRONMENT;
+      else process.env.DATABASE_TARGET_ENVIRONMENT = previousTarget;
+    }
   });
 
   it("generates a password within the shared credential bounds", () => {
@@ -58,6 +75,46 @@ describe("Stage 3 login and admin boundaries", () => {
     expect(authHttpTest.classifyAuthResponse("login", new Response(null, { status: 401 }))).toEqual(
       { kind: "unauthenticated" },
     );
+  });
+
+  it("normalizes only the supported MFA methods and accepts only otpauth TOTP secrets", () => {
+    expect(authHttpTest.mfaMethodsFor(["totp", "backup_code", "sms", "totp"])).toEqual([
+      "totp",
+      "backup",
+    ]);
+    expect(authHttpTest.mfaMethodsFor(["sms"])).toEqual([]);
+    expect(
+      authHttpTest.totpSecretFromUri(
+        "otpauth://totp/Brew%20Dashboard:user?secret=JBSWY3DPEHPK3PXP",
+      ),
+    ).toBe("JBSWY3DPEHPK3PXP");
+    expect(authHttpTest.totpSecretFromUri("https://example.test/?secret=JBSWY3DPEHPK3PXP")).toBe(
+      null,
+    );
+    expect(authHttpTest.totpSecretFromUri("otpauth://totp/Brew%20Dashboard:user?secret=bad0")).toBe(
+      null,
+    );
+    expect(authHttpTest.mfaRequiredFor({ MFA_REQUIRED: "1" } as never)).toBe(true);
+    expect(
+      authHttpTest.mfaRequiredFor({
+        MFA_REQUIRED: "0",
+        BETTER_AUTH_URL: "http://127.0.0.1:4173",
+      } as never),
+    ).toBe(false);
+    for (const value of [undefined, "true", "false", "unexpected"]) {
+      expect(() =>
+        authHttpTest.mfaRequiredFor({
+          ...(value === undefined ? {} : { MFA_REQUIRED: value }),
+          BETTER_AUTH_URL: "http://127.0.0.1:4173",
+        } as never),
+      ).toThrow();
+    }
+    expect(() =>
+      authHttpTest.mfaRequiredFor({
+        MFA_REQUIRED: "0",
+        BETTER_AUTH_URL: "https://brew-dashboard.example",
+      } as never),
+    ).toThrow();
   });
 
   it("enforces JSON, origin and body boundaries for mutations", async () => {
@@ -195,6 +252,7 @@ describe("Stage 3 login and admin boundaries", () => {
       "server_error",
       "login_failure",
     ]);
+    expect(middlewareTest.signalsFor("/api/v1/auth/mfa/verify", 401)).toEqual(["mfa_failure"]);
     expect(middlewareTest.normalizeRoutePattern("/api/v1/products/:productId/price")).toBe(
       "/api/v1/products/:productId/price",
     );

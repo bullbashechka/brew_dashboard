@@ -6,22 +6,31 @@ import { createMiddleware } from "hono/factory";
 import { authUrlFor } from "../auth/environment.ts";
 import { errorResponse } from "./errors.ts";
 import type { AppEnvironment } from "./types.ts";
+import { pseudonymize } from "../security/pseudonym.ts";
 
 export const JSON_BODY_LIMIT = 256 * 1024;
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export const SECURITY_HEADERS = {
   "Content-Security-Policy":
-    "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "X-Frame-Options": "DENY",
+  "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
 } as const;
 
 type LogLevel = "log" | "warn" | "error";
 export type RequestSignal =
-  "server_error" | "login_failure" | "onboarding_failure" | "reset_failure" | "request";
+  | "server_error"
+  | "login_failure"
+  | "mfa_failure"
+  | "onboarding_failure"
+  | "reset_failure"
+  | "request";
 export const UNMATCHED_ROUTE = "unmatched";
 export const UNMATCHED_ROUTE_SAMPLE_RATE = 0.01;
 
@@ -35,6 +44,7 @@ export const signalsFor = (path: string, status: number): RequestSignal[] => {
   const signals: RequestSignal[] = [];
   if (status >= 500) signals.push("server_error");
   if (status >= 400 && path.endsWith("/auth/login")) signals.push("login_failure");
+  if (status >= 400 && path.endsWith("/auth/mfa/verify")) signals.push("mfa_failure");
   if (status >= 400 && path.endsWith("/onboarding/complete")) signals.push("onboarding_failure");
   if (status >= 400 && path.endsWith("/demo/reset")) signals.push("reset_failure");
   return signals.length ? signals : ["request"];
@@ -108,7 +118,12 @@ export const observabilityMiddleware = createMiddleware<AppEnvironment>(async (c
     durationMs: Date.now() - context.get("requestStartedAt"),
     signal: signals[0],
     signals,
-    ...(account ? { userId: account.userId, networkId: account.networkId } : {}),
+    ...(account
+      ? {
+          userHash: await pseudonymize(account.userId, context.env, "user"),
+          networkHash: await pseudonymize(account.networkId, context.env, "network"),
+        }
+      : {}),
   };
   console[logLevelFor(status)](payload);
 });

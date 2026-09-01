@@ -9,6 +9,8 @@ export type IsolatedTestDatabase = {
   databaseName: string;
   databaseUrl: string;
   runtimeUrl: string;
+  authRuntimeUrl: string;
+  appRuntimeUrl: string;
   cleanup: () => Promise<void>;
 };
 
@@ -24,6 +26,7 @@ const assertLoopback = (adminUrl: string) => {
 /** Create a disposable database and least-privilege runtime role for tests. */
 export const createIsolatedTestDatabase = async (
   adminUrl: string,
+  options: { enableSplitRuntimeLogins?: boolean } = {},
 ): Promise<IsolatedTestDatabase> => {
   assertLoopback(adminUrl);
   const databaseName = `brew_dashboard_test_${randomUUID().replaceAll("-", "")}`;
@@ -33,11 +36,14 @@ export const createIsolatedTestDatabase = async (
   await adminClient.connect();
   try {
     const runtimeRole = await adminClient.query<{ exists: boolean }>(
-      "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'brew_runtime') AS exists",
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_roles
+         WHERE rolname IN ('brew_runtime', 'brew_auth_runtime', 'brew_app_runtime')
+       ) AS exists`,
     );
     if (runtimeRole.rows[0]?.exists) {
       throw new Error(
-        "DATABASE_TEST_ADMIN_URL must use an isolated cluster without an existing brew_runtime role",
+        "DATABASE_TEST_ADMIN_URL must use an isolated cluster without Brew Dashboard runtime roles",
       );
     }
     await adminClient.query(`CREATE DATABASE "${databaseName}"`);
@@ -54,6 +60,8 @@ export const createIsolatedTestDatabase = async (
     try {
       await cleanupClient.query(`DROP DATABASE IF EXISTS "${databaseName}"`);
       await cleanupClient.query("DROP ROLE IF EXISTS brew_runtime");
+      await cleanupClient.query("DROP ROLE IF EXISTS brew_auth_runtime");
+      await cleanupClient.query("DROP ROLE IF EXISTS brew_app_runtime");
     } finally {
       await cleanupClient.end();
     }
@@ -75,24 +83,45 @@ export const createIsolatedTestDatabase = async (
     }
 
     const runtimePassword = randomBytes(24).toString("base64url");
+    const authRuntimePassword = randomBytes(24).toString("base64url");
+    const appRuntimePassword = randomBytes(24).toString("base64url");
     const databaseClient = new Client({ connectionString: databaseUrl.toString() });
     await databaseClient.connect();
     try {
-      const statement = await databaseClient.query<{ sql: string }>(
-        "SELECT format('ALTER ROLE brew_runtime LOGIN PASSWORD %L', $1::text) AS sql",
-        [runtimePassword],
-      );
-      await databaseClient.query(statement.rows[0]!.sql);
+      const loginRoles: ReadonlyArray<readonly [string, string]> = [
+        ["brew_runtime", runtimePassword],
+        ...(options.enableSplitRuntimeLogins
+          ? ([
+              ["brew_auth_runtime", authRuntimePassword],
+              ["brew_app_runtime", appRuntimePassword],
+            ] as const)
+          : []),
+      ];
+      for (const [role, password] of loginRoles) {
+        const statement = await databaseClient.query<{ sql: string }>(
+          "SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', $1::text, $2::text) AS sql",
+          [role, password],
+        );
+        await databaseClient.query(statement.rows[0]!.sql);
+      }
     } finally {
       await databaseClient.end();
     }
     const runtimeUrl = new URL(databaseUrl);
     runtimeUrl.username = "brew_runtime";
     runtimeUrl.password = runtimePassword;
+    const authRuntimeUrl = new URL(databaseUrl);
+    authRuntimeUrl.username = "brew_auth_runtime";
+    authRuntimeUrl.password = authRuntimePassword;
+    const appRuntimeUrl = new URL(databaseUrl);
+    appRuntimeUrl.username = "brew_app_runtime";
+    appRuntimeUrl.password = appRuntimePassword;
     return {
       databaseName,
       databaseUrl: databaseUrl.toString(),
       runtimeUrl: runtimeUrl.toString(),
+      authRuntimeUrl: authRuntimeUrl.toString(),
+      appRuntimeUrl: appRuntimeUrl.toString(),
       cleanup,
     };
   } catch (error) {

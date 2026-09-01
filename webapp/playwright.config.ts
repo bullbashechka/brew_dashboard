@@ -6,7 +6,10 @@ export default defineConfig({
     ? {}
     : { testIgnore: [/system\.spec\.ts$/, /performance\.spec\.ts$/] }),
   fullyParallel: process.env.E2E_SYSTEM !== "1",
-  ...(process.env.E2E_SYSTEM === "1" ? { workers: 1 } : {}),
+  // Vite transforms lazy routes on first visit. Four simultaneous browser workers can turn this
+  // into a dev-server cold-start race; two workers preserve cross-session coverage without making
+  // route readiness timing part of the product assertion.
+  workers: process.env.E2E_SYSTEM === "1" ? 1 : 2,
   forbidOnly: true,
   retries: 0,
   timeout: process.env.E2E_SYSTEM === "1" ? 300_000 : 60_000,

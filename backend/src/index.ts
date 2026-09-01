@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   apiErrorResponseSchema,
+  authMeResponseSchema,
   healthResponseSchema,
   inventoryMovementMutationResponseSchema,
   inventoryMovementMutationSchema,
@@ -12,6 +13,10 @@ import {
   locationsQuerySchema,
   locationsResponseSchema,
   loginRequestSchema,
+  loginResponseSchema,
+  mfaSetupRequestSchema,
+  mfaSetupResponseSchema,
+  mfaVerifyRequestSchema,
   logoutRequestSchema,
   logoutResponseSchema,
   languageRequestSchema,
@@ -43,9 +48,12 @@ import {
   loginHandler,
   logoutHandler,
   meHandler,
+  mfaSetupHandler,
+  mfaVerifyHandler,
   requireAuthentication,
   requireCompletedOnboarding,
   requireIncompleteOnboarding,
+  requireMfaSetupAuthentication,
 } from "./auth/http.ts";
 import {
   ApiProblem,
@@ -83,6 +91,8 @@ import {
   settingsLanguageHandler,
 } from "./settings/http.ts";
 import { productEventHandler } from "./events/http.ts";
+import { pseudonymize } from "./security/pseudonym.ts";
+export { RateLimitActor } from "./http/rate-limit-actor.ts";
 
 export type { WorkerBindings } from "./http/types.ts";
 
@@ -114,7 +124,7 @@ const loginRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: sessionResponseSchema } },
+      content: { "application/json": { schema: loginResponseSchema } },
       description: "Authenticated session",
     },
     401: errorResponseDefinition("Generic authentication failure"),
@@ -122,7 +132,57 @@ const loginRoute = createRoute({
     413: errorResponseDefinition("Request body too large"),
     415: errorResponseDefinition("Unsupported media type"),
     429: errorResponseDefinition("Rate limit exceeded"),
+    503: errorResponseDefinition("Request protection unavailable"),
     500: errorResponseDefinition("Internal server error"),
+  },
+});
+
+const mfaSetupRoute = createRoute({
+  method: "post",
+  path: "/auth/mfa/setup",
+  request: {
+    body: {
+      content: { "application/json": { schema: mfaSetupRequestSchema } },
+      description: "Start mandatory TOTP enrollment",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: mfaSetupResponseSchema } },
+      description: "TOTP setup material",
+    },
+    400: errorResponseDefinition("MFA setup validation failed"),
+    401: errorResponseDefinition("Authentication required"),
+    403: errorResponseDefinition("Origin rejected"),
+    409: errorResponseDefinition("MFA is already enabled"),
+    429: errorResponseDefinition("MFA verification rate limit exceeded"),
+    500: errorResponseDefinition("Internal server error"),
+    503: errorResponseDefinition("Request protection unavailable"),
+  },
+});
+
+const mfaVerifyRoute = createRoute({
+  method: "post",
+  path: "/auth/mfa/verify",
+  request: {
+    body: {
+      content: { "application/json": { schema: mfaVerifyRequestSchema } },
+      description: "Verify a TOTP or one-time backup code",
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: sessionResponseSchema } },
+      description: "MFA-verified session",
+    },
+    400: errorResponseDefinition("MFA verification validation failed"),
+    401: errorResponseDefinition("MFA verification failed"),
+    403: errorResponseDefinition("Origin rejected"),
+    429: errorResponseDefinition("MFA verification rate limit exceeded"),
+    500: errorResponseDefinition("Internal server error"),
+    503: errorResponseDefinition("Request protection unavailable"),
   },
 });
 
@@ -154,8 +214,8 @@ const meRoute = createRoute({
   path: "/auth/me",
   responses: {
     200: {
-      content: { "application/json": { schema: sessionResponseSchema } },
-      description: "Current authenticated profile",
+      content: { "application/json": { schema: authMeResponseSchema } },
+      description: "Current authenticated profile or minimal mandatory MFA setup state",
     },
     401: errorResponseDefinition("Authentication required"),
     500: errorResponseDefinition("Internal server error"),
@@ -524,11 +584,21 @@ app.openapi(healthRoute, (context) =>
 );
 
 app.openapi(loginRoute, loginHandler as unknown as RouteHandler<typeof loginRoute, AppEnvironment>);
+app.use("/auth/mfa/setup", requireMfaSetupAuthentication);
+app.openapi(
+  mfaSetupRoute,
+  mfaSetupHandler as unknown as RouteHandler<typeof mfaSetupRoute, AppEnvironment>,
+);
+app.openapi(
+  mfaVerifyRoute,
+  mfaVerifyHandler as unknown as RouteHandler<typeof mfaVerifyRoute, AppEnvironment>,
+);
 app.openapi(
   logoutRoute,
   logoutHandler as unknown as RouteHandler<typeof logoutRoute, AppEnvironment>,
 );
-app.use("/auth/me", requireAuthentication);
+// Mandatory MFA enrollment can resume after reload without exposing tenant profile data.
+app.use("/auth/me", requireMfaSetupAuthentication);
 app.openapi(meRoute, meHandler as unknown as RouteHandler<typeof meRoute, AppEnvironment>);
 
 app.use("/onboarding/language", requireAuthentication, requireIncompleteOnboarding);
@@ -631,7 +701,7 @@ for (const path of [
 
 app.notFound((context) => errorResponse(context, "NOT_FOUND", 404, "Not found"));
 
-app.onError((error, context) => {
+app.onError(async (error, context) => {
   if (error instanceof ApiProblem) {
     return errorResponse(context, error.code, error.status, error.message, error.fields);
   }
@@ -649,6 +719,12 @@ app.onError((error, context) => {
   const account = context.get("safeAccount");
   const signals = signalsFor(requestPath, 500);
   context.set("requestErrorLogged", true);
+  const accountFields = account
+    ? {
+        userHash: await pseudonymize(account.userId, context.env, "user"),
+        networkHash: await pseudonymize(account.networkId, context.env, "network"),
+      }
+    : {};
   console.error({
     event: "http_request_failed.v1",
     errorName: error instanceof Error ? error.name : "UnknownError",
@@ -663,7 +739,7 @@ app.onError((error, context) => {
     signal: signals[0],
     signals,
     durationMs: context.get("requestStartedAt") ? Date.now() - context.get("requestStartedAt") : 0,
-    ...(account ? { userId: account.userId, networkId: account.networkId } : {}),
+    ...accountFields,
   });
   return errorResponse(context, "INTERNAL_ERROR", 500, "Internal server error");
 });

@@ -202,6 +202,174 @@ export function LoginForm({
   );
 }
 
+export function MfaChallengeForm({
+  locale,
+  methods,
+  onSubmit,
+}: {
+  locale: AppLocale;
+  methods: ("totp" | "backup")[];
+  onSubmit: (method: "totp" | "backup", code: string) => Promise<void>;
+}) {
+  const [method, setMethod] = useState<"totp" | "backup">(methods[0] ?? "totp");
+  const [code, setCode] = useState("");
+  const [submitError, setSubmitError] = useState<unknown>(null);
+  const [pending, setPending] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (code.trim().length < 6) return;
+    setSubmitError(null);
+    setPending(true);
+    try {
+      await onSubmit(method, code.trim());
+    } catch (error) {
+      setSubmitError(error);
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <form className="space-y-5" onSubmit={(event) => void submit(event)} noValidate>
+      <p className="text-sm text-[var(--color-text-muted)]">{translate(locale, "mfa.challenge")}</p>
+      {methods.length > 1 && (
+        <fieldset disabled={pending} className="space-y-2">
+          <legend className="text-sm font-medium text-[var(--color-text)]">
+            {translate(locale, "mfa.method")}
+          </legend>
+          {methods.map((value) => (
+            <label key={value} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="mfa-method"
+                value={value}
+                checked={method === value}
+                onChange={() => setMethod(value)}
+              />
+              {translate(locale, value === "totp" ? "mfa.totp" : "mfa.backup")}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
+        {translate(locale, method === "totp" ? "mfa.code" : "mfa.backupCode")}
+        <input
+          className="control w-full"
+          autoComplete="one-time-code"
+          autoCapitalize="none"
+          inputMode={method === "totp" ? "numeric" : "text"}
+          spellCheck={false}
+          disabled={pending}
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+        />
+      </label>
+      <FormError locale={locale} error={submitError} />
+      <Button fullWidth disabled={pending || code.trim().length < 6} type="submit">
+        {pending ? (
+          <ProgressState locale={locale} label={translate(locale, "mfa.pending")} />
+        ) : (
+          translate(locale, "mfa.verify")
+        )}
+      </Button>
+    </form>
+  );
+}
+
+export function MfaSetupForm({
+  locale,
+  onSetup,
+  onVerify,
+}: {
+  locale: AppLocale;
+  onSetup: (password: string) => Promise<{
+    totpURI: string;
+    secret: string;
+    backupCodes: string[];
+  }>;
+  onVerify: (code: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [setup, setSetup] = useState<Awaited<ReturnType<typeof onSetup>> | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [pending, setPending] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      if (!setup) setSetup(await onSetup(password));
+      else await onVerify(code.trim());
+    } catch (submitError) {
+      setError(submitError);
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <form className="space-y-5" onSubmit={(event) => void submit(event)} noValidate>
+      {!setup ? (
+        <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
+          {translate(locale, "auth.password")}
+          <input
+            className="control w-full"
+            type="password"
+            autoComplete="current-password"
+            disabled={pending}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+      ) : (
+        <>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {translate(locale, "mfa.setupInstructions")}
+          </p>
+          <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
+            {translate(locale, "mfa.secret")}
+            <input className="control w-full font-mono" readOnly value={setup.secret} />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
+            {translate(locale, "mfa.uri")}
+            <textarea
+              className="control min-h-24 w-full font-mono text-xs"
+              readOnly
+              value={setup.totpURI}
+            />
+          </label>
+          <div className="rounded-lg border border-[var(--color-border)] p-3">
+            <p className="text-sm font-medium">{translate(locale, "mfa.backupCodes")}</p>
+            <p className="mt-2 break-words font-mono text-xs">{setup.backupCodes.join(" · ")}</p>
+          </div>
+          <label className="grid gap-1.5 text-sm font-medium text-[var(--color-text)]">
+            {translate(locale, "mfa.code")}
+            <input
+              className="control w-full"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              disabled={pending}
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </label>
+        </>
+      )}
+      <FormError locale={locale} error={error} />
+      <Button
+        fullWidth
+        disabled={pending || (!setup ? password.length < 12 : code.trim().length < 6)}
+        type="submit"
+      >
+        {pending ? (
+          <ProgressState locale={locale} label={translate(locale, "mfa.pending")} />
+        ) : (
+          translate(locale, setup ? "mfa.verify" : "mfa.startSetup")
+        )}
+      </Button>
+    </form>
+  );
+}
+
 export function LanguageForm({
   locale,
   onSubmit,

@@ -45,6 +45,7 @@ export default defineConfig(({ mode }) => ({
                   config: () => ({
                     vars: {
                       SYSTEM_E2E: "1",
+                      MFA_REQUIRED: "0",
                       SYSTEM_E2E_AUTH_SECRET: process.env.SYSTEM_E2E_AUTH_SECRET ?? "",
                       SYSTEM_E2E_AUTH_URL: process.env.SYSTEM_E2E_AUTH_URL ?? "",
                     },

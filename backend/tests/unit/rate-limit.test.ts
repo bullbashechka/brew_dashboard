@@ -6,6 +6,7 @@ import {
   DEMO_RESET_MAX_REQUESTS,
   LOGIN_IP_MAX_ATTEMPTS,
   consumeAuthenticatedRequestRateLimit,
+  consumeLoginIpRateLimitDistributed,
   consumeLoginIpRateLimit,
   loginAccountRateLimitKey,
 } from "../../src/auth/rate-limit.ts";
@@ -14,6 +15,7 @@ import {
   consumeMemoryFixedWindow,
   trustedClientIp,
 } from "../../src/http/rate-limit.ts";
+import { RateLimitActor, __test as durableRateLimitTest } from "../../src/http/rate-limit-actor.ts";
 
 const secret = "stage-security-test-secret-".padEnd(32, "x");
 
@@ -85,5 +87,63 @@ describe("in-memory request rate limits", () => {
     expect(key).toStartWith("brew-dashboard:login-account:");
     expect(key).not.toContain("demo-user");
     expect(key).toBe(loginAccountRateLimitKey(secret, "demo-user"));
+  });
+
+  it("fails closed when a production limiter binding is missing", async () => {
+    const mfaProduction = await consumeLoginIpRateLimitDistributed(
+      { MFA_REQUIRED: "1" },
+      secret,
+      "198.51.100.12",
+    );
+    expect(mfaProduction.status).toBe("unavailable");
+
+    const splitProduction = await consumeLoginIpRateLimitDistributed(
+      { RUNTIME_ROLE_SPLIT_STAGE: "C", MFA_REQUIRED: "0" },
+      secret,
+      "198.51.100.13",
+    );
+    expect(splitProduction.status).toBe("unavailable");
+  });
+
+  it("serializes distributed buckets and rejects unbounded actor inputs", async () => {
+    const values = new Map<string, unknown>();
+    const state = {
+      storage: {
+        get: async (key: string) => values.get(key),
+        put: async (key: string, value: unknown) => void values.set(key, value),
+        delete: async (key: string) => values.delete(key),
+        list: async ({ prefix, limit }: { prefix?: string; limit?: number }) =>
+          new Map(
+            [...values.entries()]
+              .filter(([key]) => !prefix || key.startsWith(prefix))
+              .slice(0, limit ?? Number.POSITIVE_INFINITY),
+          ),
+      },
+      blockConcurrencyWhile: async <T>(callback: () => Promise<T>) => callback(),
+    } as unknown as DurableObjectState;
+    const actor = new RateLimitActor(state, {});
+    const request = () =>
+      actor.fetch(
+        new Request("https://rate-limit-actor/consume", {
+          method: "POST",
+          body: JSON.stringify({ key: "bucket-key", windowSeconds: 60, max: 2, nowMs: 1_000 }),
+        }),
+      );
+    expect(((await (await request()).json()) as { allowed: boolean }).allowed).toBe(true);
+    expect(((await (await request()).json()) as { allowed: boolean }).allowed).toBe(true);
+    const blocked = await request();
+    expect(blocked.status).toBe(200);
+    expect(((await blocked.json()) as { allowed: boolean }).allowed).toBe(false);
+    expect(
+      durableRateLimitTest.validConsumeRequest({
+        key: "x",
+        windowSeconds: 8 * 24 * 60 * 60,
+        max: 1,
+      }),
+    ).toBe(false);
+    expect(
+      durableRateLimitTest.validConsumeRequest({ key: "x", windowSeconds: 60, max: 100_001 }),
+    ).toBe(false);
+    expect(durableRateLimitTest.actorNameFor(secret, "x")).toStartWith("rate-limit-shard-");
   });
 });
