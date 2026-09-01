@@ -11,10 +11,18 @@ import {
   type RequestDatabase,
   type RequestTransaction,
 } from "../db/client.ts";
-import { appUsers, authAccounts, authSessions, authUsers, networks } from "../db/schema.ts";
+import {
+  appUsers,
+  authAccounts,
+  authSessions,
+  authTwoFactors,
+  authUsers,
+  authVerifications,
+  networks,
+} from "../db/schema.ts";
 import { parseLogin, parsePassword } from "../auth/login.ts";
 
-export const MAX_ACTIVE_DEMO_ACCOUNTS = 25;
+export const MAX_ACTIVE_DEMO_ACCOUNTS = 15;
 const credentialIssuer = createLocalAccountIssuer("credential");
 
 export type AccountKind = "demo" | "e2e";
@@ -163,9 +171,33 @@ export const resetAccountPassword = async (
       .returning({ id: authAccounts.id });
     if (!updated[0]) throw new AdminAccountError("Credential account is missing");
     await transaction.delete(authSessions).where(eq(authSessions.userId, account.authUserId));
+    await transaction
+      .delete(authVerifications)
+      .where(eq(authVerifications.value, account.authUserId));
   });
 
   return { login: loginNormalized, password };
+};
+
+/** Revoke MFA enrollment and every active session for a specifically confirmed account. */
+export const resetAccountMfa = async (
+  db: RequestDatabase,
+  input: { login: string; accountKind?: AccountKind },
+) => {
+  const loginNormalized = parseLogin(input.login);
+  await db.transaction(async (transaction) => {
+    const account = await findAccountForUpdate(transaction, loginNormalized, input.accountKind);
+    await transaction
+      .update(authUsers)
+      .set({ twoFactorEnabled: false, updatedAt: new Date() })
+      .where(eq(authUsers.id, account.authUserId));
+    await transaction.delete(authTwoFactors).where(eq(authTwoFactors.userId, account.authUserId));
+    await transaction.delete(authSessions).where(eq(authSessions.userId, account.authUserId));
+    await transaction
+      .delete(authVerifications)
+      .where(eq(authVerifications.value, account.authUserId));
+  });
+  return { login: loginNormalized };
 };
 
 export const disableAccount = async (
@@ -180,6 +212,9 @@ export const disableAccount = async (
       .set({ status: "disabled", updatedAt: new Date() })
       .where(eq(appUsers.id, account.appUserId));
     await transaction.delete(authSessions).where(eq(authSessions.userId, account.authUserId));
+    await transaction
+      .delete(authVerifications)
+      .where(eq(authVerifications.value, account.authUserId));
   });
   return { login: loginNormalized };
 };

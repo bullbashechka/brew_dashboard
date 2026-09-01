@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import "./index.css";
 import { router } from "./router";
 import { setSessionExpiredHandler } from "./api/client";
+import { subscribeSessionBoundary } from "./lib/session-boundary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +26,19 @@ setSessionExpiredHandler(async () => {
   const redirect = currentPath.startsWith("/app/") ? currentPath : undefined;
   await router.navigate({ to: "/login", search: { redirect }, replace: true });
 });
+const unsubscribeSessionBoundary = subscribeSessionBoundary(async () => {
+  await queryClient.cancelQueries();
+  queryClient.clear();
+  await router.navigate({ to: "/login", search: { redirect: undefined }, replace: true });
+});
+const onPageHide = (event: PageTransitionEvent) => {
+  // Keep the listener alive for bfcache restores; otherwise a tab can return with stale
+  // authenticated UI after another tab has logged out. Cleanup is needed only on final unload.
+  if (event.persisted) return;
+  unsubscribeSessionBoundary();
+  window.removeEventListener("pagehide", onPageHide);
+};
+window.addEventListener("pagehide", onPageHide);
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {

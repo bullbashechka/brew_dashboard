@@ -46,15 +46,19 @@ is served by the Worker, `/api/*` stays on the Worker path, and unknown browser 
 fallback. Playwright needs its local browser installed once with `bunx playwright install chromium`.
 
 Local Worker variables are documented in [.dev.vars.example](.dev.vars.example); keep real values
-in the ignored `.dev.vars` file. The target persistence path is a cache-disabled Cloudflare
-Hyperdrive binding backed by Railway PostgreSQL. Railway's `DATABASE_PUBLIC_URL` is used only to
-create that binding and by local migration/admin commands; it is never a Vite variable or Worker
-environment value. `BETTER_AUTH_SECRET` remains server-only.
+in the ignored `.dev.vars` file. The target persistence path is two cache-disabled Cloudflare
+Hyperdrive bindings backed by Railway PostgreSQL: `AUTH_HYPERDRIVE` is restricted to Better Auth
+tables and `APP_HYPERDRIVE` is restricted to tenant/application tables. Railway's
+`DATABASE_PUBLIC_URL` is used only by migrations, protected admin commands and backup jobs; it is
+never a Vite variable or Worker environment value. `BETTER_AUTH_SECRET` and
+`BACKUP_ENCRYPTION_KEY` remain server/operator secrets.
 
 For local Hyperdrive development, provide
-`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in the shell environment rather than
-committing a connection string. The production `HYPERDRIVE` binding is configured in
-`wrangler.jsonc`; Stage 3 opens a request-scoped connection through that cache-disabled binding.
+`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_AUTH_HYPERDRIVE` and
+`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE` in the shell environment rather
+than committing a connection string. Both may point at the same disposable database locally.
+Direct integration tests may still use their isolated `HYPERDRIVE` override; production requires
+the two named bindings configured in `wrangler.jsonc`.
 
 ## Local integration database
 
@@ -157,34 +161,40 @@ findings still fail the scan.
 
 ## Authentication and account administration (Stage 3)
 
-The Worker exposes only the application auth routes `POST /api/v1/auth/login`,
-`POST /api/v1/auth/logout` and `GET /api/v1/auth/me`. Better Auth's internal handler is mounted
-under a non-public path and is not routed by the Worker. Sessions are database-backed opaque
-cookies; signup, recovery, email confirmation and user-facing password changes are disabled.
+The Worker exposes the application auth routes `POST /api/v1/auth/login`,
+`POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, `POST /api/v1/auth/mfa/setup` and
+`POST /api/v1/auth/mfa/verify`. Better Auth's internal handler is mounted under a non-public path
+and is not routed by the Worker. Sessions are database-backed opaque cookies; signup, recovery,
+email confirmation and user-facing password changes are disabled. Production login also requires
+verified TOTP MFA; backup codes are encrypted at rest and trust-device bypass is disabled.
 Mutating requests must be same-origin JSON and are limited to 256 KiB.
 
 Login protection is server-side: a login alias has at most 10 failed attempts in 15 minutes
 across all IPs, persisted as an HMAC-derived PostgreSQL key. A successful login clears that
-bucket. The Worker additionally applies best-effort per-isolate limits of 50 login requests per
-15 minutes per trusted `CF-Connecting-IP`, 120 authenticated reads/minute/account, 30 ordinary
-mutations/minute/account, and 3 demo resets/hour/account. Browser event telemetry keeps its
-durable 30/minute and 300/day tenant limits. Memory limits intentionally reset on Worker restart;
-the durable login-failure limit does not.
+bucket. The Worker additionally uses a sharded, strongly consistent `RateLimitActor` Durable
+Object for 50 login requests per 15 minutes per trusted `CF-Connecting-IP`, 120 authenticated
+reads/minute/account, 30 ordinary mutations/minute/account, and 3 demo resets/hour/account.
+Browser event telemetry keeps its durable 30/minute and 300/day tenant limits. Missing limiter
+infrastructure fails closed for login/MFA/mutations; authenticated reads use a bounded local
+fallback and emit an alert signal.
 
 Admin commands use the owner/unpooled database URL, never the runtime Hyperdrive role. Login aliases
 are normalized to lowercase and must contain 3–64 Latin letters, digits, `.`, `_` or `-`. A generated
-password is printed once only; use `--interactive-password` to enter one without putting it in shell
-history or echoing it back to the terminal. Production commands additionally require the explicit environment/confirmation gate.
+password is printed once only; password reset never accepts a password argument or interactive
+password flag. Production commands additionally require the explicit environment/confirmation gate.
 
 ```bash
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
   bun run admin:create-user -- --login demo.owner
 
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
-  bun run admin:create-user -- --login test.owner --account-kind e2e --interactive-password
+  bun run admin:create-user -- --login test.owner --account-kind e2e
 
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
   bun run admin:reset-password -- --login demo.owner --account-kind demo --confirm-login demo.owner
+
+DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
+  bun run admin:reset-mfa -- --login demo.owner --account-kind demo --confirm-login demo.owner
 
 DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' \
   bun run admin:disable-user -- --login demo.owner --account-kind demo --confirm-login demo.owner
@@ -230,25 +240,27 @@ DATABASE_MIGRATION_URL='postgresql://owner@localhost/brew_dashboard' bun run db:
 ```
 
 `DATABASE_MIGRATION_URL` (or `DATABASE_PUBLIC_URL`) must be an owner/unpooled connection. Before
-the Worker can use Hyperdrive, apply the migrations and provision the separate non-owner role.
-Set `RUNTIME_DATABASE_PASSWORD` and `DATABASE_MIGRATION_URL` through an interactive prompt or a
-local secret manager, then run:
+the Worker can use Hyperdrive, apply the migrations and provision the two separate non-owner
+roles. Set `AUTH_RUNTIME_DATABASE_PASSWORD`, `APP_RUNTIME_DATABASE_PASSWORD` and
+`DATABASE_MIGRATION_URL` through a local secret manager, then run:
 
 ```bash
-bun run --cwd backend db:provision-runtime
+bun run db:provision-runtime-roles
+bun run db:bootstrap-runtime-roles
 ```
 
-The password is used only by this server-side command and must not be placed in `.dev.vars`, the
-Worker bundle, source control, shell history, process arguments, or logs. The cache-disabled
-Hyperdrive configuration must use a connection string for `brew_runtime`, not the migration owner.
-`brew_runtime` is default-deny: each table receives only the privileges required by the Worker, and
-future tables receive no runtime privileges until a migration grants them explicitly.
+The passwords are used only by this server-side command and must not be placed in `.dev.vars`, the
+Worker bundle, source control, shell history, process arguments, or logs. Create two cache-disabled
+Hyperdrive configurations, one for each role, and bind them as `AUTH_HYPERDRIVE` and
+`APP_HYPERDRIVE`. `brew_auth_runtime` can access only Better Auth tables; `brew_app_runtime` can
+access only tenant/application tables. Both roles are `NOBYPASSRLS` and default-deny; future tables
+receive no runtime privileges until a migration grants them explicitly.
 After Cloudflare authentication, inspect the existing configuration with
 `bun run --cwd webapp wrangler hyperdrive list` and `bun run --cwd webapp wrangler hyperdrive get <id>`;
-create it through the authenticated Cloudflare dashboard or a short-lived local session that does
-not print the connection string. Use `--caching-disabled` when creating or updating the
-configuration. Put only the returned real ID into `wrangler.jsonc` as the `HYPERDRIVE` binding. Do
-not commit a placeholder ID or a connection string.
+create them through the authenticated Cloudflare dashboard or a short-lived local session that does
+not print connection strings. Use `--caching-disabled` when creating or updating each configuration.
+Put only the returned real IDs into `wrangler.jsonc` as the `AUTH_HYPERDRIVE` and `APP_HYPERDRIVE`
+bindings. Do not commit a placeholder ID or a connection string.
 
 After the real binding exists, run the temporary, read-only data-plane check with:
 
@@ -257,33 +269,49 @@ bun run db:smoke:hyperdrive
 ```
 
 The command starts the smoke Worker with `wrangler dev --remote` on loopback, sends a one-time
-token, verifies `SELECT 1`, the `brew_runtime` role, and an empty tenant read without
-`app.network_id`, then terminates the development process. It does not deploy a permanent route or
-create test data. It requires an authenticated Wrangler session and a real `HYPERDRIVE` binding.
+token, verifies `SELECT 1`, the runtime role, and an empty tenant read without `app.network_id`, then
+terminates the development process. It does not deploy a permanent route or create test data. It
+requires an authenticated Wrangler session and real named Hyperdrive bindings.
 
 The integration runner never touches a remote database. Point it at a local PostgreSQL admin URL;
-it creates a random database, applies every migration, runs the RLS/constraint tests, and drops the
-database in a `finally` block:
+it creates a random database, applies every migration, runs the RLS/constraint and mandatory MFA
+state-machine tests, performs an encrypted dump/clean-restore/role-validation drill, and drops the
+databases in `finally` blocks:
 
 ```bash
 bun run test:integration:docker
 ```
 
-Production release order is: apply migrations with the unpooled owner URL, smoke-test the database
-and API, then deploy the Worker. Backups and disaster-recovery automation are out of scope for the
-Demo MVP on Railway Hobby; the real Hyperdrive binding remains environment configuration rather
-than a checked-in secret.
+Production release order is: apply migrations with the unpooled owner URL (stage A), provision and
+verify both runtime roles with two distinct cache-disabled Hyperdrive configurations (stage B),
+deploy and verify the split-binding Worker with `bun run release:deploy-stage-b` while legacy remains
+available (stage B), revoke the legacy role and rerun the smoke check (stage C), then deploy the
+final Worker. `release:deploy`
+refuses stages A and B. The encrypted backup and restore runbook is in
+[`docs/backup-recovery.md`](docs/backup-recovery.md); backup keys and artifacts remain outside the
+Worker and repository.
 
 For the release load gate, run `bun run test:load:release` only against localhost or a staging host
-explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL` and provide 15
-dedicated session-cookie headers as JSON in `RELEASE_LOAD_SESSION_COOKIES` to exercise the 20 RPS
-authenticated-read phase without exceeding the per-account limiter. It rotates `/auth/me`,
-`/overview` and `/locations`, reports p95 per route, and fails on any unexpected HTTP response,
-network failure, aggregate p95 above 750 ms, or per-route p95 above 750 ms.
+explicitly supplied as `RELEASE_LOAD_ALLOW_HOST`. Set `RELEASE_LOAD_BASE_URL` and provide at least
+10 session-cookie headers from distinct demo accounts as JSON in `RELEASE_LOAD_SESSION_COOKIES`.
+The gate first sends
+10 simultaneous authenticated Overview requests, then exercises the default 10 RPS authenticated
+read phase without exceeding the per-account limiter. It rotates `/auth/me`, `/overview` and
+`/locations`, reports p95 per route, and fails on any unexpected HTTP response, network failure,
+aggregate p95 above 750 ms, or per-route p95 above 750 ms. Override the concurrency with
+`RELEASE_LOAD_CONCURRENT_AUTHENTICATED_USERS` when testing a larger cohort.
+
+Migrations `0013_disable-runtime-jit.sql` and `0024_disable-split-runtime-jit.sql` disable
+PostgreSQL JIT for the legacy and split runtime roles. Keep this setting for the request-scoped
+Worker workload: dashboard aggregates finish faster than their per-connection compilation cost,
+and enabling JIT caused concurrent Overview reads to hit the statement timeout. Apply the migrations
+before deploying this Worker change.
 
 Manual release procedure (there is deliberately no hosted CI/Actions) is documented in
 [`docs/production-release.md`](docs/production-release.md). Run `bun run release:verify`, apply
 migrations with the owner connection, run `bun run db:smoke:hyperdrive`, and deploy only through
 `bun run release:deploy`. `BETTER_AUTH_URL` is a non-secret Worker variable; `BETTER_AUTH_SECRET`
-remains a Cloudflare Secret. Keep the previous deployment available for Wrangler rollback if the
-post-deploy checks fail.
+remains a Cloudflare Secret. For first-time initialization of an already-created Worker, use
+`bun run release:bootstrap-auth-secret -- --confirm-production production`; it never rotates an
+existing value. Keep the previous deployment available for Wrangler rollback if post-deploy checks
+fail.

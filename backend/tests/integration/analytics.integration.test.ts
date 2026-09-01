@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import {
   apiErrorResponseSchema,
   inventoryMovementMutationResponseSchema,
@@ -21,12 +21,13 @@ import { createInventoryMovement } from "../../src/inventory/service.ts";
 
 const ownerUrl = process.env.DATABASE_TEST_URL;
 const runtimeUrl = process.env.DATABASE_TEST_RUNTIME_URL;
-const baseUrl = process.env.BETTER_AUTH_URL ?? "https://brew-dashboard.test";
+const baseUrl = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:4173";
 const secret = process.env.BETTER_AUTH_SECRET ?? "stage5-integration-secret-".padEnd(32, "x");
 const environment = {
   HYPERDRIVE: { connectionString: runtimeUrl ?? "" } as Hyperdrive,
   BETTER_AUTH_SECRET: secret,
   BETTER_AUTH_URL: baseUrl,
+  MFA_REQUIRED: "0",
 };
 
 type TestAccount = Awaited<ReturnType<typeof createAccount>>;
@@ -108,8 +109,8 @@ describeIntegration("Stage 5 analytics API", () => {
     await ownerClient.connect();
   });
 
-  afterAll(async () => {
-    for (const account of accounts.reverse()) {
+  afterEach(async () => {
+    for (const account of accounts.splice(0).reverse()) {
       try {
         await withRequestDatabase(ownerUrl!, (db) =>
           deleteAccount(db, {
@@ -121,6 +122,9 @@ describeIntegration("Stage 5 analytics API", () => {
         // Cleanup must remain best-effort if a preceding assertion failed.
       }
     }
+  }, 60_000);
+
+  afterAll(async () => {
     await ownerClient.end();
   }, 60_000);
 
@@ -200,6 +204,56 @@ describeIntegration("Stage 5 analytics API", () => {
     );
     expect(after.rows[0]).toEqual(before.rows[0]);
   }, 60_000);
+
+  it("serves dashboard reads for ten concurrent authenticated sessions", async () => {
+    const first = await createOnboarded(
+      `stage5-concurrency-${crypto.randomUUID().slice(0, 8)}`,
+      "Stage Five Concurrency",
+    );
+    const additionalCookies = await Promise.all(
+      Array.from({ length: 9 }, async (_, index) => {
+        const loginResponse = await app.request(
+          new URL("/api/v1/auth/login", baseUrl),
+          {
+            method: "POST",
+            headers: new Headers({
+              origin: baseUrl,
+              "content-type": "application/json",
+              "cf-connecting-ip": `203.0.113.${index + 20}`,
+            }),
+            body: JSON.stringify({
+              login: first.account.login,
+              password: first.account.password,
+            }),
+          },
+          environment,
+        );
+        expect(loginResponse.status).toBe(200);
+        const cookie = cookieFrom(loginResponse);
+        if (!cookie) throw new Error("Expected concurrent analytics session cookie");
+        return cookie;
+      }),
+    );
+    const cookies = [first.cookie, ...additionalCookies];
+
+    const responses = await Promise.all(
+      cookies.map(async (cookie, index) => {
+        const ip = `203.0.113.${index + 40}`;
+        const [overview, locations] = await Promise.all([
+          request("/api/v1/overview?period=today", cookie, {}, ip),
+          request("/api/v1/locations?period=today", cookie, {}, ip),
+        ]);
+        return { overview, locations };
+      }),
+    );
+
+    for (const response of responses) {
+      expect(response.overview.status).toBe(200);
+      expect(response.locations.status).toBe(200);
+      overviewResponseSchema.parse(await response.overview.json());
+      locationsResponseSchema.parse(await response.locations.json());
+    }
+  }, 120_000);
 
   it("keeps cursor continuation stable and rejects a tampered token", async () => {
     const first = await createOnboarded(

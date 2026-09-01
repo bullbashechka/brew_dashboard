@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import { parsePostgresUrl, postgresClientConfiguration } from "./postgres-cli.ts";
 import { isLoopbackHostname } from "../src/security/hosts.ts";
 
 const migrationUrl = process.env.DATABASE_MIGRATION_URL;
@@ -13,13 +14,15 @@ if (!runtimePassword || runtimePassword.length < 24) {
 }
 const hostname = new URL(databaseUrl).hostname;
 const isLoopback = isLoopbackHostname(hostname);
-if (!isLoopback && process.env.ALLOW_PRODUCTION_MIGRATIONS !== "1") {
+if (!isLoopback) {
   throw new Error(
-    "Non-local role provisioning requires ALLOW_PRODUCTION_MIGRATIONS=1; use a loopback DATABASE_MIGRATION_URL for local databases",
+    "Legacy brew_runtime provisioning is disabled for non-local databases; use db:provision-runtime-roles",
   );
 }
 
-const client = new Client({ connectionString: databaseUrl });
+const client = new Client(
+  await postgresClientConfiguration(parsePostgresUrl(databaseUrl, "migration database URL")),
+);
 await client.connect();
 
 try {

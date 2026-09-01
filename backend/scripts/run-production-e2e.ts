@@ -9,13 +9,19 @@ import {
   requireProductionAdmin,
   withAdminDatabase,
 } from "./admin-common.ts";
-import { parseProductionBaseUrl, parseProductionE2eLogin } from "./production-e2e-guard.ts";
+import {
+  assertProductionHealth,
+  parseProductionBaseUrl,
+  parseProductionE2eLogin,
+} from "./production-e2e-guard.ts";
+import { createChildEnvironment } from "./child-environment.ts";
 
 const argumentsMap = parseAdminArguments(["--login", "--confirm-production"]);
 const databaseUrl = readAdminDatabaseUrl();
 requireProductionAdmin(databaseUrl, argumentsMap.get("--confirm-production"));
 const login = parseProductionE2eLogin(argumentsMap.get("--login"));
 const baseUrl = parseProductionBaseUrl(process.env.PRODUCTION_E2E_BASE_URL);
+await assertProductionHealth(baseUrl);
 const password = await readInteractivePassword();
 
 const account = await withAdminDatabase(async (db) => {
@@ -33,24 +39,12 @@ if (!account || account.accountKind !== "e2e" || account.status !== "active") {
 }
 
 const webappDirectory = fileURLToPath(new URL("../../webapp/", import.meta.url));
-const childEnvironment = { ...process.env };
-for (const name of [
-  "DATABASE_MIGRATION_URL",
-  "DATABASE_PUBLIC_URL",
-  "DATABASE_URL",
-  "PGPASSWORD",
-  "RUNTIME_DATABASE_PASSWORD",
-  "BETTER_AUTH_SECRET",
-  "CLOUDFLARE_API_TOKEN",
-  "CLOUDFLARE_API_KEY",
-  "CF_API_TOKEN",
-]) {
-  delete childEnvironment[name];
-}
-childEnvironment.E2E_PRODUCTION = "1";
-childEnvironment.E2E_PRODUCTION_BASE_URL = baseUrl;
-childEnvironment.E2E_PRODUCTION_LOGIN = login;
-childEnvironment.E2E_PRODUCTION_PASSWORD = password;
+const childEnvironment = createChildEnvironment(process.env, {
+  E2E_PRODUCTION: "1",
+  E2E_PRODUCTION_BASE_URL: baseUrl,
+  E2E_PRODUCTION_LOGIN: login,
+  E2E_PRODUCTION_PASSWORD: password,
+});
 
 try {
   const abortController = new AbortController();

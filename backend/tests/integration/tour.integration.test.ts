@@ -14,12 +14,13 @@ import { app } from "../../src/index.ts";
 
 const ownerUrl = process.env.DATABASE_TEST_URL;
 const runtimeUrl = process.env.DATABASE_TEST_RUNTIME_URL;
-const baseUrl = process.env.BETTER_AUTH_URL ?? "https://brew-dashboard.test";
+const baseUrl = process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:4173";
 const secret = process.env.BETTER_AUTH_SECRET ?? "stage7-integration-secret-".padEnd(32, "x");
 const environment = {
   HYPERDRIVE: { connectionString: runtimeUrl ?? "" } as Hyperdrive,
   BETTER_AUTH_SECRET: secret,
   BETTER_AUTH_URL: baseUrl,
+  MFA_REQUIRED: "0",
 };
 
 type TestAccount = Awaited<ReturnType<typeof createAccount>>;

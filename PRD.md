@@ -108,8 +108,9 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 - казахская локализация;
 - landing page, платежи и подписки;
 - staging, preview deployments и отдельная remote test database;
-- production SLA, point-in-time recovery, off-site backup automation и полноценная
-  observability-платформа.
+- production SLA, полноценная point-in-time recovery automation и managed observability-платформа.
+  При этом минимальная encrypted backup/recovery процедура из раздела 21 обязательна для
+  production release.
 
 ## 4. Технологическая основа
 
@@ -138,12 +139,17 @@ Brew Dashboard — закрытое адаптивное веб-демо для 
 - неизвестные статические маршруты получают SPA fallback на `index.html`;
 - React обращается только к Hono API того же origin;
 - браузер не обращается к PostgreSQL напрямую;
-- Hono подключается к Railway PostgreSQL через cache-disabled Cloudflare Hyperdrive binding и Drizzle;
+- Hono подключается к Railway PostgreSQL через два cache-disabled Cloudflare Hyperdrive binding:
+  `AUTH_HYPERDRIVE` для Better Auth и `APP_HYPERDRIVE` для tenant/application tables;
 - Railway `DATABASE_PUBLIC_URL` используется только для создания Hyperdrive configuration, migrations и защищённых admin commands и никогда не попадает в Worker или Vite bundle;
 - Better Auth secret хранится только в Cloudflare Secrets и никогда не попадает в Vite bundle;
 - Hono проверяет database-backed Better Auth session и получает `network_id` только из server-side профиля пользователя;
 - каждый бизнес-запрос явно ограничивается текущим `network_id`;
 - runtime database role не владеет tenant tables и не имеет `BYPASSRLS`; tenant context задаётся через transaction-local `app.network_id`;
+- auth/app runtime roles не имеют лишних schema privileges, а legacy `brew_runtime` отзывается до
+  финального production deploy;
+- login, authenticated reads и mutations защищены отдельными distributed fixed-window limits в
+  strongly-consistent Durable Object; при недоступности критический auth/mutation path fail-closed;
 - Drizzle schema является источником database types, а сгенерированные versioned SQL migrations применяются отдельно;
 - Zod-схемы в `packages/contracts` являются источником API-контрактов;
 - время хранится в UTC и показывается в IANA timezone сети.
@@ -549,10 +555,10 @@ Browser-facing `POST /events` принимает только `section_viewed` �
 
 ### 13.1. Auth и tenancy
 
-| Таблица            | Ключевые поля                                                                                                                                                   |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry                                                        |
-| `app_users`        | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at`, `tour_skipped_at` |
+| Таблица            | Ключевые поля                                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Better Auth tables | server-only user/account/session state, internal email, username alias, credential hash и session expiry                                                                                                            |
+| `app_users`        | `auth_user_id` → Better Auth user, `login_normalized UNIQUE`, `network_id UNIQUE`, `status`, `account_kind`, `expires_at`, `last_login_at`, `tour_completed_at`, `tour_skipped_at`                                  |
 | `networks`         | nullable до onboarding `name`, `owner_name`, `country_code`, `currency_code`, `timezone`, `language`, `onboarding_completed_at`; `demo_generated_for_date`, `demo_data_revision`, existing `demo_generator_version` |
 
 `account_kind`: `demo | e2e`.
@@ -572,7 +578,7 @@ Browser-facing `POST /events` принимает только `section_viewed` �
 | `revenue_targets`     | `network_id`, `month`, `amount`, UNIQUE network/month                                              |
 | `feedback_responses`  | `network_id UNIQUE`, `rating`, `comment`, `desired_features`, `submitted_at`, `updated_at`         |
 | `product_events`      | `network_id`, `user_id`, `type`, `route`, `metadata`, `occurred_at`                                |
-| `demo_generations`    | `network_id`, `generated_for_date`, `seed`, `version`, immutable UTC anchor in `created_at`          |
+| `demo_generations`    | `network_id`, `generated_for_date`, `seed`, `version`, immutable UTC anchor in `created_at`        |
 
 Все business tables используют UUID, `created_at`/`updated_at` по необходимости и обязательный `network_id`. Soft delete отсутствует.
 
@@ -607,14 +613,16 @@ physical relation size до запуска (`relationBytesBefore`), без event
 
 ### 14.1. Auth и onboarding
 
-| Method | Route                  | Назначение                               |
-| ------ | ---------------------- | ---------------------------------------- |
-| `GET`  | `/health`              | Smoke-check Worker и доступности API     |
-| `POST` | `/auth/login`          | Вход по login alias и password           |
-| `POST` | `/auth/logout`         | Logout и очистка cookies                 |
-| `GET`  | `/auth/me`             | Профиль, язык, tour и onboarding state   |
-| `PUT`  | `/onboarding/language` | Сохранить первый язык                    |
-| `POST` | `/onboarding/complete` | Сохранить сеть/точки и создать demo data |
+| Method | Route                  | Назначение                                       |
+| ------ | ---------------------- | ------------------------------------------------ |
+| `GET`  | `/health`              | Smoke-check Worker и доступности API             |
+| `POST` | `/auth/login`          | Вход по login alias и password                   |
+| `POST` | `/auth/logout`         | Logout и очистка cookies                         |
+| `GET`  | `/auth/me`             | Профиль, язык, tour и onboarding state           |
+| `POST` | `/auth/mfa/setup`      | Создать TOTP enrollment для текущей сессии       |
+| `POST` | `/auth/mfa/verify`     | Подтвердить TOTP или backup code и выдать сессию |
+| `PUT`  | `/onboarding/language` | Сохранить первый язык                            |
+| `POST` | `/onboarding/complete` | Сохранить сеть/точки и создать demo data         |
 
 ### 14.2. Аналитика
 
@@ -632,17 +640,17 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 
 ### 14.3. Разрешённые mutations
 
-| Method  | Route                        | Назначение                       |
-| ------- | ---------------------------- | -------------------------------- |
-| `PATCH` | `/products/:productId/price` | Изменить current selling price   |
-| `POST`  | `/inventory/movements`       | Создать `receipt` или `writeoff` |
-| `PUT`   | `/settings/revenue-goal`     | Upsert цели текущего месяца      |
-| `PUT`   | `/settings/language`         | Изменить язык                    |
-| `PUT`   | `/settings/tour`             | Сохранить tour state             |
-| `GET`   | `/feedback`                  | Получить текущий ответ           |
-| `PUT`   | `/feedback`                  | Upsert текущего ответа           |
+| Method  | Route                        | Назначение                              |
+| ------- | ---------------------------- | --------------------------------------- |
+| `PATCH` | `/products/:productId/price` | Изменить current selling price          |
+| `POST`  | `/inventory/movements`       | Создать `receipt` или `writeoff`        |
+| `PUT`   | `/settings/revenue-goal`     | Upsert цели текущего месяца             |
+| `PUT`   | `/settings/language`         | Изменить язык                           |
+| `PUT`   | `/settings/tour`             | Сохранить tour state                    |
+| `GET`   | `/feedback`                  | Получить текущий ответ                  |
+| `PUT`   | `/feedback`                  | Upsert текущего ответа                  |
 | `POST`  | `/events`                    | Записать client navigation/filter event |
-| `POST`  | `/demo/reset`                | Восстановить исходный набор      |
+| `POST`  | `/demo/reset`                | Восстановить исходный набор             |
 
 Других business mutations в Demo MVP нет.
 
@@ -758,6 +766,10 @@ Analytics endpoints принимают `locationId`, `period` и cursor/page п�
 - Zod validation и database constraints;
 - все business queries scoped по server-derived `network_id`;
 - feedback text не попадает в application logs или product event metadata;
+- production login требует verified TOTP MFA, доверенные устройства не используются, а brute-force
+  verification блокируется на короткое окно;
+- backup artifacts шифруются вне Worker, регулярно верифицируются и восстанавливаются в изолированное
+  окружение по runbook из раздела 21;
 - `bun audit` запускается перед release.
 
 ## 19. Наблюдаемость
@@ -834,7 +846,7 @@ Integration tests используют изолированную локальн
 
 - один Cloudflare Worker;
 - один Railway Hobby PostgreSQL service;
-- одна cache-disabled Cloudflare Hyperdrive configuration;
+- две cache-disabled Cloudflare Hyperdrive configurations: `AUTH_HYPERDRIVE` и `APP_HYPERDRIVE`;
 - бесплатный `*.workers.dev` URL;
 - одна production remote database; integration tests используют только локальную изолированную PostgreSQL;
 - staging, preview и отдельная remote test database отсутствуют.
@@ -848,12 +860,20 @@ Cloudflare configuration:
 - compatibility date зафиксирована;
 - Observability включён;
 - Cron Triggers отсутствуют;
-- Hyperdrive создаётся из Railway `DATABASE_PUBLIC_URL`; database credentials не дублируются в Worker variables;
+- Hyperdrive configurations создаются из Railway `DATABASE_PUBLIC_URL`; database credentials не
+  дублируются в Worker variables;
 - `BETTER_AUTH_SECRET` находится в Cloudflare Secrets, а non-secret base URL — в Worker environment;
-- production migrations применяются вручную до совместимого Worker release.
+- production migrations применяются вручную до совместимого Worker release;
+- role split выполняется по стадиям A → B → C: миграции, две distinct runtime roles/Hyperdrive
+  bindings, обязательный живой Stage B Worker как rollback target, затем отзыв `brew_runtime`;
+  финальный release gate принимает только stage C;
+- release gate включает `bun run release:verify`, typecheck, lint/format, unit/contract tests,
+  production build, audit, secret scan, непосредственно предшествующий deploy Hyperdrive/RLS smoke
+  и подтверждённый encrypted backup/clean-restore drill.
 
-Railway-native backups, point-in-time recovery и иная disaster-recovery автоматизация находятся
-за пределами Demo MVP и не являются release prerequisite для Hobby-плана.
+Railway-native snapshots и encrypted off-site backup/recovery являются минимальным operational
+контролем для production. Полноценные SLA, point-in-time recovery automation и managed disaster
+recovery остаются за пределами Demo MVP и возможностей Hobby-плана.
 
 Release gate:
 
@@ -862,7 +882,11 @@ Release gate:
 3. успешный production build;
 4. применённые migrations;
 5. smoke-check `/api/v1/health`;
-6. smoke-check login, Overview и feedback на e2e account.
+6. smoke-check login, mandatory MFA, Overview и feedback на e2e account;
+7. подтверждённые две runtime roles, exact-grant/RLS smoke, здоровый Stage B rollback target и
+   stage C с отозванным legacy role;
+8. успешные `bun run audit`, `bun run security:scan` и `bun run backup:verify` для последнего
+   encrypted artifact.
 
 ## 22. Критерии готовности Demo MVP
 
@@ -879,7 +903,12 @@ Demo MVP готов, когда:
 - feedback и product events сохраняются с tenant scope;
 - два аккаунта не видят и не изменяют данные друг друга;
 - основной путь работает на desktop и mobile;
-- приложение развернуто на `workers.dev` с одним Railway PostgreSQL service и Hyperdrive binding;
+- приложение развернуто на `workers.dev` с одним Railway PostgreSQL service и двумя role-scoped
+  Hyperdrive bindings;
+- production login защищён mandatory verified TOTP MFA, а auth/mutation rate limits не зависят от
+  памяти одного Worker instance;
+- последний encrypted backup artifact проходит checksum/authentication verification и monthly
+  restore drill зафиксирован в operational log;
 - в UI отсутствуют функции, заявленные как out of scope;
 - можно выдать 15 персональных доступов и оценить достижение цели «три заинтересованных владельца».
 

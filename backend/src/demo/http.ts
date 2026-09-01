@@ -18,7 +18,6 @@ export const resetDemoHandler = async (context: Context<AppEnvironment>) => {
   const result = await resetDemoData(context.get("database"), {
     authUserId: auth.authUserId,
     networkId: auth.networkId,
-    sessionId: auth.sessionId,
     idempotencyKey: request.idempotencyKey,
     startedAt,
   });

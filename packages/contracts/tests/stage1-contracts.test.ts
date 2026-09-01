@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  authMeResponseSchema,
   analyticsQuerySchema,
   analyticsMetaSchema,
   inventoryQuerySchema,
@@ -42,6 +43,21 @@ describe("Stage 1 shared contracts", () => {
     ).toBe(false);
     expect(
       loginRequestSchema.safeParse({ login: "x", password: "long-enough-password" }).success,
+    ).toBe(false);
+  });
+
+  it("keeps the pre-MFA reload contract free of tenant identity", () => {
+    const envelope = {
+      data: { mfaSetupRequired: true as const },
+      meta: {},
+      requestId: UUID,
+    };
+    expect(authMeResponseSchema.safeParse(envelope).success).toBe(true);
+    expect(
+      authMeResponseSchema.safeParse({
+        ...envelope,
+        data: { ...envelope.data, networkId: UUID, userId: UUID },
+      }).success,
     ).toBe(false);
   });
 

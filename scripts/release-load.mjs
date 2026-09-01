@@ -23,14 +23,18 @@ const positiveInteger = (name, fallback) => {
 const durationSeconds = positiveInteger("RELEASE_LOAD_DURATION_SECONDS", 600);
 const publicRequestsPerSecond = positiveInteger("RELEASE_LOAD_PUBLIC_RPS", 4);
 const publicBurstRequestsPerSecond = positiveInteger("RELEASE_LOAD_PUBLIC_BURST_RPS", 16);
-const authenticatedRequestsPerSecond = positiveInteger("RELEASE_LOAD_AUTHENTICATED_RPS", 20);
+const authenticatedRequestsPerSecond = positiveInteger("RELEASE_LOAD_AUTHENTICATED_RPS", 10);
+const concurrentAuthenticatedUsers = positiveInteger(
+  "RELEASE_LOAD_CONCURRENT_AUTHENTICATED_USERS",
+  10,
+);
 const cookies = JSON.parse(process.env.RELEASE_LOAD_SESSION_COOKIES ?? "[]");
 if (!Array.isArray(cookies) || !cookies.every((cookie) => typeof cookie === "string" && cookie)) {
   throw new Error("RELEASE_LOAD_SESSION_COOKIES must be a JSON array of non-empty cookie headers");
 }
-if (cookies.length > 0 && cookies.length < 15) {
+if (cookies.length > 0 && cookies.length < concurrentAuthenticatedUsers) {
   throw new Error(
-    "Provide session cookies for all 15 demo accounts to keep the per-account read limit intact",
+    `Provide at least ${concurrentAuthenticatedUsers} session cookies for the concurrent-user gate`,
   );
 }
 
@@ -85,6 +89,11 @@ const publicLoad = (async () => {
 })();
 const authenticatedLoad = cookies.length
   ? (async () => {
+      await Promise.all(
+        cookies
+          .slice(0, concurrentAuthenticatedUsers)
+          .map((cookie) => request("/api/v1/overview?period=today", cookie)),
+      );
       let cookieIndex = 0;
       let routeIndex = 0;
       const routes = [
@@ -121,6 +130,7 @@ console.log(
     unexpectedResponsesOrNetworkFailures: unexpectedFailures,
     failureRate,
     authenticatedLoadIncluded: Boolean(cookies.length),
+    concurrentAuthenticatedUsers: cookies.length ? concurrentAuthenticatedUsers : 0,
   }),
 );
 

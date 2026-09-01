@@ -1,10 +1,18 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { Profile } from "@brew-dashboard/contracts";
 
 import { completeOnboarding, login, saveOnboardingLanguage } from "@/api/first-run";
-import { sessionQueryKey } from "@/api/session";
-import { LanguageForm, LoginForm, OnboardingForm } from "@/components/first-run-forms";
+import { startMfaSetup, verifyMfa } from "@/api/mfa";
+import { profileFromAuthState, sessionQueryKey, type AuthState } from "@/api/session";
+import {
+  LanguageForm,
+  LoginForm,
+  MfaChallengeForm,
+  MfaSetupForm,
+  OnboardingForm,
+} from "@/components/first-run-forms";
 import { FirstRunPage } from "@/components/first-run-page";
 import { localeFromProfile, translate } from "@/lib/i18n";
 
@@ -21,6 +29,28 @@ export function LoginPage() {
     select: (state) => state.location.search as { redirect?: unknown },
   });
   const locale = "en" as const;
+  const [mfaMethods, setMfaMethods] = useState<("totp" | "backup")[] | null>(null);
+  if (mfaMethods) {
+    return (
+      <FirstRunPage
+        locale={locale}
+        title={translate(locale, "mfa.title")}
+        description={translate(locale, "mfa.challenge")}
+      >
+        <MfaChallengeForm
+          locale={locale}
+          methods={mfaMethods}
+          onSubmit={async (method, code) => {
+            const response = await verifyMfa(method, code);
+            const profile = response.data.profile;
+            queryClient.setQueryData(sessionQueryKey, profile);
+            setMfaMethods(null);
+            await navigate(nextDestination(profile));
+          }}
+        />
+      </FirstRunPage>
+    );
+  }
   return (
     <FirstRunPage
       locale={locale}
@@ -31,6 +61,15 @@ export function LoginPage() {
         locale={locale}
         onSubmit={async (values) => {
           const response = await login(values);
+          if ("mfaRequired" in response.data) {
+            setMfaMethods(response.data.methods);
+            return;
+          }
+          if ("mfaSetupRequired" in response.data) {
+            queryClient.setQueryData(sessionQueryKey, response.data);
+            await navigate({ to: "/mfa/setup", replace: true });
+            return;
+          }
           const profile = response.data.profile;
           queryClient.setQueryData(sessionQueryKey, profile);
           const destination = nextDestination(profile);
@@ -43,6 +82,35 @@ export function LoginPage() {
             return;
           }
           await navigate(destination);
+        }}
+      />
+    </FirstRunPage>
+  );
+}
+
+export function MfaSetupPage() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const profile = profileFromAuthState(
+    queryClient.getQueryData<AuthState>(sessionQueryKey) ?? null,
+  );
+  const locale = localeFromProfile(profile);
+  return (
+    <FirstRunPage
+      locale={locale}
+      title={translate(locale, "mfa.title")}
+      description={translate(locale, "mfa.setupInstructions")}
+    >
+      <MfaSetupForm
+        locale={locale}
+        onSetup={async (password) => {
+          const response = await startMfaSetup(password);
+          return response.data;
+        }}
+        onVerify={async (code) => {
+          const response = await verifyMfa("totp", code);
+          queryClient.setQueryData(sessionQueryKey, response.data.profile);
+          await navigate({ ...nextDestination(response.data.profile), replace: true });
         }}
       />
     </FirstRunPage>

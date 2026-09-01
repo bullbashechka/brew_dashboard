@@ -23,6 +23,7 @@ import {
 import { localeFromProfile, translate } from "@/lib/i18n";
 import { recordFeedbackMutation } from "@/lib/feedback-prompt";
 import { useResetDemoData } from "@/lib/reset-demo";
+import { acquireLogoutLock, announceLogout, releaseLogoutLock } from "@/lib/session-boundary";
 
 const normalizeGoal = (value: string) => {
   if (!/^(?:0|[1-9]\d{0,11})(?:\.\d{0,2})?$/u.test(value)) return null;
@@ -123,12 +124,19 @@ export function SettingsPage({
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
-    onSuccess: async () => {
+    onSettled: async () => {
+      releaseLogoutLock();
       await queryClient.cancelQueries();
       queryClient.clear();
       await onLoggedOut();
     },
   });
+
+  const startLogout = () => {
+    if (!acquireLogoutLock()) return;
+    announceLogout();
+    logoutMutation.mutate();
+  };
 
   const serverGoal = currentGoal?.target ?? "0.00";
   const displayedGoal = goalDirty ? goal : serverGoal;
@@ -352,7 +360,7 @@ export function SettingsPage({
           variant="outline"
           pending={logoutMutation.isPending}
           pendingLabel={translate(locale, "states.loading")}
-          onClick={() => logoutMutation.mutate()}
+          onClick={startLogout}
         >
           {translate(locale, "actions.logout")}
         </PendingButton>

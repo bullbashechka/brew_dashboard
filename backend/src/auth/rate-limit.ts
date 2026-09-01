@@ -4,6 +4,9 @@ import { type RequestTransaction } from "../db/client.ts";
 import { consumeFixedWindow, inspectFixedWindow, clearFixedWindow } from "../db/rate-limit.ts";
 import { authRateLimits } from "../db/schema.ts";
 import { consumeMemoryFixedWindow, rateLimitKey, trustedClientIp } from "../http/rate-limit.ts";
+import { consumeDurableRateLimit } from "../http/rate-limit-actor.ts";
+import type { WorkerBindings } from "../http/types.ts";
+import { allowsLocalRateLimitFallback } from "./mfa-policy.ts";
 
 export const LOGIN_WINDOW_SECONDS = 15 * 60;
 export const LOGIN_ACCOUNT_MAX_FAILURES = 10;
@@ -33,6 +36,38 @@ export const consumeLoginIpRateLimit = (secret: string, ipAddress: string | unde
     max: LOGIN_IP_MAX_ATTEMPTS,
   });
 
+export const consumeLoginIpRateLimitDistributed = (
+  bindings: WorkerBindings,
+  secret: string,
+  ipAddress: string | undefined,
+) => {
+  const key = loginIpRateLimitKey(secret, ipAddress ?? "unknown");
+  // Unit/integration workers intentionally omit production-only bindings. A production MFA or
+  // split-runtime deployment with a missing DO is a deployment error and must fail closed.
+  if (
+    !bindings.RATE_LIMIT_ACTOR &&
+    !bindings.AUTH_HYPERDRIVE &&
+    !bindings.APP_HYPERDRIVE &&
+    allowsLocalRateLimitFallback(bindings)
+  ) {
+    return Promise.resolve({
+      status: "ok" as const,
+      result: consumeMemoryFixedWindow({
+        key,
+        windowSeconds: LOGIN_WINDOW_SECONDS,
+        max: LOGIN_IP_MAX_ATTEMPTS,
+      }),
+    });
+  }
+  return consumeDurableRateLimit(
+    bindings.RATE_LIMIT_ACTOR,
+    secret,
+    key,
+    LOGIN_WINDOW_SECONDS,
+    LOGIN_IP_MAX_ATTEMPTS,
+  );
+};
+
 export const consumeAuthenticatedRequestRateLimit = (
   secret: string,
   authUserId: string,
@@ -56,6 +91,54 @@ export const consumeAuthenticatedRequestRateLimit = (
       : AUTHENTICATED_READ_MAX_REQUESTS;
   const key = rateLimitKey(secret, scope, authUserId);
   return { scope, key, ...consumeMemoryFixedWindow({ key, windowSeconds, max }) };
+};
+
+export const consumeAuthenticatedRequestRateLimitDistributed = (
+  bindings: WorkerBindings,
+  secret: string,
+  authUserId: string,
+  method: string,
+  path: string,
+): Promise<
+  | null
+  | { status: "unavailable"; error: unknown }
+  | {
+      status: "ok";
+      result: { scope: string; key: string; allowed: boolean; retryAfter: number | null };
+    }
+> => {
+  if (path.endsWith("/events")) return Promise.resolve(null);
+  const isReset = path.endsWith("/demo/reset");
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+  const scope = isReset ? "demo-reset" : isMutation ? "api-mutation" : "api-read";
+  const windowSeconds = isReset
+    ? DEMO_RESET_WINDOW_SECONDS
+    : isMutation
+      ? AUTHENTICATED_MUTATION_WINDOW_SECONDS
+      : AUTHENTICATED_READ_WINDOW_SECONDS;
+  const max = isReset
+    ? DEMO_RESET_MAX_REQUESTS
+    : isMutation
+      ? AUTHENTICATED_MUTATION_MAX_REQUESTS
+      : AUTHENTICATED_READ_MAX_REQUESTS;
+  const key = rateLimitKey(secret, scope, authUserId);
+  if (
+    !bindings.RATE_LIMIT_ACTOR &&
+    !bindings.AUTH_HYPERDRIVE &&
+    !bindings.APP_HYPERDRIVE &&
+    allowsLocalRateLimitFallback(bindings)
+  ) {
+    return Promise.resolve({
+      status: "ok" as const,
+      result: { ...consumeMemoryFixedWindow({ key, windowSeconds, max }), scope, key },
+    });
+  }
+  return consumeDurableRateLimit(bindings.RATE_LIMIT_ACTOR, secret, key, windowSeconds, max).then(
+    (result) =>
+      result.status === "ok"
+        ? { status: "ok" as const, result: { ...result.result, scope, key } }
+        : result,
+  );
 };
 
 const cleanupExpiredRateLimits = async (transaction: RequestTransaction, nowMs: number) => {

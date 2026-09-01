@@ -16,6 +16,23 @@ const en = {
     pending: "Signing in…",
     invalidCredentials: "Invalid login or password.",
   },
+  mfa: {
+    title: "Secure your account",
+    challenge: "Enter the code from your authenticator app or a backup code.",
+    method: "Verification method",
+    totp: "Authenticator app",
+    backup: "Backup code",
+    code: "Authenticator code",
+    backupCode: "Backup code",
+    verify: "Verify code",
+    pending: "Verifying…",
+    startSetup: "Start setup",
+    setupInstructions:
+      "Save the secret or otpauth URI in your authenticator app. Store the backup codes offline, then enter the six-digit code.",
+    secret: "Manual secret",
+    uri: "otpauth URI",
+    backupCodes: "Backup codes (save them once)",
+  },
   language: {
     title: "Choose your language",
     description: "You can change this later in Settings.",
@@ -345,6 +362,23 @@ const ru: typeof en = {
     submit: "Войти",
     pending: "Выполняется вход…",
     invalidCredentials: "Неверный логин или пароль.",
+  },
+  mfa: {
+    title: "Защитите аккаунт",
+    challenge: "Введите код из приложения-аутентификатора или резервный код.",
+    method: "Способ проверки",
+    totp: "Приложение-аутентификатор",
+    backup: "Резервный код",
+    code: "Код аутентификатора",
+    backupCode: "Резервный код",
+    verify: "Проверить код",
+    pending: "Проверяем…",
+    startSetup: "Начать настройку",
+    setupInstructions:
+      "Сохраните секрет или otpauth URI в приложении-аутентификаторе. Сохраните резервные коды офлайн, затем введите шестизначный код.",
+    secret: "Секрет вручную",
+    uri: "otpauth URI",
+    backupCodes: "Резервные коды (сохраните их один раз)",
   },
   language: {
     title: "Выберите язык",
@@ -754,6 +788,7 @@ export const errorTranslationKey = (code?: ApiErrorCode): TranslationKey => {
     CONFLICT: "errors.conflict",
     RATE_LIMITED: "errors.rateLimited",
     INTERNAL_ERROR: "errors.generic",
+    MFA_REQUIRED: "mfa.title",
   };
   return code ? mapping[code] : "errors.generic";
 };

@@ -103,6 +103,7 @@ export const apiErrorCodeSchema = z.enum([
   "NOT_FOUND",
   "CONFLICT",
   "RATE_LIMITED",
+  "MFA_REQUIRED",
   "INTERNAL_ERROR",
 ]);
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
@@ -314,6 +315,43 @@ export const logoutStateSchema = z.strictObject({
 });
 
 export const logoutResponseSchema = createSuccessEnvelopeSchema(logoutStateSchema);
+
+export const mfaMethodSchema = z.enum(["totp", "backup"]);
+export const mfaChallengeDataSchema = z.strictObject({
+  mfaRequired: z.literal(true),
+  methods: z
+    .array(z.enum(["totp", "backup"]))
+    .min(1)
+    .max(2),
+});
+export const mfaChallengeResponseSchema = createSuccessEnvelopeSchema(mfaChallengeDataSchema);
+export const mfaSetupRequiredDataSchema = z.strictObject({
+  mfaSetupRequired: z.literal(true),
+});
+export const mfaSetupRequiredResponseSchema = createSuccessEnvelopeSchema(
+  mfaSetupRequiredDataSchema,
+);
+export const mfaSetupRequestSchema = z.strictObject({ password: passwordSchema });
+export const mfaSetupDataSchema = z.strictObject({
+  setupRequired: z.literal(true),
+  totpURI: z.string().url().max(1024),
+  secret: z.string().min(16).max(128),
+  backupCodes: z.array(z.string().min(8).max(32)).min(1).max(20),
+});
+export const mfaSetupResponseSchema = createSuccessEnvelopeSchema(mfaSetupDataSchema);
+export const mfaVerifyRequestSchema = z.strictObject({
+  method: mfaMethodSchema,
+  code: z.string().trim().min(6).max(32),
+});
+export const loginResponseSchema = z.union([
+  sessionResponseSchema,
+  mfaChallengeResponseSchema,
+  mfaSetupRequiredResponseSchema,
+]);
+export const authMeResponseSchema = z.union([
+  sessionResponseSchema,
+  mfaSetupRequiredResponseSchema,
+]);
 
 const rawLocationIdSchema = z.string().trim().min(1).max(64);
 export const locationSortBySchema = z.enum([
@@ -825,6 +863,7 @@ export const productEventResponseSchema = createSuccessEnvelopeSchema(
 );
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+export type MfaVerifyRequest = z.infer<typeof mfaVerifyRequestSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type DemoCounts = z.infer<typeof demoCountsSchema>;
 export type DemoGeneration = z.infer<typeof demoGenerationSchema>;

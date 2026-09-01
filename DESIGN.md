@@ -93,7 +93,7 @@ Loading, empty, error, success, disabled, stale и conflict состояния �
 
 ### 5.1. Ограничение визуального аудита
 
-Приложенный screenshot показывает Docker Desktop, а не Brew Dashboard. Локальный app preview требует настроенной `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, поэтому текущий аудит основан на React/Tailwind-коде, UI-тестах и PRD/TASKS. Неподтверждённые детали референсов не считаются требованиями.
+Приложенный screenshot показывает Docker Desktop, а не Brew Dashboard. Локальный app preview требует настроенных `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_AUTH_HYPERDRIVE` и `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE`, поэтому текущий аудит основан на React/Tailwind-коде, UI-тестах и PRD/TASKS. Неподтверждённые детали референсов не считаются требованиями.
 
 ## 6. Аудит существующих паттернов
 

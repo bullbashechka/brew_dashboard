@@ -18,7 +18,6 @@ export const onboardingLanguageHandler = async (context: Context<AppEnvironment>
   const result = await setOnboardingLanguage(context.get("database"), {
     authUserId: auth.authUserId,
     networkId: auth.networkId,
-    sessionId: auth.sessionId,
     language: request.language,
     idempotencyKey: request.idempotencyKey,
   });
@@ -43,7 +42,6 @@ export const onboardingCompleteHandler = async (context: Context<AppEnvironment>
     authUserId: auth.authUserId,
     networkId: auth.networkId,
     request,
-    sessionId: auth.sessionId,
     startedAt,
   });
   const profile = await loadActiveProfile(context.get("database"), auth.authUserId, startedAt);

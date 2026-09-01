@@ -21,13 +21,13 @@ import {
 import {
   lockAuthUser,
   lockNetwork,
+  setAuthUserContext,
   setTenantContext,
   type RequestTransaction,
 } from "../db/client.ts";
 import {
   categories,
   demoGenerations,
-  authSessions,
   inventoryBalances,
   inventoryItems,
   inventoryMovements,
@@ -66,8 +66,9 @@ const assertAccountNetwork = async (
   transaction: RequestTransaction,
   authUserId: string,
   networkId: string,
-  options: { revalidate?: boolean; sessionId?: string; now?: Date } = {},
+  options: { revalidate?: boolean; now?: Date } = {},
 ) => {
+  await setAuthUserContext(transaction, authUserId);
   const rows = await transaction
     .select({ id: appUsers.id, status: appUsers.status, expiresAt: appUsers.expiresAt })
     .from(appUsers)
@@ -79,16 +80,6 @@ const assertAccountNetwork = async (
     const now = options.now ?? new Date();
     if (account.status !== "active" || (account.expiresAt && account.expiresAt <= now)) {
       throw new ApiProblem("UNAUTHENTICATED", 401, "The authenticated session has expired");
-    }
-    if (options.sessionId) {
-      const sessions = await transaction
-        .select({ id: authSessions.id, expiresAt: authSessions.expiresAt })
-        .from(authSessions)
-        .where(and(eq(authSessions.id, options.sessionId), eq(authSessions.userId, authUserId)))
-        .for("update");
-      if (!sessions[0] || sessions[0].expiresAt <= now) {
-        throw new ApiProblem("UNAUTHENTICATED", 401, "The authenticated session has expired");
-      }
     }
   }
 };
@@ -306,7 +297,6 @@ export const setOnboardingLanguage = async (
   input: {
     authUserId: string;
     networkId: string;
-    sessionId?: string;
     language: "en" | "ru";
     idempotencyKey: string;
   },
@@ -314,10 +304,7 @@ export const setOnboardingLanguage = async (
   await lockAuthUser(transaction, input.authUserId);
   await assertAccountNetwork(transaction, input.authUserId, input.networkId);
   await lockNetwork(transaction, input.networkId);
-  await assertAccountNetwork(transaction, input.authUserId, input.networkId, {
-    revalidate: true,
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-  });
+  await assertAccountNetwork(transaction, input.authUserId, input.networkId, { revalidate: true });
   await setTenantContext(transaction, input.networkId);
   const network = await selectNetworkForUpdate(transaction, input.networkId);
   const requestHash = await hashOperationPayload(ONBOARDING_LANGUAGE_OPERATION, {
@@ -352,7 +339,6 @@ export const completeOnboarding = async (
   input: {
     authUserId: string;
     networkId: string;
-    sessionId?: string;
     request: OnboardingRequest;
     startedAt?: Date;
     hooks?: OnboardingServiceHooks;
@@ -364,10 +350,7 @@ export const completeOnboarding = async (
   await lockAuthUser(transaction, input.authUserId);
   await assertAccountNetwork(transaction, input.authUserId, input.networkId);
   await lockNetwork(transaction, input.networkId);
-  await assertAccountNetwork(transaction, input.authUserId, input.networkId, {
-    revalidate: true,
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-  });
+  await assertAccountNetwork(transaction, input.authUserId, input.networkId, { revalidate: true });
   await setTenantContext(transaction, input.networkId);
   let network = await selectNetworkForUpdate(transaction, input.networkId);
   const requestHash = await hashOperationPayload(ONBOARDING_COMPLETE_OPERATION, normalized);
@@ -453,7 +436,6 @@ export const resetDemoData = async (
   input: {
     authUserId: string;
     networkId: string;
-    sessionId?: string;
     idempotencyKey: string;
     startedAt?: Date;
     hooks?: OnboardingServiceHooks;
@@ -463,10 +445,7 @@ export const resetDemoData = async (
   await lockAuthUser(transaction, input.authUserId);
   await assertAccountNetwork(transaction, input.authUserId, input.networkId);
   await lockNetwork(transaction, input.networkId);
-  await assertAccountNetwork(transaction, input.authUserId, input.networkId, {
-    revalidate: true,
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-  });
+  await assertAccountNetwork(transaction, input.authUserId, input.networkId, { revalidate: true });
   await setTenantContext(transaction, input.networkId);
   let network = await selectNetworkForUpdate(transaction, input.networkId);
   if (!network.onboardingCompletedAt || !network.timezone || !network.demoGeneratorVersion) {

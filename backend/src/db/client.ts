@@ -69,6 +69,10 @@ export const setTenantContext = async (transaction: RequestTransaction, networkI
   await transaction.execute(sql`select set_config('app.network_id', ${networkId}, true)`);
 };
 
+export const setAuthUserContext = async (transaction: RequestTransaction, authUserId: string) => {
+  await transaction.execute(sql`select set_config('app.auth_user_id', ${authUserId}, true)`);
+};
+
 const advisoryLock = async (transaction: RequestTransaction, key: string) => {
   await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 };

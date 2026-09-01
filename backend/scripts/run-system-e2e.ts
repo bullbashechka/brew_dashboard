@@ -10,6 +10,7 @@ import {
   type SystemE2eLogCanary,
 } from "../../scripts/system-e2e-log-safety.ts";
 import { assertE2eAccountKind } from "./test-safety.ts";
+import { createChildEnvironment } from "./child-environment.ts";
 
 const adminUrl = process.env.DATABASE_TEST_ADMIN_URL;
 if (!adminUrl) {
@@ -23,22 +24,11 @@ const webappDirectory = fileURLToPath(new URL("../../webapp/", import.meta.url))
 const secondaryLogins = new Set<string>(
   Object.values(SYSTEM_E2E_FIXTURES).map((group) => group.secondary.login),
 );
-const workerEnvironment = { ...process.env };
-for (const variable of [
-  "DATABASE_TEST_ADMIN_URL",
-  "DATABASE_TEST_URL",
-  "DATABASE_TEST_RUNTIME_URL",
-  "DATABASE_MIGRATION_URL",
-  "DATABASE_PUBLIC_URL",
-  "DATABASE_URL",
-  "RUNTIME_DATABASE_PASSWORD",
-  "PGPASSWORD",
-  "CLOUDFLARE_API_TOKEN",
-  "CLOUDFLARE_API_KEY",
-  "CF_API_TOKEN",
-]) {
-  delete workerEnvironment[variable];
-}
+const unknownInheritedSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+const workerEnvironment = createChildEnvironment({
+  ...process.env,
+  SYSTEM_E2E_UNKNOWN_SECRET: unknownInheritedSecret,
+});
 const isolated = await createIsolatedTestDatabase(adminUrl);
 const accounts: Awaited<ReturnType<typeof createAccount>>[] = [];
 let server: Bun.Subprocess | undefined;
@@ -51,6 +41,7 @@ const logCanaries: SystemE2eLogCanary[] = [
     value,
   })),
   { category: "auth secret", value: systemSecret },
+  { category: "unknown inherited secret", value: unknownInheritedSecret },
   ...Object.values(SYSTEM_E2E_FIXTURES).flatMap((group) =>
     Object.values(group).flatMap((fixture) => [
       { category: "fixture identity" as const, value: fixture.login },
@@ -153,7 +144,8 @@ try {
         E2E_ACCOUNT_KIND: "e2e",
         SYSTEM_E2E_AUTH_SECRET: systemSecret,
         SYSTEM_E2E_AUTH_URL: "http://127.0.0.1:4173",
-        CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: isolated.runtimeUrl,
+        CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_AUTH_HYPERDRIVE: isolated.runtimeUrl,
+        CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE: isolated.runtimeUrl,
         WRANGLER_WRITE_LOGS: "false",
       },
       // Workerd starts children with inherited descriptors. Use durable local

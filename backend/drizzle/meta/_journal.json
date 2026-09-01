@@ -92,6 +92,97 @@
       "when": 1788071904528,
       "tag": "0012_bouncy_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788093317064,
+      "tag": "0013_disable-runtime-jit",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788109132187,
+      "tag": "0015_wild_shinobi_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788109452975,
+      "tag": "0016_flippant_mercury",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788109452976,
+      "tag": "0017_two_factor_runtime_grant",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788109452977,
+      "tag": "0018_split-runtime-roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788109981456,
+      "tag": "0019_two_factor_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788109981457,
+      "tag": "0020_minimize-auth-runtime-grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788112331691,
+      "tag": "0021_restore-login-rate-limit-grant",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788112331692,
+      "tag": "0022_grant-app-baseline-functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788113749331,
+      "tag": "0023_scope-app-users-rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788115621803,
+      "tag": "0024_disable-split-runtime-jit",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788115621804,
+      "tag": "0025_revoke-public-schema-usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788115621805,
+      "tag": "0026_verify-migration-head",
+      "breakpoints": true
     }
   ]
 }

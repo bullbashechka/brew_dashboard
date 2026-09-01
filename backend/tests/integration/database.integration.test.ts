@@ -69,16 +69,18 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
       rolcreaterole: boolean;
       rolcreatedb: boolean;
       rolbypassrls: boolean;
+      rolconfig: string[] | null;
     }>(
-      `SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls
+      `SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolconfig
        FROM pg_roles WHERE rolname = 'brew_runtime'`,
     );
-    expect(role.rows[0]).toEqual({
+    expect(role.rows[0]).toMatchObject({
       rolsuper: false,
       rolcreaterole: false,
       rolcreatedb: false,
       rolbypassrls: false,
     });
+    expect(role.rows[0]?.rolconfig).toContain("jit=off");
 
     await client.query("BEGIN");
     try {
@@ -187,6 +189,91 @@ describe.skipIf(!databaseUrl)("isolated PostgreSQL migration, constraints and RL
     } finally {
       await client.query("DROP TABLE IF EXISTS app.runtime_grant_probe_app");
       await client.query("DROP TABLE IF EXISTS auth.runtime_grant_probe_auth");
+    }
+  });
+
+  it("keeps auth and application runtime roles split with user-scoped app_users RLS", async () => {
+    const roles = await client.query<{
+      rolname: string;
+      rolcanlogin: boolean;
+      rolsuper: boolean;
+      rolbypassrls: boolean;
+    }>(
+      `SELECT rolname, rolcanlogin, rolsuper, rolbypassrls
+       FROM pg_roles
+       WHERE rolname IN ('brew_auth_runtime', 'brew_app_runtime')
+       ORDER BY rolname`,
+    );
+    expect(roles.rows).toEqual([
+      {
+        rolname: "brew_app_runtime",
+        rolcanlogin: false,
+        rolsuper: false,
+        rolbypassrls: false,
+      },
+      {
+        rolname: "brew_auth_runtime",
+        rolcanlogin: false,
+        rolsuper: false,
+        rolbypassrls: false,
+      },
+    ]);
+
+    const roleSettings = await client.query<{ rolname: string; rolconfig: string[] | null }>(
+      `SELECT rolname, rolconfig
+       FROM pg_roles
+       WHERE rolname IN ('brew_auth_runtime', 'brew_app_runtime')
+       ORDER BY rolname`,
+    );
+    expect(roleSettings.rows).toEqual([
+      { rolname: "brew_app_runtime", rolconfig: ["jit=off"] },
+      { rolname: "brew_auth_runtime", rolconfig: ["jit=off"] },
+    ]);
+
+    await client.query("BEGIN");
+    try {
+      await client.query("SET LOCAL ROLE brew_app_runtime");
+      await client.query("SELECT set_config('app.auth_user_id', $1, true)", ["auth-a"]);
+      await client.query("SELECT set_config('app.network_id', $1, true)", [networkA]);
+      const own = await client.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM app.app_users",
+      );
+      expect(own.rows[0]?.count).toBe("1");
+
+      await client.query("SELECT set_config('app.auth_user_id', $1, true)", ["auth-b"]);
+      const foreign = await client.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM app.app_users",
+      );
+      expect(foreign.rows[0]?.count).toBe("0");
+      await client.query("SAVEPOINT denied_auth_read");
+      await expect(client.query("SELECT count(*) FROM auth.users")).rejects.toThrow();
+      await client.query("ROLLBACK TO SAVEPOINT denied_auth_read");
+      const functions = await client.query<{ replace_granted: boolean; clear_granted: boolean }>(
+        `SELECT
+           has_function_privilege(current_user, 'app.replace_inventory_baseline(jsonb, timestamptz)', 'EXECUTE') AS replace_granted,
+           has_function_privilege(current_user, 'app.clear_inventory_baseline()', 'EXECUTE') AS clear_granted`,
+      );
+      expect(functions.rows[0]).toEqual({ replace_granted: true, clear_granted: true });
+    } finally {
+      await client.query("ROLLBACK");
+    }
+
+    await client.query("BEGIN");
+    try {
+      await client.query("SET LOCAL ROLE brew_auth_runtime");
+      await client.query("SAVEPOINT denied_app_read");
+      await expect(client.query("SELECT count(*) FROM app.locations")).rejects.toThrow();
+      await client.query("ROLLBACK TO SAVEPOINT denied_app_read");
+      const auth = await client.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM auth.users WHERE id IN ('auth-a', 'auth-b')",
+      );
+      expect(auth.rows[0]?.count).toBe("2");
+      const rateLimit = await client.query<{ granted: boolean }>(
+        "SELECT has_table_privilege(current_user, 'auth.rate_limits', 'SELECT, INSERT, UPDATE, DELETE') AS granted",
+      );
+      expect(rateLimit.rows[0]?.granted).toBe(true);
+    } finally {
+      await client.query("ROLLBACK");
     }
   });
 

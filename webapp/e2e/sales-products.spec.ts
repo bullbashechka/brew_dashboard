@@ -276,7 +276,11 @@ test("updates current product pricing without changing mocked historical sales",
   await installRoutes(page);
 
   await page.goto("/app/products?period=7d");
-  await expect(page.getByRole("heading", { name: "Products" })).toBeVisible();
+  // Products is lazily loaded; the shared Vite server can still be transforming it while the
+  // parallel desktop/mobile suites open their first pages.
+  await expect(page.getByRole("heading", { name: "Products" })).toBeVisible({
+    timeout: 15_000,
+  });
   await page.getByRole("button", { name: "Edit price" }).click();
   await page.getByLabel("Selling price").fill("9.99");
   await page.getByRole("button", { name: "Save price" }).click();
@@ -335,7 +339,10 @@ test("keeps heatmap, matrix, and data views accessible across desktop and mobile
   await page.goto("/app/sales?period=7d");
   const salesPage = page.getByTestId("page-sales");
   const heatmap = salesPage.locator("figure[aria-labelledby='sales-heatmap-title']");
-  await expect(heatmap.getByText("Sales by weekday and hour", { exact: true })).toBeVisible();
+  // Sales is another lazy route and may still be transformed during the first parallel visit.
+  await expect(heatmap.getByText("Sales by weekday and hour", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(heatmap.getByRole("table")).toBeVisible();
   await expect(heatmap.getByRole("cell", { name: /10:00.*1 orders/i })).toBeVisible();
   const recentOrders = salesPage.locator("section[aria-labelledby='recent-orders-title']");

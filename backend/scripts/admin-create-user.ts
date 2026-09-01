@@ -3,6 +3,7 @@ import {
   parseAccountKind,
   parseAdminArguments,
   parseExpiry,
+  assertInteractivePasswordAllowed,
   readAdminDatabaseUrl,
   readInteractivePassword,
   requireFlag,
@@ -16,21 +17,21 @@ const argumentsMap = parseAdminArguments(
 );
 const databaseUrl = readAdminDatabaseUrl();
 requireProductionAdmin(databaseUrl, argumentsMap.get("--confirm-production"));
-const password = argumentsMap.has("--interactive-password")
-  ? await readInteractivePassword()
-  : undefined;
+const interactivePassword = argumentsMap.has("--interactive-password");
+assertInteractivePasswordAllowed(databaseUrl, interactivePassword);
+const password = interactivePassword ? await readInteractivePassword() : undefined;
 const result = await withAdminDatabase((db) => {
   const input = {
     login: requireFlag(argumentsMap, "--login"),
     accountKind: parseAccountKind(argumentsMap.get("--account-kind") ?? "demo"),
     expiresAt: parseExpiry(argumentsMap.get("--expires-at")),
-    ...(argumentsMap.has("--interactive-password") ? { password: password! } : {}),
+    ...(interactivePassword ? { password: password! } : {}),
   };
   return createAccount(db, input);
 });
 
 console.log(`Login: ${result.login}`);
-if (argumentsMap.has("--interactive-password")) {
+if (interactivePassword) {
   console.log("Password was accepted interactively and is not echoed.");
 } else {
   console.log(`Password (shown once): ${result.password}`);

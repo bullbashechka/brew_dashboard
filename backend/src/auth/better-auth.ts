@@ -1,21 +1,29 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth/minimal";
-import { username } from "better-auth/plugins";
+import { twoFactor, username } from "better-auth/plugins";
 
 import type { DatabaseExecutor } from "../db/client.ts";
-import { authAccounts, authSessions, authUsers, authVerifications } from "../db/schema.ts";
+import {
+  authAccounts,
+  authSessions,
+  authTwoFactors,
+  authUsers,
+  authVerifications,
+} from "../db/schema.ts";
 import { isSupportedLogin, normalizeLogin } from "./login.ts";
 
 export const AUTH_BASE_PATH = "/api/v1/internal-auth";
 export const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
 export const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;
 export const SESSION_COOKIE_NAME = "__Secure-brew_dashboard.session_token";
+export const TWO_FACTOR_COOKIE_NAME = "__Secure-brew_dashboard.two_factor";
 
 const authSchema = {
   user: authUsers,
   session: authSessions,
   account: authAccounts,
   verification: authVerifications,
+  twoFactor: authTwoFactors,
 };
 
 export type BetterAuthEnvironment = {
@@ -70,6 +78,17 @@ export const createBetterAuth = (db: DatabaseExecutor, environment: BetterAuthEn
         usernameValidator: isSupportedLogin,
         validationOrder: { username: "post-normalization" },
         immutableUsername: true,
+      }),
+      twoFactor({
+        issuer: "Brew Dashboard",
+        twoFactorTable: "twoFactor",
+        skipVerificationOnEnable: false,
+        twoFactorCookieMaxAge: 600,
+        // Trust-device cookies are never accepted by our wrapper endpoints.
+        trustDeviceMaxAge: 1,
+        totpOptions: { digits: 6, period: 30 },
+        backupCodeOptions: { amount: 10, length: 10, storeBackupCodes: "encrypted" },
+        accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 900 },
       }),
     ],
     user: {
